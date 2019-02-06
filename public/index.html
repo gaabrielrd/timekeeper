@@ -1,0 +1,413 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="author" content="Gabriel Roda">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Timekeeper</title>
+
+    <link rel="shortcut icon" href="src/favicon.png" type="image/png">
+
+
+    <script src="https://www.gstatic.com/firebasejs/5.8.2/firebase.js"></script>
+    <script>
+        // Initialize Firebase
+        var config = {
+            apiKey: "AIzaSyBOLyOQ6-g3VqotQf7pCej4CAhVXvC0oYY",
+            authDomain: "timekeeper-d9a0a.firebaseapp.com",
+            databaseURL: "https://timekeeper-d9a0a.firebaseio.com",
+            projectId: "timekeeper-d9a0a",
+            storageBucket: "timekeeper-d9a0a.appspot.com",
+            messagingSenderId: "190447151292"
+        };
+        firebase.initializeApp(config);
+
+    </script>
+
+    <script src="src/data.js"></script>
+    <script src="src/anime.min.js"></script>
+
+    <link rel="stylesheet" href="https://use.typekit.net/yhy2qvv.css">
+    <link rel="stylesheet" href="src/normalize.css">
+    <link rel="stylesheet" href="src/style.css">
+
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-130016272-2"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+
+        function gtag() {
+            dataLayer.push(arguments);
+        }
+        gtag('js', new Date());
+
+        gtag('config', 'UA-130016272-2');
+
+    </script>
+
+    <!-- Firebase Login UI -->
+    <script src="https://cdn.firebase.com/libs/firebaseui/3.1.1/firebaseui.js"></script>
+    <link type="text/css" rel="stylesheet" href="https://cdn.firebase.com/libs/firebaseui/3.1.1/firebaseui.css" />
+</head>
+
+<body>
+    <div id="header">
+        <i class="material-icons">timelapse</i>
+        Timekeeper
+
+        <div id="config-wrapper">
+            <div id="config-content">
+                <a class="config-text">Trabalho até as: </a>
+                <select id="config-hora" onchange="setHours()">
+                    <option value="17">17</option>
+                    <option value="18">18</option>
+                    <option value="19">19</option>
+                    <option value="20">20</option>
+                    <option value="21">21</option>
+                    <option value="22">22</option>
+                </select>
+                <select id="config-minutos" onchange="setMinutes()">
+                    <option value="55">55</option>
+                    <option value="25">25</option>
+                </select>
+            </div>
+        </div>
+
+        <div id="toggle-config" onclick="toggleFs()">
+            <i class="material-icons">fullscreen</i>
+        </div>
+    </div>
+
+    <div id="top-panels">
+        <div class="a-panel">
+            <div class="panel-title">EXPEDIENTE</div><br>
+            <a class="panel-pre">Ainda faltam</a><br>
+            <a class="panel-main">329 dias, 17 horas, 56 minutos e 12 segundos</a><br>
+            <a class="panel-post">para o fim do expediente.</a>
+        </div>
+        <div class="a-panel">
+            <a class="panel-title">PAGAMENTO</a><br>
+            <a class="panel-pre">Ainda faltam</a><br>
+            <a class="panel-main">329 dias, 17 horas, 56 minutos e 12 segundos</a><br>
+            <a class="panel-post">para o próximo pagamento.</a>
+        </div>
+        <div class="a-panel">
+            <a class="panel-title">FERIADO</a><br>
+            <a class="panel-pre">Ainda faltam</a><br>
+            <a class="panel-main">329 dias, 17 horas, 56 minutos e 12 segundos</a><br>
+            <a class="panel-post">para o próximo feriado.</a>
+        </div>
+        <div class="a-panel">
+            <a class="panel-title">FERIAS</a><br>
+            <a class="panel-pre">Ainda faltam</a><br>
+            <a class="panel-main">329 dias, 17 horas, 56 minutos e 12 segundos</a><br>
+            <a class="panel-post">para as férias coletivas.</a>
+        </div>
+    </div>
+
+    <div class="forecast">
+        <a class="weatherwidget-io" href="https://forecast7.com/pt/n26d90n49d24/indaial/" data-label_1="INDAIAL" data-label_2="O Inferno em Terra" data-font="Roboto" data-icons="Climacons Animated" data-days="7" data-theme="original" data-basecolor="rgba(31, 86, 124, 0)">INDAIAL O Inferno em Terra</a>
+        <script>
+            ! function(d, s, id) {
+                var js, fjs = d.getElementsByTagName(s)[0];
+                if (!d.getElementById(id)) {
+                    js = d.createElement(s);
+                    js.id = id;
+                    js.src = 'https://weatherwidget.io/js/widget.min.js';
+                    fjs.parentNode.insertBefore(js, fjs);
+                }
+            }(document, 'script', 'weatherwidget-io-js');
+
+        </script>
+    </div>
+
+    <div id="calendario">
+        <embed id="pdf" src="src/calendario.pdf">
+    </div>
+
+    <div id="modal" class="hidden">
+        <div id="modal-content">
+            <div id="modal-header">Atenção!</div>
+            <img id="modal-image" src="src/dudu.jpeg">
+            <div id="modal-text">Dudu está chamando você para o café</div>
+            <div id="modal-button" onclick="closeModal()">Estou descendo</div>
+        </div>
+    </div>
+
+    <audio id="alarme" src="src/alarm.mp3" oncanplay="canplay=true"></audio>
+    <script>
+        var shown = false;
+        var canplay = false;
+        var agora = new Date();
+
+        var ateExp = new Date(agora);
+        ateExp.setHours(17);
+        ateExp.setMinutes(55);
+        ateExp.setSeconds(0);
+
+        var ateFeriado = new Date(agora);
+        for (var umFeriado in feriados) {
+            if (feriados[umFeriado] > ateFeriado) {
+                ateFeriado = feriados[umFeriado];
+                break;
+            }
+        }
+
+        var atePagamento = new Date(agora);
+        for (var umPagamento in pagamentos) {
+            if (pagamentos[umPagamento] > atePagamento) {
+                atePagamento = pagamentos[umPagamento];
+                break;
+            }
+        }
+
+        var ateFerias = new Date('2019-12-20T17:55:00');
+
+        const msIna = {
+            second: 1000,
+            minute: 1000 * 60,
+            hour: 1000 * 60 * 60,
+            day: 1000 * 60 * 60 * 24
+        }
+
+        function intervalBreakdown(howLong) {
+            var tempDate = new Date(howLong);
+
+            var dias = parseInt(tempDate / msIna.day);
+            tempDate = dias > 0 ? tempDate % (dias * msIna.day) : tempDate;
+
+            var horas = parseInt(tempDate / msIna.hour);
+            tempDate = horas > 0 ? tempDate % (horas * msIna.hour) : tempDate;
+
+            var minutos = parseInt(tempDate / msIna.minute);
+            tempDate = minutos > 0 ? tempDate % (minutos * msIna.minute) : tempDate;
+
+            var segundos = parseInt(tempDate / 1000);
+
+            return {
+                'dias': dias,
+                'horas': horas,
+                'minutos': minutos,
+                'segundos': segundos
+            }
+        }
+
+        function fill() {
+            //pega os campos que tem os timings
+            var els = document.querySelectorAll('.panel-main');
+
+            //preenche eles na ordem, comecando por expediente
+            var msgString = '';
+            var expediente = intervalBreakdown(ateExp - new Date());
+
+            if (expediente.dias > 0)
+                msgString += expediente.dias + " dias, ";
+            if (expediente.horas > 0)
+                msgString += expediente.horas + " horas, ";
+            if (expediente.minutos > 0)
+                msgString += expediente.minutos + " minutos e ";
+            msgString += expediente.segundos + " segundos";
+
+            els[0].innerHTML = msgString;
+
+            //depois pagamento
+            msgString = '';
+            var pagamento = intervalBreakdown(atePagamento - new Date());
+
+            if (pagamento.dias > 0)
+                msgString += pagamento.dias + " dias, ";
+            if (pagamento.horas > 0)
+                msgString += pagamento.horas + " horas, ";
+            if (pagamento.minutos > 0)
+                msgString += pagamento.minutos + " minutos e ";
+            msgString += pagamento.segundos + " segundos";
+
+            els[1].innerHTML = msgString;
+
+            //proximo feriado
+            msgString = '';
+            var feriado = intervalBreakdown(ateFeriado - new Date());
+
+            if (feriado.dias > 0)
+                msgString += feriado.dias + " dias, ";
+            if (feriado.horas > 0)
+                msgString += feriado.horas + " horas, ";
+            if (feriado.minutos > 0)
+                msgString += feriado.minutos + " minutos e ";
+            msgString += feriado.segundos + " segundos";
+
+            els[2].innerHTML = msgString;
+
+            //ferias de fim de ano
+            msgString = '';
+            var ferias = intervalBreakdown(ateFerias - new Date());
+
+            if (ferias.dias > 0)
+                msgString += ferias.dias + " dias, ";
+            if (ferias.horas > 0)
+                msgString += ferias.horas + " horas, ";
+            if (ferias.minutos > 0)
+                msgString += ferias.minutos + " minutos e ";
+            msgString += ferias.segundos + " segundos";
+
+            els[3].innerHTML = msgString;
+
+
+
+            //----- alarme do cafe -----
+            var now = new Date();
+            if (now.getHours() == 10 && now.getMinutes() == 10 && !shown && canplay) {
+                //mostrar
+
+                var aud = document.getElementById('alarme');
+                aud.play();
+
+                document.getElementById('modal').classList.remove('hidden');
+                shown = true;
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('modal').classList.add('hidden');
+            document.getElementById('alarme').pause();
+        }
+
+        function resizePDF() {
+            var pdfEl = document.getElementById('pdf');
+
+            var newWidth = window.innerWidth - 80;
+            var newHeight = newWidth * Math.sqrt(2);
+
+            pdfEl.setAttribute('width', newWidth + 'px');
+            pdfEl.setAttribute('height', newHeight + 'px');
+        }
+
+        function setCookie(cname, cvalue, exdays) {
+            var d = new Date();
+            d.setTime(d.getTime() + (exdays * 24 * 60 * 60 * 1000));
+            var expires = "expires=" + d.toUTCString();
+            document.cookie = cname + "=" + cvalue + ";" + expires + ";path=/";
+        }
+
+        function getCookie(cname) {
+            var name = cname + "=";
+            var ca = document.cookie.split(';');
+            for (var i = 0; i < ca.length; i++) {
+                var c = ca[i];
+                while (c.charAt(0) == ' ') {
+                    c = c.substring(1);
+                }
+                if (c.indexOf(name) == 0) {
+                    return c.substring(name.length, c.length);
+                }
+            }
+            return "";
+        }
+
+        function setHours() {
+            var value = document.getElementById('config-hora').value;
+
+            ateExp.setHours(value);
+            ateFeriado.setHours(value - 1);
+            ateFerias.setHours(value);
+
+            setCookie('hourTime', value);
+        }
+
+        function setMinutes() {
+            var value = document.getElementById('config-minutos').value;
+
+            ateExp.setMinutes(value);
+            ateFeriado.setMinutes(value);
+            ateFerias.setMinutes(value);
+
+            setCookie('minutesTime', value);
+        }
+
+        function toggleFs() {
+            var elem = document.body;
+
+            if (window.parent.screen.height - 50 > window.parent.innerHeight) {
+                if (elem.requestFullscreen) {
+                    elem.requestFullscreen();
+                } else if (elem.mozRequestFullScreen) { /* Firefox */
+                    elem.mozRequestFullScreen();
+                } else if (elem.webkitRequestFullscreen) { /* Chrome, Safari & Opera */
+                    elem.webkitRequestFullscreen();
+                } else if (elem.msRequestFullscreen) {
+                    elem.msRequestFullscreen(); /* IE/Edge */
+                }
+            } else {
+                try {
+                    var cpDoc = window.parent.document;
+
+                    if (cpDoc.exitFullscreen) {
+                        cpDoc.exitFullscreen();
+                    } else if (cpDoc.webkitExitFullscreen) {
+                        cpDoc.webkitExitFullscreen();
+                    } else if (cpDoc.mozCancelFullScreen) {
+                        cpDoc.mozCancelFullScreen();
+                    } else if (cpDoc.msExitFullscreen) {
+                        cpDoc.msExitFullscreen();
+                    }
+
+                } catch (e) {
+                    console.log("Error getting out of fullscreen");
+                    console.log(e);
+                }
+            }
+        }
+
+        var atualizador = window.setInterval(fill, 1000);
+
+        firebase.auth().onAuthStateChanged(function(user) {
+            if (user) {
+                // User is signed in.
+                var displayName = user.displayName;
+                var email = user.email;
+                var emailVerified = user.emailVerified;
+                var photoURL = user.photoURL;
+                var isAnonymous = user.isAnonymous;
+                var uid = user.uid;
+                var providerData = user.providerData;
+                // ...
+            } else {
+                // User is signed out.
+                // ...
+            }
+        });
+
+        ui.start('#login-container', {
+            signInOptions: [
+                firebase.auth.EmailAuthProvider.PROVIDER_ID,
+                firebase.auth.GoogleAuthProvider.PROVIDER_ID
+            ]
+        })
+
+        window.onload = () => {
+            fill();
+            resizePDF();
+
+            var hora = getCookie('hourTime');
+            var minutos = getCookie('minutesTime');
+
+            if (hora.length > 0) {
+                document.getElementById('config-hora').value = hora;
+                setHours();
+            }
+
+            if (minutos.length > 0) {
+                document.getElementById('config-minutos').value = minutos;
+                setMinutes();
+            }
+        }
+
+        window.onresize = () => {
+            resizePDF();
+        }
+
+    </script>
+</body>
+
+</html>
