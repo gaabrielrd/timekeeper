@@ -47,8 +47,10 @@
     </script>
 
     <!-- Firebase Login UI -->
+    <!--
     <script src="https://cdn.firebase.com/libs/firebaseui/3.1.1/firebaseui.js"></script>
     <link type="text/css" rel="stylesheet" href="https://cdn.firebase.com/libs/firebaseui/3.1.1/firebaseui.css" />
+    -->
 </head>
 
 <body>
@@ -56,7 +58,7 @@
         <i class="material-icons">timelapse</i>
         Timekeeper
 
-        <!--
+
 
         <div id="config-wrapper">
             <div id="config-content">
@@ -75,12 +77,12 @@
                 </select>
             </div>
         </div>
-        -->
 
+        <!--
         <div id="toggle-config" onclick="login()">
             <i class="material-icons">person</i>
         </div>
-
+-->
     </div>
 
     <div id="top-panels">
@@ -122,6 +124,7 @@
                     fjs.parentNode.insertBefore(js, fjs);
                 }
             }(document, 'script', 'weatherwidget-io-js');
+
         </script>
     </div>
 
@@ -363,32 +366,32 @@
         }
 
         var atualizador = window.setInterval(fill, 1000);
+        /*
+                firebase.auth().onAuthStateChanged(function(user) {
+                    if (user) {
+                        // User is signed in.
+                        var displayName = user.displayName;
+                        var email = user.email;
+                        var emailVerified = user.emailVerified;
+                        var photoURL = user.photoURL;
+                        var isAnonymous = user.isAnonymous;
+                        var uid = user.uid;
+                        var providerData = user.providerData;
+                        // ...
 
-        firebase.auth().onAuthStateChanged(function(user) {
-            if (user) {
-                // User is signed in.
-                var displayName = user.displayName;
-                var email = user.email;
-                var emailVerified = user.emailVerified;
-                var photoURL = user.photoURL;
-                var isAnonymous = user.isAnonymous;
-                var uid = user.uid;
-                var providerData = user.providerData;
-                // ...
+                        console.log('logged');
 
-                console.log('logged');
+                        //trocar o botao para config
+                        document.querySelector('#toggle-config').setAttribute('onclick', 'toggleSettings()');
 
-                //trocar o botao para config
-                document.querySelector('#toggle-config').setAttribute('onclick', 'toggleSettings()');
+                        document.querySelector('#toggle-config .material-icons').innerHTML = 'settings';
+                    } else {
+                        // User is signed out.
+                        // ...
+                    }
+                });
 
-                document.querySelector('#toggle-config .material-icons').innerHTML = 'settings';
-            } else {
-                // User is signed out.
-                // ...
-            }
-        });
-
-
+        */
 
         window.onload = () => {
             fill();
@@ -406,18 +409,20 @@
                 document.getElementById('config-minutos').value = minutos;
                 setMinutes();
             }
-
-            ui.start('#modal-content', {
-                signInOptions: [
-                    firebase.auth.EmailAuthProvider.PROVIDER_ID,
-                    firebase.auth.GoogleAuthProvider.PROVIDER_ID
-                ]
-            })
+            /*
+                        ui.start('#modal-content', {
+                            signInOptions: [
+                                firebase.auth.EmailAuthProvider.PROVIDER_ID,
+                                firebase.auth.GoogleAuthProvider.PROVIDER_ID
+                            ]
+                        })
+                        */
         }
 
         window.onresize = () => {
             resizePDF();
         }
+
     </script>
 </body>
 
