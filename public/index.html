@@ -56,6 +56,8 @@
         <i class="material-icons">timelapse</i>
         Timekeeper
 
+        <!--
+
         <div id="config-wrapper">
             <div id="config-content">
                 <a class="config-text">Trabalho até as: </a>
@@ -73,10 +75,12 @@
                 </select>
             </div>
         </div>
+        -->
 
-        <div id="toggle-config" onclick="toggleFs()">
-            <i class="material-icons">fullscreen</i>
+        <div id="toggle-config" onclick="login()">
+            <i class="material-icons">person</i>
         </div>
+
     </div>
 
     <div id="top-panels">
@@ -118,7 +122,6 @@
                     fjs.parentNode.insertBefore(js, fjs);
                 }
             }(document, 'script', 'weatherwidget-io-js');
-
         </script>
     </div>
 
@@ -128,15 +131,15 @@
 
     <div id="modal" class="hidden">
         <div id="modal-content">
-            <div id="modal-header">Atenção!</div>
-            <img id="modal-image" src="src/dudu.jpeg">
-            <div id="modal-text">Dudu está chamando você para o café</div>
-            <div id="modal-button" onclick="closeModal()">Estou descendo</div>
+
         </div>
     </div>
 
     <audio id="alarme" src="src/alarm.mp3" oncanplay="canplay=true"></audio>
     <script>
+        var ui = new firebaseui.auth.AuthUI(firebase.auth());
+
+
         var shown = false;
         var canplay = false;
         var agora = new Date();
@@ -256,7 +259,7 @@
 
 
             //----- alarme do cafe -----
-            var now = new Date();
+            /*var now = new Date();
             if (now.getHours() == 10 && now.getMinutes() == 10 && !shown && canplay) {
                 //mostrar
 
@@ -265,7 +268,7 @@
 
                 document.getElementById('modal').classList.remove('hidden');
                 shown = true;
-            }
+            }*/
         }
 
         function closeModal() {
@@ -372,18 +375,20 @@
                 var uid = user.uid;
                 var providerData = user.providerData;
                 // ...
+
+                console.log('logged');
+
+                //trocar o botao para config
+                document.querySelector('#toggle-config').setAttribute('onclick', 'toggleSettings()');
+
+                document.querySelector('#toggle-config .material-icons').innerHTML = 'settings';
             } else {
                 // User is signed out.
                 // ...
             }
         });
 
-        ui.start('#login-container', {
-            signInOptions: [
-                firebase.auth.EmailAuthProvider.PROVIDER_ID,
-                firebase.auth.GoogleAuthProvider.PROVIDER_ID
-            ]
-        })
+
 
         window.onload = () => {
             fill();
@@ -401,12 +406,18 @@
                 document.getElementById('config-minutos').value = minutos;
                 setMinutes();
             }
+
+            ui.start('#modal-content', {
+                signInOptions: [
+                    firebase.auth.EmailAuthProvider.PROVIDER_ID,
+                    firebase.auth.GoogleAuthProvider.PROVIDER_ID
+                ]
+            })
         }
 
         window.onresize = () => {
             resizePDF();
         }
-
     </script>
 </body>
 
