@@ -9,24 +9,9 @@
 
     <link rel="shortcut icon" href="src/favicon.png" type="image/png">
 
-
-    <script src="https://www.gstatic.com/firebasejs/5.8.2/firebase.js"></script>
-    <script>
-        // Initialize Firebase
-        var config = {
-            apiKey: "AIzaSyBOLyOQ6-g3VqotQf7pCej4CAhVXvC0oYY",
-            authDomain: "timekeeper-d9a0a.firebaseapp.com",
-            databaseURL: "https://timekeeper-d9a0a.firebaseio.com",
-            projectId: "timekeeper-d9a0a",
-            storageBucket: "timekeeper-d9a0a.appspot.com",
-            messagingSenderId: "190447151292"
-        };
-        firebase.initializeApp(config);
-
-    </script>
-
     <script src="src/data.js"></script>
     <script src="src/anime.min.js"></script>
+    <script src="src/progressbar.min.js"></script>
 
     <link rel="stylesheet" href="https://use.typekit.net/yhy2qvv.css">
     <link rel="stylesheet" href="src/normalize.css">
@@ -45,20 +30,12 @@
         gtag('config', 'UA-130016272-2');
 
     </script>
-
-    <!-- Firebase Login UI -->
-    <!--
-    <script src="https://cdn.firebase.com/libs/firebaseui/3.1.1/firebaseui.js"></script>
-    <link type="text/css" rel="stylesheet" href="https://cdn.firebase.com/libs/firebaseui/3.1.1/firebaseui.css" />
-    -->
 </head>
 
 <body>
     <div id="header">
         <i class="material-icons">timelapse</i>
         Timekeeper
-
-
 
         <div id="config-wrapper">
             <div id="config-content">
@@ -78,33 +55,35 @@
             </div>
         </div>
 
-        <!--
-        <div id="toggle-config" onclick="login()">
-            <i class="material-icons">person</i>
+        <div id="toggle-config" onclick="toggleFs()">
+            <i class="material-icons">fullscreen</i>
         </div>
--->
     </div>
 
     <div id="top-panels">
         <div class="a-panel">
+            <div class="progress-bar"></div>
             <div class="panel-title">EXPEDIENTE</div><br>
             <a class="panel-pre">Ainda faltam</a><br>
             <a class="panel-main">329 dias, 17 horas, 56 minutos e 12 segundos</a><br>
             <a class="panel-post">para o fim do expediente.</a>
         </div>
         <div class="a-panel">
+            <div class="progress-bar"></div>
             <a class="panel-title">PAGAMENTO</a><br>
             <a class="panel-pre">Ainda faltam</a><br>
             <a class="panel-main">329 dias, 17 horas, 56 minutos e 12 segundos</a><br>
             <a class="panel-post">para o próximo pagamento.</a>
         </div>
         <div class="a-panel">
+            <div class="progress-bar"></div>
             <a class="panel-title">FERIADO</a><br>
             <a class="panel-pre">Ainda faltam</a><br>
             <a class="panel-main">329 dias, 17 horas, 56 minutos e 12 segundos</a><br>
             <a class="panel-post">para o próximo feriado.</a>
         </div>
         <div class="a-panel">
+            <div class="progress-bar"></div>
             <a class="panel-title">FERIAS</a><br>
             <a class="panel-pre">Ainda faltam</a><br>
             <a class="panel-main">329 dias, 17 horas, 56 minutos e 12 segundos</a><br>
@@ -129,23 +108,25 @@
     </div>
 
     <div id="calendario">
-        <embed id="pdf" src="src/calendario.pdf">
+        <img src="src/calendario.svg">
+
     </div>
 
     <div id="modal" class="hidden">
         <div id="modal-content">
-
+            <div id="modal-header">Atenção!</div>
+            <img id="modal-image" src="src/dudu.jpeg">
+            <div id="modal-text">Dudu está chamando você para o café</div>
+            <div id="modal-button" onclick="closeModal()">Estou descendo</div>
         </div>
     </div>
 
     <audio id="alarme" src="src/alarm.mp3" oncanplay="canplay=true"></audio>
     <script>
-        var ui = new firebaseui.auth.AuthUI(firebase.auth());
-
-
         var shown = false;
         var canplay = false;
         var agora = new Date();
+        var pBars = [];
 
         var ateExp = new Date(agora);
         ateExp.setHours(17);
@@ -199,6 +180,29 @@
             }
         }
 
+        document.querySelectorAll('.progress-bar').forEach((el) => {
+            pBars.push(new ProgressBar.Line(el, {
+                strokeWidth: 20,
+                easing: 'easeInOut',
+                duration: 1400,
+                color: '#ff6347',
+                trailWidth: 20,
+                svgStyle: {
+                    width: '100%',
+                    height: '100%'
+                },
+                from: {
+                    color: '#ff2700'
+                },
+                to: {
+                    color: '#00e200'
+                },
+                step: (state, bar) => {
+                    bar.path.setAttribute('stroke', state.color);
+                }
+            }))
+        })
+
         function fill() {
             //pega os campos que tem os timings
             var els = document.querySelectorAll('.panel-main');
@@ -207,14 +211,17 @@
             var msgString = '';
             var expediente = intervalBreakdown(ateExp - new Date());
 
-            if (expediente.dias > 0)
-                msgString += expediente.dias + " dias, ";
-            if (expediente.horas > 0)
-                msgString += expediente.horas + " horas, ";
-            if (expediente.minutos > 0)
-                msgString += expediente.minutos + " minutos e ";
-            msgString += expediente.segundos + " segundos";
-
+            if (expediente.segundos < 0) {
+                msgString += '0 segundos';
+            } else {
+                if (expediente.dias > 0)
+                    msgString += expediente.dias + " dias, ";
+                if (expediente.horas > 0)
+                    msgString += expediente.horas + " horas, ";
+                if (expediente.minutos > 0)
+                    msgString += expediente.minutos + " minutos e ";
+                msgString += expediente.segundos + " segundos";
+            }
             els[0].innerHTML = msgString;
 
             //depois pagamento
@@ -259,34 +266,80 @@
 
             els[3].innerHTML = msgString;
 
+            //--barras de progesso
 
+            pBars[0].animate(dayPercentage(new Date()));
+            pBars[1].animate(payPercentage(new Date()));
+            pBars[2].animate(holidayPercentage(new Date()));
+            pBars[3].animate(vacationPercentage(new Date()));
+        }
 
-            //----- alarme do cafe -----
-            /*var now = new Date();
-            if (now.getHours() == 10 && now.getMinutes() == 10 && !shown && canplay) {
-                //mostrar
+        function dayPercentage(actualTime) {
+            let startTime = new Date();
+            startTime.setHours(document.querySelector('#config-hora').value);
+            startTime.setMinutes(document.querySelector('#config-minutos').value);
+            startTime.setSeconds(0);
 
-                var aud = document.getElementById('alarme');
-                aud.play();
+            let workJourney = 36000000;
 
-                document.getElementById('modal').classList.remove('hidden');
-                shown = true;
-            }*/
+            let dif = (actualTime - startTime);
+
+            let percent = 1 - (dif / workJourney).toFixed(2);
+
+            return percent;
+        }
+
+        function payPercentage(actualTime) {
+            let lastPayday;
+            let nextPayday;
+
+            for (let i = 0; i < pagamentos.length; i++) {
+                if (pagamentos[i] > actualTime) {
+                    lastPayday = pagamentos[i - 1];
+                    nextPayday = pagamentos[i];
+                    break;
+                }
+            }
+
+            let timeframe = nextPayday - lastPayday;
+            let currentp = actualTime - lastPayday;
+
+            return (currentp / timeframe).toFixed(2);
+        }
+
+        function holidayPercentage(actualTime) {
+            let lastHoliday;
+            let nextHoliday;
+
+            for (let i = 0; i < feriados.length; i++) {
+                if (feriados[i] > actualTime) {
+                    lastHoliday = feriados[i - 1];
+                    nextHoliday = feriados[i];
+                    break;
+                }
+            }
+
+            let timeframe = nextHoliday - lastHoliday;
+            let currentp = actualTime - lastHoliday;
+
+            return (currentp / timeframe).toFixed(2);
+        }
+
+        function vacationPercentage(actualTime) {
+            let startTime = new Date('2019-01-01T00:00:00');
+
+            let workJourney = 31341300000;
+
+            let dif = (actualTime - startTime);
+
+            let percent = (dif / workJourney).toFixed(2);
+
+            return percent;
         }
 
         function closeModal() {
             document.getElementById('modal').classList.add('hidden');
             document.getElementById('alarme').pause();
-        }
-
-        function resizePDF() {
-            var pdfEl = document.getElementById('pdf');
-
-            var newWidth = window.innerWidth - 80;
-            var newHeight = newWidth * Math.sqrt(2);
-
-            pdfEl.setAttribute('width', newWidth + 'px');
-            pdfEl.setAttribute('height', newHeight + 'px');
         }
 
         function setCookie(cname, cvalue, exdays) {
@@ -366,36 +419,9 @@
         }
 
         var atualizador = window.setInterval(fill, 1000);
-        /*
-                firebase.auth().onAuthStateChanged(function(user) {
-                    if (user) {
-                        // User is signed in.
-                        var displayName = user.displayName;
-                        var email = user.email;
-                        var emailVerified = user.emailVerified;
-                        var photoURL = user.photoURL;
-                        var isAnonymous = user.isAnonymous;
-                        var uid = user.uid;
-                        var providerData = user.providerData;
-                        // ...
-
-                        console.log('logged');
-
-                        //trocar o botao para config
-                        document.querySelector('#toggle-config').setAttribute('onclick', 'toggleSettings()');
-
-                        document.querySelector('#toggle-config .material-icons').innerHTML = 'settings';
-                    } else {
-                        // User is signed out.
-                        // ...
-                    }
-                });
-
-        */
 
         window.onload = () => {
             fill();
-            resizePDF();
 
             var hora = getCookie('hourTime');
             var minutos = getCookie('minutesTime');
@@ -409,18 +435,6 @@
                 document.getElementById('config-minutos').value = minutos;
                 setMinutes();
             }
-            /*
-                        ui.start('#modal-content', {
-                            signInOptions: [
-                                firebase.auth.EmailAuthProvider.PROVIDER_ID,
-                                firebase.auth.GoogleAuthProvider.PROVIDER_ID
-                            ]
-                        })
-                        */
-        }
-
-        window.onresize = () => {
-            resizePDF();
         }
 
     </script>

@@ -14,7 +14,8 @@ const pagamentos = [
 ];
 
 var feriados = [
-    new Date('2019-03-01T16:55:00'),
+    new Date('2019-01-01T16:55:00'),
+    new Date('2019-03-01T17:55:00'),
     new Date('2019-03-20T17:55:00'),
     new Date('2019-04-18T17:55:00'),
     new Date('2019-04-30T17:55:00'),

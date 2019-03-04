@@ -39,17 +39,17 @@
 
 
 ::-webkit-scrollbar-track {
-    background-color: #fafafa;
+    margin-top: 60px;
+    background-color: #000;
 }
 
 ::-webkit-scrollbar {
     width: 6px;
-    background-color: #fafafa;
+    background-color: #000;
 }
 
 ::-webkit-scrollbar-thumb {
-    border-radius: 10px;
-    background-color: rgba(0, 0, 0, 0.2);
+    background-color: #fff;
 }
 
 /*----- -----*/
@@ -134,6 +134,21 @@ body {
     align-items: center;
 }
 
+.progress-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 5px;
+    width: 100%;
+}
+
+.progress-bar svg {
+    position: absolute;
+    top: 0px;
+    border-bottom-left-radius: 5px;
+    border-bottom-right-radius: 5px;
+}
+
 #top-panels {
     margin: 80px 20px 0 20px;
     box-sizing: border-box;
@@ -145,6 +160,8 @@ body {
     flex-grow: 1;
     padding: 20px;
     border-radius: 15px;
+    border-bottom-left-radius: 5px;
+    border-bottom-right-radius: 5px;
     color: white;
     margin: 5px;
     background-image: linear-gradient(to bottom right, #2399ce, #2c67eb);
@@ -157,7 +174,6 @@ body {
 .forecast {
     border-radius: 15px;
     width: calc(100% - 50px);
-    max-height: 200px;
     overflow: hidden;
     margin: 5px 25px;
     background-image: linear-gradient(to bottom right, #2399ce, #2c67eb);
@@ -193,10 +209,11 @@ body {
 }
 
 #calendario {
-    margin: 0 20px;
+    margin: 10px 25px;
     padding: 20px;
     height: 100%;
-    background-color: #333;
+    background-color: #fff;
+    border-radius: 10px;
 }
 
 select {
