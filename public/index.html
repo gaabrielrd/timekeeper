@@ -275,16 +275,17 @@
         }
 
         function dayPercentage(actualTime) {
-            let startTime = new Date();
-            startTime.setHours(document.querySelector('#config-hora').value);
-            startTime.setMinutes(document.querySelector('#config-minutos').value);
-            startTime.setSeconds(0);
+            let endTime = new Date();
+            endTime.setHours(document.querySelector('#config-hora').value);
+            endTime.setMinutes(document.querySelector('#config-minutos').value);
+            endTime.setSeconds(0);
 
             let workJourney = 36000000;
 
-            let dif = (actualTime - startTime);
+            let dif = (endTime - actualTime);
 
-            let percent = 1 - (dif / workJourney).toFixed(2);
+            let percent = (1 - (dif / workJourney)).toFixed(2);
+            console.log(percent);
 
             return percent;
         }
