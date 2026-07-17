@@ -79,6 +79,9 @@ input {
 	align-items: center;
 	justify-content: space-between;
 	border-bottom: 1px solid var(--line);
+	opacity: 0;
+	transform: translateY(12px);
+	animation: page-enter 0.58s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 .dashboard-title {
 	display: flex;
@@ -240,6 +243,15 @@ main {
 .overview,
 .weather-section {
 	padding: clamp(28px, 4vw, 56px) clamp(20px, 4vw, 64px);
+	opacity: 0;
+	transform: translateY(16px);
+	animation: page-enter 0.68s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.overview {
+	animation-delay: 0.08s;
+}
+.weather-section {
+	animation-delay: 0.2s;
 }
 
 #top-panels {
@@ -805,6 +817,12 @@ input[type="color"]::-webkit-color-swatch {
 		transform: translateY(0);
 	}
 }
+@keyframes page-enter {
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
 @keyframes modal-enter {
 	from {
 		opacity: 0;
@@ -828,6 +846,7 @@ input[type="color"]::-webkit-color-swatch {
 	*::after {
 		scroll-behavior: auto !important;
 		animation-duration: 0.01ms !important;
+		animation-delay: 0ms !important;
 		animation-iteration-count: 1 !important;
 		transition-duration: 0.01ms !important;
 	}
