@@ -118,15 +118,17 @@
 					</article>
 				</div>
 
-				<section id="custom-counters-section" class="custom-counters-section" aria-labelledby="custom-counters-title" hidden>
-					<div class="section-heading">
-						<div>
-							<p class="section-kicker">Sua conta</p>
-							<h2 id="custom-counters-title">Meus contadores</h2>
+				<section id="custom-counters-section" class="custom-counters-section" aria-labelledby="custom-counters-title" aria-hidden="true">
+					<div class="custom-counters-reveal">
+						<div class="section-heading">
+							<div>
+								<p class="section-kicker">Sua conta</p>
+								<h2 id="custom-counters-title">Meus contadores</h2>
+							</div>
+							<span id="counter-live-state" class="live-state" data-state="connecting">Conectando...</span>
 						</div>
-						<span id="counter-live-state" class="live-state" data-state="connecting">Conectando...</span>
+						<div id="custom-panels" class="custom-panels"></div>
 					</div>
-					<div id="custom-panels" class="custom-panels"></div>
 				</section>
 			</section>
 

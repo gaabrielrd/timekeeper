@@ -419,7 +419,12 @@ function renderCounterList(counters) {
 function updateCustomVisibility(counters = userSettings.customCounters) {
 	const hasCounters = counters.length > 0;
 	const isVisible = userSettings.showCustomCounters !== false;
-	elements.customSection.hidden = !hasCounters || !isVisible;
+	const shouldShowSection = hasCounters && isVisible;
+	elements.customSection.classList.toggle("is-open", shouldShowSection);
+	elements.customSection.setAttribute(
+		"aria-hidden",
+		String(!shouldShowSection),
+	);
 	elements.customVisibilityButton.hidden = !currentUser || !hasCounters;
 	elements.customVisibilityButton.disabled = !hasCounters;
 	elements.customVisibilityButton.setAttribute(
