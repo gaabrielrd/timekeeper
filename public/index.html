@@ -15,6 +15,21 @@
 
 		<script src="src/data.js"></script>
 		<script src="src/progressbar.min.js"></script>
+
+		<!-- Google tag (gtag.js) -->
+		<script
+			async
+			src="https://www.googletagmanager.com/gtag/js?id=G-77L2BHYR8X"
+		></script>
+		<script>
+			window.dataLayer = window.dataLayer || [];
+			function gtag() {
+				dataLayer.push(arguments);
+			}
+			gtag("js", new Date());
+
+			gtag("config", "G-77L2BHYR8X");
+		</script>
 	</head>
 
 	<body>
@@ -24,41 +39,48 @@
 				<span>Timekeeper</span>
 			</div>
 
-			<div id="config-wrapper">
-				<label for="config-hora">Encerrar expediente</label>
-				<div class="time-selects">
-					<select
-						id="config-hora"
-						onchange="setHours()"
-						aria-label="Hora do fim do expediente"
-					>
-						<option value="17">17</option>
-						<option value="18">18</option>
-						<option value="19">19</option>
-						<option value="20">20</option>
-						<option value="21">21</option>
-						<option value="22">22</option>
-					</select>
-					<span>:</span>
-					<select
-						id="config-minutos"
-						onchange="setMinutes()"
-						aria-label="Minutos do fim do expediente"
-					>
-						<option value="55">55</option>
-						<option value="25">25</option>
-					</select>
+			<div class="header-actions">
+				<div id="guest-time-config" class="guest-time-config">
+					<label for="guest-config-hora">Encerrar expediente</label>
+					<div class="time-selects compact-time-selects">
+						<select id="guest-config-hora" onchange="setGuestHours()" aria-label="Hora do fim do expediente">
+							<option value="17">17</option>
+							<option value="18">18</option>
+							<option value="19">19</option>
+							<option value="20">20</option>
+							<option value="21">21</option>
+							<option value="22">22</option>
+						</select>
+						<span>:</span>
+						<select id="guest-config-minutos" onchange="setGuestMinutes()" aria-label="Minutos do fim do expediente">
+							<option value="55">55</option>
+							<option value="25">25</option>
+						</select>
+					</div>
 				</div>
-			</div>
 
-			<button
-				id="toggle-config"
-				onclick="toggleFs()"
-				aria-label="Alternar tela cheia"
-				title="Tela cheia"
-			>
-				<i class="material-icons">fullscreen</i>
-			</button>
+				<button id="custom-visibility-button" class="header-tool-button" type="button" aria-pressed="true" title="Ocultar contadores personalizados" hidden>
+					<i id="custom-visibility-icon" class="material-icons" aria-hidden="true">visibility</i>
+					<span>Meus contadores</span>
+				</button>
+
+				<button id="auth-button" class="account-button" type="button" aria-haspopup="true" aria-expanded="false">
+					<span id="account-avatar" class="account-avatar" aria-hidden="true">
+						<i class="material-icons">person</i>
+					</span>
+					<span id="account-label">Entrar com Google</span>
+					<i class="material-icons account-chevron" aria-hidden="true">chevron_right</i>
+				</button>
+
+				<button
+					id="toggle-config"
+					onclick="toggleFs()"
+					aria-label="Alternar tela cheia"
+					title="Tela cheia"
+				>
+					<i class="material-icons">fullscreen</i>
+				</button>
+			</div>
 		</div>
 
 		<main>
@@ -95,6 +117,17 @@
 						<div class="progress-bar"></div>
 					</article>
 				</div>
+
+				<section id="custom-counters-section" class="custom-counters-section" aria-labelledby="custom-counters-title" hidden>
+					<div class="section-heading">
+						<div>
+							<p class="section-kicker">Sua conta</p>
+							<h2 id="custom-counters-title">Meus contadores</h2>
+						</div>
+						<span id="counter-live-state" class="live-state" data-state="connecting">Conectando...</span>
+					</div>
+					<div id="custom-panels" class="custom-panels"></div>
+				</section>
 			</section>
 
 			<section class="weather-section" aria-label="Previsão do tempo">
@@ -163,6 +196,127 @@
 			</section>
 		</main>
 
+		<button id="sidebar-backdrop" class="sidebar-backdrop" type="button" aria-label="Fechar menu" tabindex="-1"></button>
+		<aside id="account-sidebar" class="account-sidebar" aria-hidden="true" aria-labelledby="sidebar-title" inert>
+			<header class="sidebar-header">
+				<div class="sidebar-identity">
+					<img id="sidebar-avatar" alt="" />
+					<div>
+						<p id="sidebar-name">Conta</p>
+						<span id="sidebar-email"></span>
+					</div>
+				</div>
+				<button id="sidebar-close" class="icon-button" type="button" aria-label="Fechar menu">
+					<i class="material-icons">close</i>
+				</button>
+			</header>
+
+			<div class="sidebar-scroll">
+				<section class="settings-section" aria-labelledby="sidebar-title">
+					<div class="settings-heading">
+						<div>
+							<p class="section-kicker">Rotina</p>
+							<h2 id="sidebar-title">Expediente</h2>
+						</div>
+						<span class="save-state" id="settings-state">Sincronizado</span>
+					</div>
+					<label class="field-label" for="config-hora">Encerrar expediente</label>
+					<div class="time-selects sidebar-time-selects">
+						<select id="config-hora" onchange="setHours()" aria-label="Hora do fim do expediente">
+							<option value="17">17</option>
+							<option value="18">18</option>
+							<option value="19">19</option>
+							<option value="20">20</option>
+							<option value="21">21</option>
+							<option value="22">22</option>
+						</select>
+						<span>:</span>
+						<select id="config-minutos" onchange="setMinutes()" aria-label="Minutos do fim do expediente">
+							<option value="55">55</option>
+							<option value="25">25</option>
+						</select>
+					</div>
+				</section>
+
+				<section class="settings-section" aria-labelledby="appearance-title">
+					<div class="settings-heading">
+						<div>
+							<p class="section-kicker">Interface</p>
+							<h2 id="appearance-title">Cores de destaque</h2>
+						</div>
+					</div>
+					<div class="color-fields">
+						<label class="color-field">
+							<span>Principal</span>
+							<input id="accent-primary" type="color" value="#a78bfa" />
+						</label>
+						<label class="color-field">
+							<span>Secundária</span>
+							<input id="accent-secondary" type="color" value="#362860" />
+						</label>
+					</div>
+				</section>
+
+				<section class="settings-section counter-settings" aria-labelledby="counter-management-title">
+					<div class="settings-heading">
+						<div>
+							<p class="section-kicker">Até três</p>
+							<h2 id="counter-management-title">Meus contadores</h2>
+						</div>
+						<div class="counter-heading-meta">
+							<span id="counter-sidebar-state" class="live-state compact" data-state="connecting">Conectando...</span>
+							<span id="counter-count" class="counter-count">0 / 3</span>
+						</div>
+					</div>
+
+					<div id="counter-list" class="counter-list" aria-live="polite"></div>
+					<button id="open-counter-modal" class="primary-button" type="button">
+						<i class="material-icons" aria-hidden="true">add</i>
+						<span id="open-counter-modal-label">Novo contador</span>
+					</button>
+				</section>
+			</div>
+
+			<footer class="sidebar-footer">
+				<button id="sign-out-button" class="text-button" type="button">
+					<i class="material-icons" aria-hidden="true">logout</i>
+					Sair da conta
+				</button>
+			</footer>
+		</aside>
+
+		<dialog id="counter-dialog" class="counter-dialog" aria-labelledby="counter-dialog-title">
+			<form id="counter-form" class="counter-form">
+				<div class="modal-heading">
+					<div>
+						<p id="counter-dialog-kicker" class="section-kicker">Novo contador</p>
+						<h2 id="counter-dialog-title">Criar contador</h2>
+					</div>
+					<button id="counter-dialog-close" class="icon-button" type="button" aria-label="Fechar">
+						<i class="material-icons">close</i>
+					</button>
+				</div>
+				<label class="field-label">Nome<input name="name" type="text" maxlength="50" placeholder="Ex.: Férias" required /></label>
+				<div class="date-grid">
+					<label class="field-label">Início<input name="startAt" type="datetime-local" required /></label>
+					<label class="field-label">Fim<input name="endAt" type="datetime-local" required /></label>
+				</div>
+				<label class="color-option">
+					<input id="counter-color-enabled" name="colorEnabled" type="checkbox" />
+					<span>Usar uma cor própria</span>
+					<input id="counter-color" name="color" type="color" value="#a78bfa" disabled />
+				</label>
+				<p id="counter-message" class="form-message" aria-live="polite"></p>
+				<div class="modal-actions">
+					<button id="counter-dialog-cancel" class="secondary-button" type="button">Cancelar</button>
+					<button id="counter-submit" class="primary-button" type="submit">Criar contador</button>
+				</div>
+			</form>
+		</dialog>
+		<div id="app-toast" class="app-toast" role="status" aria-live="polite"></div>
+
+		<script type="module" src="src/firebase.js"></script>
+
 		<script>
 			var agora = new Date();
 			var pBars = [];
@@ -217,9 +371,7 @@
 					interval.segundos +
 						(interval.segundos === 1 ? " segundo" : " segundos"),
 				);
-				return parts.length > 1
-					? parts.slice(0, -1).join(", ") + " e " + parts.at(-1)
-					: parts[0];
+				return parts.join(",<br>");
 			}
 
 			document.querySelectorAll(".progress-bar").forEach((el) => {
@@ -262,8 +414,8 @@
 			function fill() {
 				var now = new Date();
 				var targets = [ateExp, atePagamento, ateFeriado];
-				document.querySelectorAll(".panel-main").forEach((el, index) => {
-					el.textContent = formatInterval(
+				document.querySelectorAll("#top-panels .panel-main").forEach((el, index) => {
+					el.innerHTML = formatInterval(
 						intervalBreakdown(targets[index] - now),
 					);
 				});
@@ -301,6 +453,16 @@
 				);
 				fill();
 			}
+			function setGuestHours() {
+				document.getElementById("config-hora").value =
+					document.getElementById("guest-config-hora").value;
+				setHours();
+			}
+			function setGuestMinutes() {
+				document.getElementById("config-minutos").value =
+					document.getElementById("guest-config-minutos").value;
+				setMinutes();
+			}
 
 			function toggleFs() {
 				if (!document.fullscreenElement)
@@ -326,6 +488,10 @@
 					document.getElementById("config-minutos").value = minutos;
 					setMinutes();
 				}
+				document.getElementById("guest-config-hora").value =
+					document.getElementById("config-hora").value;
+				document.getElementById("guest-config-minutos").value =
+					document.getElementById("config-minutos").value;
 				fill();
 				loadWeatherWidget();
 			});
