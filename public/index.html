@@ -1,444 +1,335 @@
 <!doctype html>
-<html>
-
-<head>
-    <meta charset="utf-8">
-    <meta name="author" content="Gabriel Roda">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Timekeeper</title>
-
-    <link rel="shortcut icon" href="src/favicon.png" type="image/png">
-
-    <script src="src/data.js"></script>
-    <script src="src/anime.min.js"></script>
-    <script src="src/progressbar.min.js"></script>
-
-    <link rel="stylesheet" href="https://use.typekit.net/yhy2qvv.css">
-    <link rel="stylesheet" href="src/normalize.css">
-    <link rel="stylesheet" href="src/style.css">
-
-    <!-- Global site tag (gtag.js) - Google Analytics -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-130016272-2"></script>
-    <script>
-        window.dataLayer = window.dataLayer || [];
-
-        function gtag() {
-            dataLayer.push(arguments);
-        }
-        gtag('js', new Date());
-
-        gtag('config', 'UA-130016272-2');
-
-    </script>
-</head>
-
-<body>
-    <div id="header">
-        <i class="material-icons">timelapse</i>
-        Timekeeper
-
-        <div id="config-wrapper">
-            <div id="config-content">
-                <a class="config-text">Trabalho até as: </a>
-                <select id="config-hora" onchange="setHours()">
-                    <option value="17">17</option>
-                    <option value="18">18</option>
-                    <option value="19">19</option>
-                    <option value="20">20</option>
-                    <option value="21">21</option>
-                    <option value="22">22</option>
-                </select>
-                <select id="config-minutos" onchange="setMinutes()">
-                    <option value="55">55</option>
-                    <option value="25">25</option>
-                </select>
-            </div>
-        </div>
-
-        <div id="toggle-config" onclick="toggleFs()">
-            <i class="material-icons">fullscreen</i>
-        </div>
-    </div>
-
-    <div id="top-panels">
-        <div class="a-panel">
-            <div class="progress-bar"></div>
-            <div class="panel-title">EXPEDIENTE</div><br>
-            <a class="panel-pre">Ainda faltam</a><br>
-            <a class="panel-main">329 dias, 17 horas, 56 minutos e 12 segundos</a><br>
-            <a class="panel-post">para o fim do expediente.</a>
-        </div>
-        <div class="a-panel">
-            <div class="progress-bar"></div>
-            <a class="panel-title">PAGAMENTO</a><br>
-            <a class="panel-pre">Ainda faltam</a><br>
-            <a class="panel-main">329 dias, 17 horas, 56 minutos e 12 segundos</a><br>
-            <a class="panel-post">para o próximo pagamento.</a>
-        </div>
-        <div class="a-panel">
-            <div class="progress-bar"></div>
-            <a class="panel-title">FERIADO</a><br>
-            <a class="panel-pre">Ainda faltam</a><br>
-            <a class="panel-main">329 dias, 17 horas, 56 minutos e 12 segundos</a><br>
-            <a class="panel-post">para o próximo feriado.</a>
-        </div>
-        <div class="a-panel">
-            <div class="progress-bar"></div>
-            <a class="panel-title">FERIAS</a><br>
-            <a class="panel-pre">Ainda faltam</a><br>
-            <a class="panel-main">329 dias, 17 horas, 56 minutos e 12 segundos</a><br>
-            <a class="panel-post">para as férias coletivas.</a>
-        </div>
-    </div>
-
-    <div class="forecast">
-        <a class="weatherwidget-io" href="https://forecast7.com/pt/n26d90n49d24/indaial/" data-label_1="INDAIAL" data-label_2="O Inferno em Terra" data-font="Roboto" data-icons="Climacons Animated" data-days="7" data-theme="original" data-basecolor="rgba(31, 86, 124, 0)">INDAIAL O Inferno em Terra</a>
-        <script>
-            ! function(d, s, id) {
-                var js, fjs = d.getElementsByTagName(s)[0];
-                if (!d.getElementById(id)) {
-                    js = d.createElement(s);
-                    js.id = id;
-                    js.src = 'https://weatherwidget.io/js/widget.min.js';
-                    fjs.parentNode.insertBefore(js, fjs);
-                }
-            }(document, 'script', 'weatherwidget-io-js');
-
-        </script>
-    </div>
-
-    <div id="calendario">
-        <img src="src/calendario.svg">
-
-    </div>
-
-    <div id="modal" class="hidden">
-        <div id="modal-content">
-            <div id="modal-header">Atenção!</div>
-            <img id="modal-image" src="src/dudu.jpeg">
-            <div id="modal-text">Dudu está chamando você para o café</div>
-            <div id="modal-button" onclick="closeModal()">Estou descendo</div>
-        </div>
-    </div>
-
-    <audio id="alarme" src="src/alarm.mp3" oncanplay="canplay=true"></audio>
-    <script>
-        var shown = false;
-        var canplay = false;
-        var agora = new Date();
-        var pBars = [];
-
-        var ateExp = new Date(agora);
-        ateExp.setHours(17);
-        ateExp.setMinutes(55);
-        ateExp.setSeconds(0);
-
-        var ateFeriado = new Date(agora);
-        for (var umFeriado in feriados) {
-            if (feriados[umFeriado] > ateFeriado) {
-                ateFeriado = feriados[umFeriado];
-                break;
-            }
-        }
-
-        var atePagamento = new Date(agora);
-        for (var umPagamento in pagamentos) {
-            if (pagamentos[umPagamento] > atePagamento) {
-                atePagamento = pagamentos[umPagamento];
-                break;
-            }
-        }
-
-        var ateFerias = new Date('2019-12-20T17:55:00');
-
-        const msIna = {
-            second: 1000,
-            minute: 1000 * 60,
-            hour: 1000 * 60 * 60,
-            day: 1000 * 60 * 60 * 24
-        }
-
-        function intervalBreakdown(howLong) {
-            var tempDate = new Date(howLong);
-
-            var dias = parseInt(tempDate / msIna.day);
-            tempDate = dias > 0 ? tempDate % (dias * msIna.day) : tempDate;
-
-            var horas = parseInt(tempDate / msIna.hour);
-            tempDate = horas > 0 ? tempDate % (horas * msIna.hour) : tempDate;
-
-            var minutos = parseInt(tempDate / msIna.minute);
-            tempDate = minutos > 0 ? tempDate % (minutos * msIna.minute) : tempDate;
-
-            var segundos = parseInt(tempDate / 1000);
-
-            return {
-                'dias': dias,
-                'horas': horas,
-                'minutos': minutos,
-                'segundos': segundos
-            }
-        }
-
-        document.querySelectorAll('.progress-bar').forEach((el) => {
-            pBars.push(new ProgressBar.Line(el, {
-                strokeWidth: 20,
-                easing: 'easeInOut',
-                duration: 1400,
-                color: '#ff6347',
-                trailWidth: 20,
-                svgStyle: {
-                    width: '100%',
-                    height: '100%'
-                },
-                from: {
-                    color: '#ff2700'
-                },
-                to: {
-                    color: '#00e200'
-                },
-                step: (state, bar) => {
-                    bar.path.setAttribute('stroke', state.color);
-                }
-            }))
-        })
-
-        function fill() {
-            //pega os campos que tem os timings
-            var els = document.querySelectorAll('.panel-main');
-
-            //preenche eles na ordem, comecando por expediente
-            var msgString = '';
-            var expediente = intervalBreakdown(ateExp - new Date());
-
-            if (expediente.segundos < 0) {
-                msgString += '0 segundos';
-            } else {
-                if (expediente.dias > 0)
-                    msgString += expediente.dias + " dias, ";
-                if (expediente.horas > 0)
-                    msgString += expediente.horas + " horas, ";
-                if (expediente.minutos > 0)
-                    msgString += expediente.minutos + " minutos e ";
-                msgString += expediente.segundos + " segundos";
-            }
-            els[0].innerHTML = msgString;
-
-            //depois pagamento
-            msgString = '';
-            var pagamento = intervalBreakdown(atePagamento - new Date());
-
-            if (pagamento.dias > 0)
-                msgString += pagamento.dias + " dias, ";
-            if (pagamento.horas > 0)
-                msgString += pagamento.horas + " horas, ";
-            if (pagamento.minutos > 0)
-                msgString += pagamento.minutos + " minutos e ";
-            msgString += pagamento.segundos + " segundos";
-
-            els[1].innerHTML = msgString;
-
-            //proximo feriado
-            msgString = '';
-            var feriado = intervalBreakdown(ateFeriado - new Date());
-
-            if (feriado.dias > 0)
-                msgString += feriado.dias + " dias, ";
-            if (feriado.horas > 0)
-                msgString += feriado.horas + " horas, ";
-            if (feriado.minutos > 0)
-                msgString += feriado.minutos + " minutos e ";
-            msgString += feriado.segundos + " segundos";
-
-            els[2].innerHTML = msgString;
-
-            //ferias de fim de ano
-            msgString = '';
-            var ferias = intervalBreakdown(ateFerias - new Date());
-
-            if (ferias.dias > 0)
-                msgString += ferias.dias + " dias, ";
-            if (ferias.horas > 0)
-                msgString += ferias.horas + " horas, ";
-            if (ferias.minutos > 0)
-                msgString += ferias.minutos + " minutos e ";
-            msgString += ferias.segundos + " segundos";
-
-            els[3].innerHTML = msgString;
-
-            //--barras de progesso
-
-            pBars[0].animate(dayPercentage(new Date()));
-            pBars[1].animate(payPercentage(new Date()));
-            pBars[2].animate(holidayPercentage(new Date()));
-            pBars[3].animate(vacationPercentage(new Date()));
-        }
-
-        function dayPercentage(actualTime) {
-            let endTime = new Date();
-            endTime.setHours(document.querySelector('#config-hora').value);
-            endTime.setMinutes(document.querySelector('#config-minutos').value);
-            endTime.setSeconds(0);
-
-            let workJourney = 36000000;
-
-            let dif = (endTime - actualTime);
-
-            let percent = (1 - (dif / workJourney)).toFixed(2);
-            console.log(percent);
-
-            return percent;
-        }
-
-        function payPercentage(actualTime) {
-            let lastPayday;
-            let nextPayday;
-
-            for (let i = 0; i < pagamentos.length; i++) {
-                if (pagamentos[i] > actualTime) {
-                    lastPayday = pagamentos[i - 1];
-                    nextPayday = pagamentos[i];
-                    break;
-                }
-            }
-
-            let timeframe = nextPayday - lastPayday;
-            let currentp = actualTime - lastPayday;
-
-            return (currentp / timeframe).toFixed(2);
-        }
-
-        function holidayPercentage(actualTime) {
-            let lastHoliday;
-            let nextHoliday;
-
-            for (let i = 0; i < feriados.length; i++) {
-                if (feriados[i] > actualTime) {
-                    lastHoliday = feriados[i - 1];
-                    nextHoliday = feriados[i];
-                    break;
-                }
-            }
-
-            let timeframe = nextHoliday - lastHoliday;
-            let currentp = actualTime - lastHoliday;
-
-            return (currentp / timeframe).toFixed(2);
-        }
-
-        function vacationPercentage(actualTime) {
-            let startTime = new Date('2019-01-01T00:00:00');
-
-            let workJourney = 31341300000;
-
-            let dif = (actualTime - startTime);
-
-            let percent = (dif / workJourney).toFixed(2);
-
-            return percent;
-        }
-
-        function closeModal() {
-            document.getElementById('modal').classList.add('hidden');
-            document.getElementById('alarme').pause();
-        }
-
-        function setCookie(cname, cvalue, exdays) {
-            var d = new Date();
-            d.setTime(d.getTime() + (exdays * 24 * 60 * 60 * 1000));
-            var expires = "expires=" + d.toUTCString();
-            document.cookie = cname + "=" + cvalue + ";" + expires + ";path=/";
-        }
-
-        function getCookie(cname) {
-            var name = cname + "=";
-            var ca = document.cookie.split(';');
-            for (var i = 0; i < ca.length; i++) {
-                var c = ca[i];
-                while (c.charAt(0) == ' ') {
-                    c = c.substring(1);
-                }
-                if (c.indexOf(name) == 0) {
-                    return c.substring(name.length, c.length);
-                }
-            }
-            return "";
-        }
-
-        function setHours() {
-            var value = document.getElementById('config-hora').value;
-
-            ateExp.setHours(value);
-            ateFeriado.setHours(value - 1);
-            ateFerias.setHours(value);
-
-            setCookie('hourTime', value);
-        }
-
-        function setMinutes() {
-            var value = document.getElementById('config-minutos').value;
-
-            ateExp.setMinutes(value);
-            ateFeriado.setMinutes(value);
-            ateFerias.setMinutes(value);
-
-            setCookie('minutesTime', value);
-        }
-
-        function toggleFs() {
-            var elem = document.body;
-
-            if (window.parent.screen.height - 50 > window.parent.innerHeight) {
-                if (elem.requestFullscreen) {
-                    elem.requestFullscreen();
-                } else if (elem.mozRequestFullScreen) { /* Firefox */
-                    elem.mozRequestFullScreen();
-                } else if (elem.webkitRequestFullscreen) { /* Chrome, Safari & Opera */
-                    elem.webkitRequestFullscreen();
-                } else if (elem.msRequestFullscreen) {
-                    elem.msRequestFullscreen(); /* IE/Edge */
-                }
-            } else {
-                try {
-                    var cpDoc = window.parent.document;
-
-                    if (cpDoc.exitFullscreen) {
-                        cpDoc.exitFullscreen();
-                    } else if (cpDoc.webkitExitFullscreen) {
-                        cpDoc.webkitExitFullscreen();
-                    } else if (cpDoc.mozCancelFullScreen) {
-                        cpDoc.mozCancelFullScreen();
-                    } else if (cpDoc.msExitFullscreen) {
-                        cpDoc.msExitFullscreen();
-                    }
-
-                } catch (e) {
-                    console.log("Error getting out of fullscreen");
-                    console.log(e);
-                }
-            }
-        }
-
-        var atualizador = window.setInterval(fill, 1000);
-
-        window.onload = () => {
-            fill();
-
-            var hora = getCookie('hourTime');
-            var minutos = getCookie('minutesTime');
-
-            if (hora.length > 0) {
-                document.getElementById('config-hora').value = hora;
-                setHours();
-            }
-
-            if (minutos.length > 0) {
-                document.getElementById('config-minutos').value = minutos;
-                setMinutes();
-            }
-        }
-
-    </script>
-</body>
-
+<html lang="pt-BR">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="author" content="Gabriel Roda" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<meta name="theme-color" content="#0b0d0c" />
+		<title>Timekeeper</title>
+
+		<link rel="shortcut icon" href="src/favicon.png" type="image/png" />
+		<link rel="preconnect" href="https://use.typekit.net" />
+		<link rel="stylesheet" href="https://use.typekit.net/yhy2qvv.css" />
+		<link rel="stylesheet" href="src/normalize.css" />
+		<link rel="stylesheet" href="src/style.css" />
+
+		<script src="src/data.js"></script>
+		<script src="src/progressbar.min.js"></script>
+	</head>
+
+	<body>
+		<div class="dashboard-controls" aria-label="Controles da dashboard">
+			<div class="dashboard-title">
+				<i class="material-icons" aria-hidden="true">timelapse</i>
+				<span>Timekeeper</span>
+			</div>
+
+			<div id="config-wrapper">
+				<label for="config-hora">Encerrar expediente</label>
+				<div class="time-selects">
+					<select
+						id="config-hora"
+						onchange="setHours()"
+						aria-label="Hora do fim do expediente"
+					>
+						<option value="17">17</option>
+						<option value="18">18</option>
+						<option value="19">19</option>
+						<option value="20">20</option>
+						<option value="21">21</option>
+						<option value="22">22</option>
+					</select>
+					<span>:</span>
+					<select
+						id="config-minutos"
+						onchange="setMinutes()"
+						aria-label="Minutos do fim do expediente"
+					>
+						<option value="55">55</option>
+						<option value="25">25</option>
+					</select>
+				</div>
+			</div>
+
+			<button
+				id="toggle-config"
+				onclick="toggleFs()"
+				aria-label="Alternar tela cheia"
+				title="Tela cheia"
+			>
+				<i class="material-icons">fullscreen</i>
+			</button>
+		</div>
+
+		<main>
+			<section class="overview" aria-label="Contadores">
+				<div id="top-panels">
+					<article class="a-panel featured">
+						<div class="panel-top">
+							<span class="panel-index">01</span>
+							<h2 class="panel-title">Expediente</h2>
+						</div>
+						<p class="panel-pre">Ainda faltam</p>
+						<p class="panel-main" aria-live="polite">carregando...</p>
+						<p class="panel-post">para encerrar o dia de trabalho.</p>
+						<div class="progress-bar"></div>
+					</article>
+					<article class="a-panel">
+						<div class="panel-top">
+							<span class="panel-index">02</span>
+							<h2 class="panel-title">Pagamento</h2>
+						</div>
+						<p class="panel-pre">Ainda faltam</p>
+						<p class="panel-main" aria-live="polite">carregando...</p>
+						<p class="panel-post">para o próximo pagamento.</p>
+						<div class="progress-bar"></div>
+					</article>
+					<article class="a-panel">
+						<div class="panel-top">
+							<span class="panel-index">03</span>
+							<h2 class="panel-title">Feriado</h2>
+						</div>
+						<p class="panel-pre">Ainda faltam</p>
+						<p class="panel-main" aria-live="polite">carregando...</p>
+						<p class="panel-post">para o próximo feriado.</p>
+						<div class="progress-bar"></div>
+					</article>
+				</div>
+			</section>
+
+			<section class="weather-section" aria-label="Previsão do tempo">
+				<div class="forecasts">
+					<div class="forecast">
+						<a
+							class="weatherwidget-io"
+							href="https://forecast7.com/pt/n26d90n49d24/indaial/"
+							data-label_1="INDAIAL"
+							data-label_2="SANTA CATARINA"
+							data-font="Roboto"
+							data-icons="Climacons Animated"
+							data-days="7"
+							data-theme="pure"
+							data-basecolor="#17151c"
+							data-accent="#362860"
+							data-textcolor="#f7f5fa"
+							data-highcolor="#f7f5fa"
+							data-lowcolor="#9993a3"
+							data-suncolor="#c4b5fd"
+							data-cloudfill="#302c39"
+							>INDAIAL · SANTA CATARINA</a
+						>
+					</div>
+					<div class="forecast">
+						<a
+							class="weatherwidget-io"
+							href="https://forecast7.com/pt/n23d42n51d93/maringa/"
+							data-label_1="MARINGÁ"
+							data-label_2="PARANÁ"
+							data-font="Roboto"
+							data-icons="Climacons Animated"
+							data-days="7"
+							data-theme="pure"
+							data-basecolor="#17151c"
+							data-accent="#362860"
+							data-textcolor="#f7f5fa"
+							data-highcolor="#f7f5fa"
+							data-lowcolor="#9993a3"
+							data-suncolor="#c4b5fd"
+							data-cloudfill="#302c39"
+							>MARINGÁ · PARANÁ</a
+						>
+					</div>
+					<div class="forecast">
+						<a
+							class="weatherwidget-io"
+							href="https://forecast7.com/pt/n23d55n46d63/sao-paulo/"
+							data-label_1="SÃO PAULO"
+							data-label_2="SÃO PAULO"
+							data-font="Roboto"
+							data-icons="Climacons Animated"
+							data-days="7"
+							data-theme="pure"
+							data-basecolor="#17151c"
+							data-accent="#362860"
+							data-textcolor="#f7f5fa"
+							data-highcolor="#f7f5fa"
+							data-lowcolor="#9993a3"
+							data-suncolor="#c4b5fd"
+							data-cloudfill="#302c39"
+							>SÃO PAULO · SÃO PAULO</a
+						>
+					</div>
+				</div>
+			</section>
+		</main>
+
+		<script>
+			var agora = new Date();
+			var pBars = [];
+			var ateExp = new Date(agora);
+			ateExp.setHours(17, 55, 0, 0);
+
+			function findNext(dates) {
+				return (
+					dates.find((date) => date > new Date()) || dates[dates.length - 1]
+				);
+			}
+
+			var ateFeriado = findNext(feriados);
+			var atePagamento = findNext(pagamentos);
+			const msIna = {
+				second: 1000,
+				minute: 60000,
+				hour: 3600000,
+				day: 86400000,
+			};
+
+			function intervalBreakdown(howLong) {
+				var remaining = Math.max(0, howLong);
+				var dias = Math.floor(remaining / msIna.day);
+				remaining %= msIna.day;
+				var horas = Math.floor(remaining / msIna.hour);
+				remaining %= msIna.hour;
+				var minutos = Math.floor(remaining / msIna.minute);
+				remaining %= msIna.minute;
+				return {
+					dias,
+					horas,
+					minutos,
+					segundos: Math.floor(remaining / msIna.second),
+				};
+			}
+
+			function formatInterval(interval) {
+				var parts = [];
+				if (interval.dias)
+					parts.push(interval.dias + (interval.dias === 1 ? " dia" : " dias"));
+				if (interval.horas)
+					parts.push(
+						interval.horas + (interval.horas === 1 ? " hora" : " horas"),
+					);
+				if (interval.minutos)
+					parts.push(
+						interval.minutos +
+							(interval.minutos === 1 ? " minuto" : " minutos"),
+					);
+				parts.push(
+					interval.segundos +
+						(interval.segundos === 1 ? " segundo" : " segundos"),
+				);
+				return parts.length > 1
+					? parts.slice(0, -1).join(", ") + " e " + parts.at(-1)
+					: parts[0];
+			}
+
+			document.querySelectorAll(".progress-bar").forEach((el) => {
+				pBars.push(
+					new ProgressBar.Line(el, {
+						strokeWidth: 2,
+						trailWidth: 2,
+						easing: "easeInOut",
+						duration: 900,
+						color: "#a78bfa",
+						trailColor: "#302c39",
+						svgStyle: { width: "100%", height: "100%" },
+					}),
+				);
+			});
+
+			function clamp(value) {
+				return Math.max(0, Math.min(1, Number(value) || 0));
+			}
+			function periodPercentage(dates, actualTime) {
+				var nextIndex = dates.findIndex((date) => date > actualTime);
+				if (nextIndex <= 0) return 0;
+				return clamp(
+					(actualTime - dates[nextIndex - 1]) /
+						(dates[nextIndex] - dates[nextIndex - 1]),
+				);
+			}
+
+			function dayPercentage(actualTime) {
+				var endTime = new Date(actualTime);
+				endTime.setHours(
+					document.querySelector("#config-hora").value,
+					document.querySelector("#config-minutos").value,
+					0,
+					0,
+				);
+				return clamp(1 - (endTime - actualTime) / 36000000);
+			}
+
+			function fill() {
+				var now = new Date();
+				var targets = [ateExp, atePagamento, ateFeriado];
+				document.querySelectorAll(".panel-main").forEach((el, index) => {
+					el.textContent = formatInterval(
+						intervalBreakdown(targets[index] - now),
+					);
+				});
+				pBars[0].animate(dayPercentage(now));
+				pBars[1].animate(periodPercentage(pagamentos, now));
+				pBars[2].animate(periodPercentage(feriados, now));
+			}
+
+			function setCookie(name, value, days) {
+				var expires = new Date(Date.now() + days * 86400000).toUTCString();
+				document.cookie =
+					name + "=" + value + ";expires=" + expires + ";path=/;SameSite=Lax";
+			}
+			function getCookie(name) {
+				var match = document.cookie
+					.split("; ")
+					.find((row) => row.startsWith(name + "="));
+				return match ? match.split("=")[1] : "";
+			}
+			function setHours() {
+				ateExp.setHours(document.getElementById("config-hora").value);
+				setCookie(
+					"hourTime",
+					document.getElementById("config-hora").value,
+					365,
+				);
+				fill();
+			}
+			function setMinutes() {
+				ateExp.setMinutes(document.getElementById("config-minutos").value);
+				setCookie(
+					"minutesTime",
+					document.getElementById("config-minutos").value,
+					365,
+				);
+				fill();
+			}
+
+			function toggleFs() {
+				if (!document.fullscreenElement)
+					document.documentElement.requestFullscreen?.();
+				else document.exitFullscreen?.();
+			}
+
+			function loadWeatherWidget() {
+				var script = document.createElement("script");
+				script.src = "https://weatherwidget.io/js/widget.min.js";
+				script.id = "weatherwidget-io-js";
+				document.body.appendChild(script);
+			}
+
+			window.addEventListener("load", () => {
+				var hora = getCookie("hourTime");
+				var minutos = getCookie("minutesTime");
+				if (hora) {
+					document.getElementById("config-hora").value = hora;
+					setHours();
+				}
+				if (minutos) {
+					document.getElementById("config-minutos").value = minutos;
+					setMinutes();
+				}
+				fill();
+				loadWeatherWidget();
+			});
+			window.setInterval(fill, 1000);
+		</script>
+	</body>
 </html>
