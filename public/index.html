@@ -299,15 +299,40 @@
 					</button>
 				</div>
 				<label class="field-label">Nome<input name="name" type="text" maxlength="50" placeholder="Ex.: Férias" required /></label>
-				<div class="date-grid">
-					<label class="field-label">Início<input name="startAt" type="datetime-local" required /></label>
-					<label class="field-label">Fim<input name="endAt" type="datetime-local" required /></label>
-				</div>
 				<label class="color-option">
 					<input id="counter-color-enabled" name="colorEnabled" type="checkbox" />
 					<span>Usar uma cor própria</span>
 					<input id="counter-color" name="color" type="color" value="#a78bfa" disabled />
 				</label>
+				<label class="field-label">
+					Tipo
+					<select id="counter-type" name="type" class="field-control">
+						<option value="fixed">Período fixo</option>
+						<option value="recurring">Evento recorrente</option>
+					</select>
+				</label>
+				<div id="fixed-schedule-fields" class="schedule-fields">
+					<div class="date-grid">
+						<label class="field-label">Início<input name="startAt" type="datetime-local" required /></label>
+						<label class="field-label">Fim<input name="endAt" type="datetime-local" required /></label>
+					</div>
+				</div>
+				<fieldset id="recurring-schedule-fields" class="schedule-fields recurring-schedule-fields" hidden disabled>
+					<div class="date-grid">
+						<label class="field-label">Hora inicial<input name="startTime" type="time" value="08:00" required /></label>
+						<label class="field-label">Hora final<input name="endTime" type="time" value="17:00" required /></label>
+					</div>
+					<legend>Dias da semana</legend>
+					<div class="weekday-options">
+						<label><input name="daysOfWeek" type="checkbox" value="1" checked /><span>Seg</span></label>
+						<label><input name="daysOfWeek" type="checkbox" value="2" checked /><span>Ter</span></label>
+						<label><input name="daysOfWeek" type="checkbox" value="3" checked /><span>Qua</span></label>
+						<label><input name="daysOfWeek" type="checkbox" value="4" checked /><span>Qui</span></label>
+						<label><input name="daysOfWeek" type="checkbox" value="5" checked /><span>Sex</span></label>
+						<label><input name="daysOfWeek" type="checkbox" value="6" /><span>Sáb</span></label>
+						<label><input name="daysOfWeek" type="checkbox" value="0" /><span>Dom</span></label>
+					</div>
+				</fieldset>
 				<p id="counter-message" class="form-message" aria-live="polite"></p>
 				<div class="modal-actions">
 					<button id="counter-dialog-cancel" class="secondary-button" type="button">Cancelar</button>
@@ -322,8 +347,6 @@
 		<script>
 			var agora = new Date();
 			var pBars = [];
-			var ateExp = new Date(agora);
-			ateExp.setHours(17, 55, 0, 0);
 
 			function findNext(dates) {
 				return (
@@ -393,6 +416,84 @@
 			function clamp(value) {
 				return Math.max(0, Math.min(1, Number(value) || 0));
 			}
+			function dateAtTime(date, time) {
+				var parts = String(time || "00:00").split(":");
+				var result = new Date(date);
+				result.setHours(Number(parts[0]) || 0, Number(parts[1]) || 0, 0, 0);
+				return result;
+			}
+			function recurringRangeForDate(date, startTime, endTime) {
+				var start = dateAtTime(date, startTime);
+				var end = dateAtTime(date, endTime);
+				if (end <= start) end.setDate(end.getDate() + 1);
+				return { start, end };
+			}
+			function resolveRecurringState(counter, actualTime) {
+				var days = Array.isArray(counter.daysOfWeek)
+					? counter.daysOfWeek.map(Number)
+					: [];
+				var active = null;
+				var previous = null;
+				var next = null;
+				for (var offset = -8; offset <= 8; offset += 1) {
+					var occurrenceDate = new Date(actualTime);
+					occurrenceDate.setDate(actualTime.getDate() + offset);
+					occurrenceDate.setHours(0, 0, 0, 0);
+					if (!days.includes(occurrenceDate.getDay())) continue;
+					var range = recurringRangeForDate(
+						occurrenceDate,
+						counter.startTime,
+						counter.endTime,
+					);
+					if (range.start <= actualTime && actualTime < range.end) {
+						active = range;
+					}
+					if (
+						range.end <= actualTime &&
+						(!previous || range.end > previous.end)
+					) {
+						previous = range;
+					}
+					if (
+						range.start > actualTime &&
+						(!next || range.start < next.start)
+					) {
+						next = range;
+					}
+				}
+				if (active) {
+					return {
+						phase: "active",
+						target: active.end,
+						progress: clamp(
+							(actualTime - active.start) / (active.end - active.start),
+						),
+					};
+				}
+				if (next) {
+					var waitStart = previous ? previous.end : actualTime;
+					return {
+						phase: "upcoming",
+						target: next.start,
+						progress: clamp(
+							(actualTime - waitStart) / (next.start - waitStart),
+						),
+					};
+				}
+				return { phase: "upcoming", target: actualTime, progress: 0 };
+			}
+			function resolveCounterState(counter, actualTime) {
+				if ((counter.type || "fixed") === "recurring") {
+					return resolveRecurringState(counter, actualTime);
+				}
+				var start = new Date(counter.startAt);
+				var end = new Date(counter.endAt);
+				return {
+					phase: "fixed",
+					target: end,
+					progress: clamp((actualTime - start) / (end - start)),
+				};
+			}
 			function periodPercentage(dates, actualTime) {
 				var nextIndex = dates.findIndex((date) => date > actualTime);
 				if (nextIndex <= 0) return 0;
@@ -402,26 +503,38 @@
 				);
 			}
 
-			function dayPercentage(actualTime) {
-				var endTime = new Date(actualTime);
-				endTime.setHours(
-					document.querySelector("#config-hora").value,
-					document.querySelector("#config-minutos").value,
-					0,
-					0,
-				);
-				return clamp(1 - (endTime - actualTime) / 36000000);
-			}
-
 			function fill() {
 				var now = new Date();
-				var targets = [ateExp, atePagamento, ateFeriado];
-				document.querySelectorAll("#top-panels .panel-main").forEach((el, index) => {
-					el.innerHTML = formatInterval(
-						intervalBreakdown(targets[index] - now),
+				var workdayState = resolveRecurringState(
+					{
+						type: "recurring",
+						startTime: "08:00",
+						endTime:
+							String(document.querySelector("#config-hora").value).padStart(2, "0") +
+							":" +
+							String(document.querySelector("#config-minutos").value).padStart(2, "0"),
+						daysOfWeek: [1, 2, 3, 4, 5],
+					},
+					now,
+				);
+				var panels = document.querySelectorAll("#top-panels .a-panel");
+				panels[0].querySelector(".panel-pre").textContent =
+					workdayState.phase === "active" ? "Ainda faltam" : "Começa em";
+				panels[0].querySelector(".panel-main").innerHTML = formatInterval(
+					intervalBreakdown(workdayState.target - now),
+				);
+				panels[0].querySelector(".panel-post").textContent =
+					workdayState.phase === "active"
+						? "para encerrar o dia de trabalho."
+						: "para iniciar o próximo expediente.";
+				var targets = [atePagamento, ateFeriado];
+				panels.forEach((panel, index) => {
+					if (index === 0) return;
+					panel.querySelector(".panel-main").innerHTML = formatInterval(
+						intervalBreakdown(targets[index - 1] - now),
 					);
 				});
-				pBars[0].animate(dayPercentage(now));
+				pBars[0].animate(workdayState.progress);
 				pBars[1].animate(periodPercentage(pagamentos, now));
 				pBars[2].animate(periodPercentage(feriados, now));
 			}
@@ -438,7 +551,6 @@
 				return match ? match.split("=")[1] : "";
 			}
 			function setHours() {
-				ateExp.setHours(document.getElementById("config-hora").value);
 				setCookie(
 					"hourTime",
 					document.getElementById("config-hora").value,
@@ -447,7 +559,6 @@
 				fill();
 			}
 			function setMinutes() {
-				ateExp.setMinutes(document.getElementById("config-minutos").value);
 				setCookie(
 					"minutesTime",
 					document.getElementById("config-minutos").value,

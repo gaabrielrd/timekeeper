@@ -75,6 +75,11 @@ const elements = {
 	counterSubmit: document.querySelector("#counter-submit"),
 	counterColorEnabled: document.querySelector("#counter-color-enabled"),
 	counterColor: document.querySelector("#counter-color"),
+	counterType: document.querySelector("#counter-type"),
+	fixedScheduleFields: document.querySelector("#fixed-schedule-fields"),
+	recurringScheduleFields: document.querySelector(
+		"#recurring-schedule-fields",
+	),
 	customSection: document.querySelector("#custom-counters-section"),
 	customPanels: document.querySelector("#custom-panels"),
 	toast: document.querySelector("#app-toast"),
@@ -280,21 +285,25 @@ async function saveCounters(counters) {
 	}
 }
 
-function percentageBetween(startAt, endAt, now) {
-	const duration = endAt - startAt;
-	if (duration <= 0) return 0;
-	return Math.max(0, Math.min(1, (now - startAt) / duration));
-}
-
 function updateCustomCounters() {
 	const now = new Date();
-	customProgressBars.forEach(({ counter, main, bar }) => {
-		const startAt = new Date(counter.startAt);
-		const endAt = new Date(counter.endAt);
+	customProgressBars.forEach(({ counter, pre, main, post, bar }) => {
+		const state = window.resolveCounterState(counter, now);
+		const isRecurring = counter.type === "recurring";
+		if (isRecurring) {
+			pre.textContent = state.phase === "active" ? "Ainda faltam" : "Começa em";
+			post.textContent =
+				state.phase === "active"
+					? `para encerrar ${counter.name}.`
+					: `para iniciar ${counter.name}.`;
+		} else {
+			pre.textContent = "Ainda faltam";
+			post.textContent = `para ${counter.name}.`;
+		}
 		main.innerHTML = window.formatInterval(
-			window.intervalBreakdown(endAt - now),
+			window.intervalBreakdown(state.target - now),
 		);
-		bar.animate(percentageBetween(startAt, endAt, now));
+		bar.animate(state.progress);
 	});
 }
 
@@ -340,11 +349,33 @@ function createCustomPanel(counter, index) {
 		trailColor: "#302c39",
 		svgStyle: { width: "100%", height: "100%" },
 	});
-	customProgressBars.push({ counter, main, bar });
+	customProgressBars.push({ counter, pre, main, post, bar });
 	return panel;
 }
 
 function formatDateRange(counter) {
+	if (counter.type === "recurring") {
+		const days = [
+			...new Set(
+				(Array.isArray(counter.daysOfWeek) ? counter.daysOfWeek : []).map(Number),
+			),
+		];
+		const orderedDays = [1, 2, 3, 4, 5, 6, 0].filter((day) =>
+			days.includes(day),
+		);
+		const weekdayNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+		let dayLabel = orderedDays
+			.map((day) => weekdayNames[day])
+			.filter(Boolean)
+			.join(", ");
+		if ([1, 2, 3, 4, 5].every((day) => days.includes(day)) && days.length === 5) {
+			dayLabel = "Seg–Sex";
+		}
+		if ([0, 1, 2, 3, 4, 5, 6].every((day) => days.includes(day))) {
+			dayLabel = "Todos os dias";
+		}
+		return `${dayLabel} · ${counter.startTime}–${counter.endTime}`;
+	}
 	const formatter = new Intl.DateTimeFormat("pt-BR", {
 		day: "2-digit",
 		month: "short",
@@ -479,7 +510,13 @@ function applySettings(data) {
 
 function applyCounters(counters) {
 	userSettings.customCounters = Array.isArray(counters)
-		? counters.slice(0, MAX_COUNTERS)
+		? counters
+				.filter((counter) => counter && typeof counter === "object")
+				.slice(0, MAX_COUNTERS)
+				.map((counter) => ({
+					...counter,
+					type: counter.type === "recurring" ? "recurring" : "fixed",
+				}))
 		: [];
 	renderCustomCounters(userSettings.customCounters);
 }
@@ -629,6 +666,17 @@ function closeCounterDialog() {
 	elements.counterMessage.textContent = "";
 }
 
+function setCounterType(type) {
+	const isRecurring = type === "recurring";
+	elements.counterType.value = isRecurring ? "recurring" : "fixed";
+	elements.fixedScheduleFields.hidden = isRecurring;
+	elements.fixedScheduleFields
+		.querySelectorAll("input")
+		.forEach((input) => (input.disabled = isRecurring));
+	elements.recurringScheduleFields.hidden = !isRecurring;
+	elements.recurringScheduleFields.disabled = !isRecurring;
+}
+
 function openCounterDialog(counter = null) {
 	editingCounterId = counter?.id || null;
 	elements.counterForm.reset();
@@ -645,14 +693,27 @@ function openCounterDialog(counter = null) {
 		: "Criar contador";
 	elements.counterSubmit.disabled = false;
 
-	const startDate = counter ? new Date(counter.startAt) : new Date();
-	if (!counter) startDate.setSeconds(0, 0);
-	const endDate = counter
-		? new Date(counter.endAt)
-		: new Date(startDate.getTime() + 24 * 60 * 60 * 1000);
+	const counterType = counter?.type === "recurring" ? "recurring" : "fixed";
 	elements.counterForm.elements.name.value = counter?.name || "";
-	elements.counterForm.elements.startAt.value = toLocalInputValue(startDate);
-	elements.counterForm.elements.endAt.value = toLocalInputValue(endDate);
+	setCounterType(counterType);
+	if (counterType === "recurring") {
+		elements.counterForm.elements.startTime.value = counter.startTime || "08:00";
+		elements.counterForm.elements.endTime.value = counter.endTime || "17:00";
+		const selectedDays = new Set(
+			(Array.isArray(counter.daysOfWeek) ? counter.daysOfWeek : []).map(Number),
+		);
+		elements.counterForm
+			.querySelectorAll('input[name="daysOfWeek"]')
+			.forEach((input) => (input.checked = selectedDays.has(Number(input.value))));
+	} else {
+		const startDate = counter ? new Date(counter.startAt) : new Date();
+		if (!counter) startDate.setSeconds(0, 0);
+		const endDate = counter
+			? new Date(counter.endAt)
+			: new Date(startDate.getTime() + 24 * 60 * 60 * 1000);
+		elements.counterForm.elements.startAt.value = toLocalInputValue(startDate);
+		elements.counterForm.elements.endAt.value = toLocalInputValue(endDate);
+	}
 	elements.counterColorEnabled.checked = Boolean(counter?.color);
 	elements.counterColor.disabled = !counter?.color;
 	elements.counterColor.value = counter?.color || userSettings.accentPrimary;
@@ -738,6 +799,9 @@ elements.counterColorEnabled.addEventListener("change", () => {
 		elements.counterColor.value = userSettings.accentPrimary;
 	}
 });
+elements.counterType.addEventListener("change", () => {
+	setCounterType(elements.counterType.value);
+});
 
 elements.counterForm.addEventListener("submit", async (event) => {
 	event.preventDefault();
@@ -748,15 +812,48 @@ elements.counterForm.addEventListener("submit", async (event) => {
 	}
 	const data = new FormData(elements.counterForm);
 	const name = String(data.get("name") || "").trim();
-	const startAt = new Date(String(data.get("startAt")));
-	const endAt = new Date(String(data.get("endAt")));
-	if (!name || Number.isNaN(startAt.getTime()) || Number.isNaN(endAt.getTime())) {
-		elements.counterMessage.textContent = "Preencha nome, início e fim.";
+	const type = data.get("type") === "recurring" ? "recurring" : "fixed";
+	if (!name) {
+		elements.counterMessage.textContent = "Informe o nome do contador.";
 		return;
 	}
-	if (endAt <= startAt) {
-		elements.counterMessage.textContent = "O fim precisa ser posterior ao início.";
-		return;
+	let schedule;
+	if (type === "recurring") {
+		const startTime = String(data.get("startTime") || "");
+		const endTime = String(data.get("endTime") || "");
+		const daysOfWeek = [
+			...new Set(
+				data
+					.getAll("daysOfWeek")
+					.map(Number)
+					.filter((day) => Number.isInteger(day) && day >= 0 && day <= 6),
+			),
+		].sort((a, b) => a - b);
+		if (!/^\d{2}:\d{2}$/.test(startTime) || !/^\d{2}:\d{2}$/.test(endTime)) {
+			elements.counterMessage.textContent = "Informe os horários inicial e final.";
+			return;
+		}
+		if (!daysOfWeek.length) {
+			elements.counterMessage.textContent = "Selecione pelo menos um dia da semana.";
+			return;
+		}
+		schedule = { type, startTime, endTime, daysOfWeek };
+	} else {
+		const startAt = new Date(String(data.get("startAt")));
+		const endAt = new Date(String(data.get("endAt")));
+		if (Number.isNaN(startAt.getTime()) || Number.isNaN(endAt.getTime())) {
+			elements.counterMessage.textContent = "Preencha as datas de início e fim.";
+			return;
+		}
+		if (endAt <= startAt) {
+			elements.counterMessage.textContent = "O fim precisa ser posterior ao início.";
+			return;
+		}
+		schedule = {
+			type,
+			startAt: startAt.toISOString(),
+			endAt: endAt.toISOString(),
+		};
 	}
 	const existingCounter = editingCounterId
 		? userSettings.customCounters.find((counter) => counter.id === editingCounterId)
@@ -771,8 +868,7 @@ elements.counterForm.addEventListener("submit", async (event) => {
 			crypto.randomUUID?.() ||
 			`${Date.now()}-${Math.random()}`,
 		name,
-		startAt: startAt.toISOString(),
-		endAt: endAt.toISOString(),
+		...schedule,
 		color: data.get("colorEnabled") ? String(data.get("color")) : null,
 		createdAt: existingCounter?.createdAt || new Date().toISOString(),
 	};

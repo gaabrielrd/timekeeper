@@ -680,7 +680,9 @@ input[type="color"]::-webkit-color-swatch {
 	gap: 14px;
 }
 .counter-form input[type="text"],
-.counter-form input[type="datetime-local"] {
+.counter-form input[type="datetime-local"],
+.counter-form input[type="time"],
+.counter-form .field-control {
 	width: 100%;
 	padding: 11px 12px;
 	border: 1px solid var(--line);
@@ -689,13 +691,73 @@ input[type="color"]::-webkit-color-swatch {
 	background: var(--bg);
 	color: var(--text);
 }
-.counter-form input:focus {
+.counter-form input:focus,
+.counter-form .field-control:focus {
 	border-color: var(--accent);
+}
+.counter-form .field-control {
+	appearance: auto;
+}
+.counter-form .field-control option {
+	background: var(--surface);
+	color: var(--text);
 }
 .date-grid {
 	display: grid;
 	grid-template-columns: 1fr 1fr;
 	gap: 10px;
+}
+.schedule-fields:not([hidden]) {
+	animation: schedule-fields-enter 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.recurring-schedule-fields {
+	min-width: 0;
+	margin: 0;
+	padding: 0;
+	border: 0;
+}
+.recurring-schedule-fields legend {
+	margin: 18px 0 9px;
+	padding: 0;
+	color: var(--muted);
+	font-size: 12px;
+}
+.weekday-options {
+	display: grid;
+	grid-template-columns: repeat(7, minmax(0, 1fr));
+	gap: 6px;
+}
+.weekday-options label {
+	min-width: 0;
+	cursor: pointer;
+}
+.weekday-options input {
+	position: absolute;
+	opacity: 0;
+	pointer-events: none;
+}
+.weekday-options span {
+	min-height: 36px;
+	display: grid;
+	place-items: center;
+	border: 1px solid var(--line);
+	border-radius: 9px;
+	background: var(--bg);
+	color: var(--muted);
+	font-size: 11px;
+	transition:
+		border-color 0.2s,
+		background 0.2s,
+		color 0.2s;
+}
+.weekday-options input:checked + span {
+	border-color: color-mix(in srgb, var(--accent) 65%, var(--line));
+	background: color-mix(in srgb, var(--accent-secondary) 66%, var(--bg));
+	color: var(--text);
+}
+.weekday-options input:focus-visible + span {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
 }
 .color-option {
 	justify-content: flex-start;
@@ -749,7 +811,9 @@ input[type="color"]::-webkit-color-swatch {
 }
 .counter-dialog {
 	width: min(560px, calc(100% - 32px));
+	max-height: calc(100dvh - 32px);
 	padding: 0;
+	overflow-y: auto;
 	border: 1px solid var(--line);
 	border-radius: 18px;
 	background: color-mix(in srgb, var(--surface) 96%, var(--accent-secondary));
@@ -866,6 +930,12 @@ input[type="color"]::-webkit-color-swatch {
 		transform: translateY(12px) scale(0.985);
 	}
 }
+@keyframes schedule-fields-enter {
+	from {
+		opacity: 0;
+		transform: translateY(6px);
+	}
+}
 @keyframes live-pulse {
 	60% {
 		box-shadow: 0 0 0 5px transparent;
@@ -946,6 +1016,9 @@ input[type="color"]::-webkit-color-swatch {
 	}
 	.date-grid {
 		grid-template-columns: 1fr;
+	}
+	.weekday-options {
+		grid-template-columns: repeat(4, minmax(0, 1fr));
 	}
 	.overview,
 	.weather-section {
