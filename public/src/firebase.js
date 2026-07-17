@@ -29,6 +29,12 @@ const DEFAULTS = {
 	endMinutes: 55,
 	accentPrimary: "#a78bfa",
 	accentSecondary: "#362860",
+	backgroundEnabled: false,
+	backgroundStyle: "lava",
+	backgroundColorA: "#7c3aed",
+	backgroundColorB: "#0ea5e9",
+	backgroundSpeed: 55,
+	backgroundIntensity: 55,
 	showCustomCounters: true,
 	customCounters: [],
 };
@@ -58,6 +64,18 @@ const elements = {
 	minutes: document.querySelector("#config-minutos"),
 	accentPrimary: document.querySelector("#accent-primary"),
 	accentSecondary: document.querySelector("#accent-secondary"),
+	backgroundEnabled: document.querySelector("#background-enabled"),
+	backgroundControls: document.querySelector("#background-controls"),
+	backgroundStyle: document.querySelector("#background-style"),
+	backgroundDescription: document.querySelector("#background-description"),
+	backgroundColorA: document.querySelector("#background-color-a"),
+	backgroundColorB: document.querySelector("#background-color-b"),
+	backgroundSpeed: document.querySelector("#background-speed"),
+	backgroundSpeedOutput: document.querySelector("#background-speed-output"),
+	backgroundIntensity: document.querySelector("#background-intensity"),
+	backgroundIntensityOutput: document.querySelector(
+		"#background-intensity-output",
+	),
 	settingsState: document.querySelector("#settings-state"),
 	counterForm: document.querySelector("#counter-form"),
 	counterDialog: document.querySelector("#counter-dialog"),
@@ -186,6 +204,79 @@ function applyAccents(primary, secondary) {
 		widget.dataset.accent = safeSecondary;
 		widget.dataset.suncolor = safePrimary;
 	});
+}
+
+const BACKGROUND_DESCRIPTIONS = {
+	lava: "Formas quentes que sobem, se fundem e mudam lentamente.",
+	float: "Orbes mais definidos cruzam a tela em trajetórias independentes.",
+	glass: "Faixas translúcidas refratam cor sob superfícies de vidro.",
+};
+
+function boundedNumber(value, minimum, maximum, fallback) {
+	const number = Number(value);
+	return Number.isFinite(number)
+		? Math.max(minimum, Math.min(maximum, number))
+		: fallback;
+}
+
+function backgroundSettingsFromControls() {
+	return {
+		backgroundEnabled: elements.backgroundEnabled.checked,
+		backgroundStyle: elements.backgroundStyle.value,
+		backgroundColorA: elements.backgroundColorA.value,
+		backgroundColorB: elements.backgroundColorB.value,
+		backgroundSpeed: Number(elements.backgroundSpeed.value),
+		backgroundIntensity: Number(elements.backgroundIntensity.value),
+	};
+}
+
+function applyBackground(settings) {
+	const enabled = settings.backgroundEnabled === true;
+	const style = Object.hasOwn(BACKGROUND_DESCRIPTIONS, settings.backgroundStyle)
+		? settings.backgroundStyle
+		: DEFAULTS.backgroundStyle;
+	const colorA = isHexColor(settings.backgroundColorA)
+		? settings.backgroundColorA
+		: DEFAULTS.backgroundColorA;
+	const colorB = isHexColor(settings.backgroundColorB)
+		? settings.backgroundColorB
+		: DEFAULTS.backgroundColorB;
+	const speed = boundedNumber(
+		settings.backgroundSpeed,
+		20,
+		100,
+		DEFAULTS.backgroundSpeed,
+	);
+	const intensity = boundedNumber(
+		settings.backgroundIntensity,
+		15,
+		100,
+		DEFAULTS.backgroundIntensity,
+	);
+	const duration = Math.round(78 - speed * 0.62);
+	const opacity = (0.16 + intensity * 0.0064).toFixed(2);
+
+	document.body.dataset.backgroundEnabled = String(enabled);
+	document.body.dataset.backgroundStyle = style;
+	document.documentElement.style.setProperty("--ambient-a", colorA);
+	document.documentElement.style.setProperty("--ambient-b", colorB);
+	document.documentElement.style.setProperty("--ambient-duration", `${duration}s`);
+	document.documentElement.style.setProperty("--ambient-opacity", opacity);
+
+	elements.backgroundEnabled.checked = enabled;
+	elements.backgroundStyle.value = style;
+	elements.backgroundColorA.value = colorA;
+	elements.backgroundColorB.value = colorB;
+	elements.backgroundSpeed.value = String(speed);
+	elements.backgroundIntensity.value = String(intensity);
+	elements.backgroundDescription.textContent = BACKGROUND_DESCRIPTIONS[style];
+	elements.backgroundSpeedOutput.textContent =
+		speed < 40 ? "Lenta" : speed > 75 ? "Rápida" : "Normal";
+	elements.backgroundIntensityOutput.textContent = `${Math.round(intensity)}%`;
+	elements.backgroundControls.classList.toggle("is-disabled", !enabled);
+	elements.backgroundControls
+		.querySelectorAll("input, select")
+		.forEach((control) => (control.disabled = !enabled));
 }
 
 function openSidebar() {
@@ -505,6 +596,7 @@ function applySettings(data) {
 	};
 	syncTimeControls(userSettings.endHour, userSettings.endMinutes);
 	applyAccents(userSettings.accentPrimary, userSettings.accentSecondary);
+	applyBackground(userSettings);
 	updateCustomVisibility(currentCounters);
 }
 
@@ -562,6 +654,31 @@ async function ensureUserData(user) {
 				accentSecondary: isHexColor(legacy.accentSecondary)
 					? legacy.accentSecondary
 					: DEFAULTS.accentSecondary,
+				backgroundEnabled: legacy.backgroundEnabled === true,
+				backgroundStyle: Object.hasOwn(
+					BACKGROUND_DESCRIPTIONS,
+					legacy.backgroundStyle,
+				)
+					? legacy.backgroundStyle
+					: DEFAULTS.backgroundStyle,
+				backgroundColorA: isHexColor(legacy.backgroundColorA)
+					? legacy.backgroundColorA
+					: DEFAULTS.backgroundColorA,
+				backgroundColorB: isHexColor(legacy.backgroundColorB)
+					? legacy.backgroundColorB
+					: DEFAULTS.backgroundColorB,
+				backgroundSpeed: boundedNumber(
+					legacy.backgroundSpeed,
+					20,
+					100,
+					DEFAULTS.backgroundSpeed,
+				),
+				backgroundIntensity: boundedNumber(
+					legacy.backgroundIntensity,
+					15,
+					100,
+					DEFAULTS.backgroundIntensity,
+				),
 				showCustomCounters: legacy.showCustomCounters !== false,
 				updatedAt: serverTimestamp(),
 			}),
@@ -793,6 +910,38 @@ elements.accentPrimary.addEventListener("change", () => {
 elements.accentSecondary.addEventListener("change", () => {
 	saveSettings({ accentSecondary: elements.accentSecondary.value });
 });
+elements.backgroundEnabled.addEventListener("change", () => {
+	const settings = backgroundSettingsFromControls();
+	applyBackground(settings);
+	saveSettings({ backgroundEnabled: settings.backgroundEnabled });
+});
+elements.backgroundStyle.addEventListener("change", () => {
+	const settings = backgroundSettingsFromControls();
+	applyBackground(settings);
+	saveSettings({ backgroundStyle: settings.backgroundStyle });
+});
+for (const [element, property] of [
+	[elements.backgroundColorA, "backgroundColorA"],
+	[elements.backgroundColorB, "backgroundColorB"],
+]) {
+	element.addEventListener("input", () => {
+		applyBackground(backgroundSettingsFromControls());
+	});
+	element.addEventListener("change", () => {
+		saveSettings({ [property]: element.value });
+	});
+}
+for (const [element, property] of [
+	[elements.backgroundSpeed, "backgroundSpeed"],
+	[elements.backgroundIntensity, "backgroundIntensity"],
+]) {
+	element.addEventListener("input", () => {
+		applyBackground(backgroundSettingsFromControls());
+	});
+	element.addEventListener("change", () => {
+		saveSettings({ [property]: Number(element.value) });
+	});
+}
 elements.counterColorEnabled.addEventListener("change", () => {
 	elements.counterColor.disabled = !elements.counterColorEnabled.checked;
 	if (!elements.counterColorEnabled.checked) {

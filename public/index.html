@@ -33,6 +33,13 @@
 	</head>
 
 	<body>
+		<div id="ambient-background" class="ambient-background" aria-hidden="true">
+			<span class="ambient-blob blob-one"></span>
+			<span class="ambient-blob blob-two"></span>
+			<span class="ambient-blob blob-three"></span>
+			<span class="ambient-blob blob-four"></span>
+			<span class="ambient-blob blob-five"></span>
+		</div>
 		<div class="dashboard-controls" aria-label="Controles da dashboard">
 			<div class="dashboard-title">
 				<i class="material-icons" aria-hidden="true">timelapse</i>
@@ -240,25 +247,6 @@
 					</div>
 				</section>
 
-				<section class="settings-section" aria-labelledby="appearance-title">
-					<div class="settings-heading">
-						<div>
-							<p class="section-kicker">Interface</p>
-							<h2 id="appearance-title">Cores de destaque</h2>
-						</div>
-					</div>
-					<div class="color-fields">
-						<label class="color-field">
-							<span>Principal</span>
-							<input id="accent-primary" type="color" value="#a78bfa" />
-						</label>
-						<label class="color-field">
-							<span>Secundária</span>
-							<input id="accent-secondary" type="color" value="#362860" />
-						</label>
-					</div>
-				</section>
-
 				<section class="settings-section counter-settings" aria-labelledby="counter-management-title">
 					<div class="settings-heading">
 						<div>
@@ -276,6 +264,64 @@
 						<i class="material-icons" aria-hidden="true">add</i>
 						<span id="open-counter-modal-label">Novo contador</span>
 					</button>
+				</section>
+
+				<section class="settings-section" aria-labelledby="appearance-title">
+					<div class="settings-heading">
+						<div>
+							<p class="section-kicker">Interface</p>
+							<h2 id="appearance-title">Aparência</h2>
+						</div>
+					</div>
+					<p class="setting-label">Cores de destaque</p>
+					<div class="color-fields">
+						<label class="color-field">
+							<span>Principal</span>
+							<input id="accent-primary" type="color" value="#a78bfa" />
+						</label>
+						<label class="color-field">
+							<span>Secundária</span>
+							<input id="accent-secondary" type="color" value="#362860" />
+						</label>
+					</div>
+
+					<div class="appearance-divider"></div>
+					<label class="toggle-field" for="background-enabled">
+						<span>
+							<strong>Fundo animado</strong>
+							<small>Movimento ambiente atrás dos contadores</small>
+						</span>
+						<input id="background-enabled" type="checkbox" role="switch" />
+					</label>
+					<div id="background-controls" class="background-controls is-disabled">
+						<label class="field-label">
+							Estilo
+							<select id="background-style" class="settings-select" disabled>
+								<option value="lava">Lava lamp</option>
+								<option value="float">Blobs flutuantes</option>
+								<option value="glass">Correntes de vidro</option>
+							</select>
+						</label>
+						<p id="background-description" class="setting-help">Formas quentes que sobem, se fundem e mudam lentamente.</p>
+						<div class="color-fields background-color-fields">
+							<label class="color-field">
+								<span>Cor A</span>
+								<input id="background-color-a" type="color" value="#7c3aed" disabled />
+							</label>
+							<label class="color-field">
+								<span>Cor B</span>
+								<input id="background-color-b" type="color" value="#0ea5e9" disabled />
+							</label>
+						</div>
+						<label class="range-field">
+							<span>Velocidade <output id="background-speed-output" for="background-speed">Normal</output></span>
+							<input id="background-speed" type="range" min="20" max="100" step="1" value="55" disabled />
+						</label>
+						<label class="range-field">
+							<span>Intensidade <output id="background-intensity-output" for="background-intensity">55%</output></span>
+							<input id="background-intensity" type="range" min="15" max="100" step="1" value="55" disabled />
+						</label>
+					</div>
 				</section>
 			</div>
 
