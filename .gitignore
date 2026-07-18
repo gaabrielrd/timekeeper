@@ -8,6 +8,10 @@ firebase-debug.log*
 
 # Firebase cache
 .firebase/
+.firebase-local-config/
+
+# Workspace-local npm cache used by sandboxed tooling
+.npm-cache/
 
 # Firebase config
 

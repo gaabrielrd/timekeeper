@@ -1,12 +1,14 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
 import {
 	GoogleAuthProvider,
+	connectAuthEmulator,
 	getAuth,
 	onAuthStateChanged,
 	signInWithPopup,
 	signOut,
 } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
 import {
+	connectFirestoreEmulator,
 	doc,
 	getDoc,
 	getFirestore,
@@ -41,6 +43,16 @@ const DEFAULTS = {
 const MAX_COUNTERS = 5;
 const auth = getAuth(app);
 const db = getFirestore(app);
+const useLocalEmulators =
+	["localhost", "127.0.0.1"].includes(window.location.hostname) &&
+	new URLSearchParams(window.location.search).has("emulators");
+if (useLocalEmulators) {
+	connectAuthEmulator(auth, "http://127.0.0.1:9099", {
+		disableWarnings: true,
+	});
+	connectFirestoreEmulator(db, "127.0.0.1", 8080);
+	document.body.dataset.emulators = "true";
+}
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: "select_account" });
 
@@ -114,6 +126,10 @@ let editingCounterId = null;
 
 function isHexColor(value) {
 	return /^#[0-9a-f]{6}$/i.test(value || "");
+}
+
+function hasOwn(object, property) {
+	return Object.prototype.hasOwnProperty.call(object, property);
 }
 
 function getCookieValue(name) {
@@ -237,7 +253,7 @@ function backgroundSettingsFromControls() {
 
 function applyBackground(settings) {
 	const enabled = settings.backgroundEnabled === true;
-	const style = Object.hasOwn(BACKGROUND_DESCRIPTIONS, settings.backgroundStyle)
+	const style = hasOwn(BACKGROUND_DESCRIPTIONS, settings.backgroundStyle)
 		? settings.backgroundStyle
 		: DEFAULTS.backgroundStyle;
 	const colorA = isHexColor(settings.backgroundColorA)
@@ -551,6 +567,10 @@ function friendlyAuthError(error) {
 		"auth/popup-blocked": "O navegador bloqueou a janela de login.",
 		"auth/operation-not-allowed":
 			"Ative o login com Google no Firebase Authentication.",
+		"auth/unauthorized-domain":
+			"Este domínio ainda não está autorizado para o login Google.",
+		"auth/network-request-failed":
+			"Falha de rede durante o login. Verifique sua conexão.",
 	};
 	return messages[error.code] || "Não foi possível entrar com o Google.";
 }
@@ -906,7 +926,7 @@ async function ensureUserData(user) {
 					? legacy.accentSecondary
 					: DEFAULTS.accentSecondary,
 				backgroundEnabled: legacy.backgroundEnabled === true,
-				backgroundStyle: Object.hasOwn(
+				backgroundStyle: hasOwn(
 					BACKGROUND_DESCRIPTIONS,
 					legacy.backgroundStyle,
 				)
@@ -1315,5 +1335,9 @@ window.addEventListener("blur", () => {
 	constellationState.pointerY = null;
 });
 document.addEventListener("visibilitychange", syncConstellation);
-reducedMotionQuery.addEventListener("change", syncConstellation);
+if (typeof reducedMotionQuery.addEventListener === "function") {
+	reducedMotionQuery.addEventListener("change", syncConstellation);
+} else {
+	reducedMotionQuery.addListener(syncConstellation);
+}
 window.setInterval(updateCustomCounters, 1000);

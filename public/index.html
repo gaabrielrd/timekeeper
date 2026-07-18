@@ -14,6 +14,7 @@
 		<link rel="stylesheet" href="src/style.css" />
 
 		<script src="src/data.js"></script>
+		<script src="src/time.js"></script>
 		<script src="src/progressbar.min.js"></script>
 
 		<!-- Google tag (gtag.js) -->
@@ -414,59 +415,14 @@
 		<script type="module" src="src/firebase.js"></script>
 
 		<script>
-			var agora = new Date();
 			var pBars = [];
-
-			function findNext(dates) {
-				return (
-					dates.find((date) => date > new Date()) || dates[dates.length - 1]
-				);
-			}
-
-			var ateFeriado = findNext(feriados);
-			var atePagamento = findNext(pagamentos);
-			const msIna = {
-				second: 1000,
-				minute: 60000,
-				hour: 3600000,
-				day: 86400000,
-			};
-
-			function intervalBreakdown(howLong) {
-				var remaining = Math.max(0, howLong);
-				var dias = Math.floor(remaining / msIna.day);
-				remaining %= msIna.day;
-				var horas = Math.floor(remaining / msIna.hour);
-				remaining %= msIna.hour;
-				var minutos = Math.floor(remaining / msIna.minute);
-				remaining %= msIna.minute;
-				return {
-					dias,
-					horas,
-					minutos,
-					segundos: Math.floor(remaining / msIna.second),
-				};
-			}
-
-			function formatInterval(interval) {
-				var parts = [];
-				if (interval.dias)
-					parts.push(interval.dias + (interval.dias === 1 ? " dia" : " dias"));
-				if (interval.horas)
-					parts.push(
-						interval.horas + (interval.horas === 1 ? " hora" : " horas"),
-					);
-				if (interval.minutos)
-					parts.push(
-						interval.minutos +
-							(interval.minutos === 1 ? " minuto" : " minutos"),
-					);
-				parts.push(
-					interval.segundos +
-						(interval.segundos === 1 ? " segundo" : " segundos"),
-				);
-				return parts.join(",<br>");
-			}
+			const {
+				findNext,
+				formatInterval,
+				intervalBreakdown,
+				periodPercentage,
+				resolveRecurringState,
+			} = window.TimekeeperTime;
 
 			document.querySelectorAll(".progress-bar").forEach((el) => {
 				pBars.push(
@@ -481,96 +437,6 @@
 					}),
 				);
 			});
-
-			function clamp(value) {
-				return Math.max(0, Math.min(1, Number(value) || 0));
-			}
-			function dateAtTime(date, time) {
-				var parts = String(time || "00:00").split(":");
-				var result = new Date(date);
-				result.setHours(Number(parts[0]) || 0, Number(parts[1]) || 0, 0, 0);
-				return result;
-			}
-			function recurringRangeForDate(date, startTime, endTime) {
-				var start = dateAtTime(date, startTime);
-				var end = dateAtTime(date, endTime);
-				if (end <= start) end.setDate(end.getDate() + 1);
-				return { start, end };
-			}
-			function resolveRecurringState(counter, actualTime) {
-				var days = Array.isArray(counter.daysOfWeek)
-					? counter.daysOfWeek.map(Number)
-					: [];
-				var active = null;
-				var previous = null;
-				var next = null;
-				for (var offset = -8; offset <= 8; offset += 1) {
-					var occurrenceDate = new Date(actualTime);
-					occurrenceDate.setDate(actualTime.getDate() + offset);
-					occurrenceDate.setHours(0, 0, 0, 0);
-					if (!days.includes(occurrenceDate.getDay())) continue;
-					var range = recurringRangeForDate(
-						occurrenceDate,
-						counter.startTime,
-						counter.endTime,
-					);
-					if (range.start <= actualTime && actualTime < range.end) {
-						active = range;
-					}
-					if (
-						range.end <= actualTime &&
-						(!previous || range.end > previous.end)
-					) {
-						previous = range;
-					}
-					if (
-						range.start > actualTime &&
-						(!next || range.start < next.start)
-					) {
-						next = range;
-					}
-				}
-				if (active) {
-					return {
-						phase: "active",
-						target: active.end,
-						progress: clamp(
-							(actualTime - active.start) / (active.end - active.start),
-						),
-					};
-				}
-				if (next) {
-					var waitStart = previous ? previous.end : actualTime;
-					return {
-						phase: "upcoming",
-						target: next.start,
-						progress: clamp(
-							(actualTime - waitStart) / (next.start - waitStart),
-						),
-					};
-				}
-				return { phase: "upcoming", target: actualTime, progress: 0 };
-			}
-			function resolveCounterState(counter, actualTime) {
-				if ((counter.type || "fixed") === "recurring") {
-					return resolveRecurringState(counter, actualTime);
-				}
-				var start = new Date(counter.startAt);
-				var end = new Date(counter.endAt);
-				return {
-					phase: "fixed",
-					target: end,
-					progress: clamp((actualTime - start) / (end - start)),
-				};
-			}
-			function periodPercentage(dates, actualTime) {
-				var nextIndex = dates.findIndex((date) => date > actualTime);
-				if (nextIndex <= 0) return 0;
-				return clamp(
-					(actualTime - dates[nextIndex - 1]) /
-						(dates[nextIndex] - dates[nextIndex - 1]),
-				);
-			}
 
 			function fill() {
 				var now = new Date();
@@ -596,12 +462,23 @@
 					workdayState.phase === "active"
 						? "para encerrar o dia de trabalho."
 						: "para iniciar o próximo expediente.";
-				var targets = [atePagamento, ateFeriado];
+				var targets = [findNext(pagamentos, now), findNext(feriados, now)];
+				var calendarLabels = ["próximo pagamento", "próximo feriado"];
 				panels.forEach((panel, index) => {
 					if (index === 0) return;
-					panel.querySelector(".panel-main").innerHTML = formatInterval(
-						intervalBreakdown(targets[index - 1] - now),
-					);
+					var target = targets[index - 1];
+					var pre = panel.querySelector(".panel-pre");
+					var main = panel.querySelector(".panel-main");
+					var post = panel.querySelector(".panel-post");
+					if (target) {
+						pre.textContent = "Ainda faltam";
+						main.innerHTML = formatInterval(intervalBreakdown(target - now));
+						post.textContent = `para o ${calendarLabels[index - 1]}.`;
+						return;
+					}
+					pre.textContent = "Calendário";
+					main.textContent = "indisponível";
+					post.textContent = "Atualize as datas deste contador.";
 				});
 				pBars[0].animate(workdayState.progress);
 				pBars[1].animate(periodPercentage(pagamentos, now));

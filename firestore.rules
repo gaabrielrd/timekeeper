@@ -2,36 +2,218 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isGoogleOwner(userId) {
+      return request.auth != null
+        && request.auth.uid == userId
+        && request.auth.token.firebase.sign_in_provider == 'google.com';
+    }
+
+    function isHexColor(value) {
+      return value is string
+        && value.matches('^#[0-9a-fA-F]{6}$');
+    }
+
+    function hasValidUpdatedAt(data) {
+      return !('updatedAt' in data) || data.updatedAt is timestamp;
+    }
+
+    function hasValidSettingsFields(data) {
+      return (!('endHour' in data)
+          || (data.endHour is int && data.endHour >= 17 && data.endHour <= 22))
+        && (!('endMinutes' in data)
+          || (data.endMinutes is int && data.endMinutes in [25, 55]))
+        && (!('accentPrimary' in data) || isHexColor(data.accentPrimary))
+        && (!('accentSecondary' in data) || isHexColor(data.accentSecondary))
+        && (!('backgroundEnabled' in data) || data.backgroundEnabled is bool)
+        && (!('backgroundStyle' in data)
+          || data.backgroundStyle in [
+            'lava',
+            'float',
+            'glass',
+            'rings',
+            'aurora',
+            'topography',
+            'constellation'
+          ])
+        && (!('backgroundColorA' in data) || isHexColor(data.backgroundColorA))
+        && (!('backgroundColorB' in data) || isHexColor(data.backgroundColorB))
+        && (!('backgroundSpeed' in data)
+          || (data.backgroundSpeed is int
+            && data.backgroundSpeed >= 20
+            && data.backgroundSpeed <= 100))
+        && (!('backgroundIntensity' in data)
+          || (data.backgroundIntensity is int
+            && data.backgroundIntensity >= 15
+            && data.backgroundIntensity <= 100))
+        && (!('showCustomCounters' in data) || data.showCustomCounters is bool);
+    }
+
+    function hasValidProfileFields(data) {
+      return data.keys().hasOnly([
+          'displayName',
+          'email',
+          'photoURL',
+          'updatedAt',
+          'endHour',
+          'endMinutes',
+          'accentPrimary',
+          'accentSecondary',
+          'backgroundEnabled',
+          'backgroundStyle',
+          'backgroundColorA',
+          'backgroundColorB',
+          'backgroundSpeed',
+          'backgroundIntensity',
+          'showCustomCounters',
+          'customCounters'
+        ])
+        && (!('displayName' in data)
+          || (data.displayName is string && data.displayName.size() <= 100))
+        && (!('email' in data)
+          || (data.email is string && data.email.size() <= 320))
+        && (!('photoURL' in data)
+          || (data.photoURL is string && data.photoURL.size() <= 2048))
+        && (!('customCounters' in data)
+          || (data.customCounters is list && data.customCounters.size() <= 5))
+        && hasValidSettingsFields(data)
+        && hasValidUpdatedAt(data);
+    }
+
+    function hasValidCounterBase(counter) {
+      return counter is map
+        && counter.id is string
+        && counter.id.size() > 0
+        && counter.id.size() <= 100
+        && counter.name is string
+        && counter.name.size() > 0
+        && counter.name.size() <= 50
+        && (!('createdAt' in counter)
+          || (counter.createdAt is string && counter.createdAt.size() <= 40))
+        && (!('color' in counter)
+          || counter.color == null
+          || isHexColor(counter.color));
+    }
+
+    function isValidFixedCounter(counter) {
+      return counter.keys().hasOnly([
+          'id',
+          'name',
+          'type',
+          'startAt',
+          'endAt',
+          'color',
+          'createdAt'
+        ])
+        && (!('type' in counter) || counter.type == 'fixed')
+        && counter.startAt is string
+        && counter.startAt.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}T.*Z$')
+        && counter.endAt is string
+        && counter.endAt.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}T.*Z$');
+    }
+
+    function isValidDayAt(days, index) {
+      return days.size() <= index
+        ? true
+        : days[index] is int && days[index] >= 0 && days[index] <= 6;
+    }
+
+    function hasValidDays(days) {
+      return days is list
+        && days.size() >= 1
+        && days.size() <= 7
+        && isValidDayAt(days, 0)
+        && isValidDayAt(days, 1)
+        && isValidDayAt(days, 2)
+        && isValidDayAt(days, 3)
+        && isValidDayAt(days, 4)
+        && isValidDayAt(days, 5)
+        && isValidDayAt(days, 6);
+    }
+
+    function isValidRecurringCounter(counter) {
+      return counter.keys().hasOnly([
+          'id',
+          'name',
+          'type',
+          'startTime',
+          'endTime',
+          'daysOfWeek',
+          'color',
+          'createdAt'
+        ])
+        && counter.type == 'recurring'
+        && counter.startTime is string
+        && counter.startTime.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')
+        && counter.endTime is string
+        && counter.endTime.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')
+        && hasValidDays(counter.daysOfWeek);
+    }
+
+    function isValidCounter(counter) {
+      return hasValidCounterBase(counter)
+        && (isValidFixedCounter(counter) || isValidRecurringCounter(counter));
+    }
+
+    function isValidCounterAt(items, index) {
+      return items.size() <= index ? true : isValidCounter(items[index]);
+    }
+
+    function hasValidCounterItems(items) {
+      return items is list
+        && items.size() <= 5
+        && isValidCounterAt(items, 0)
+        && isValidCounterAt(items, 1)
+        && isValidCounterAt(items, 2)
+        && isValidCounterAt(items, 3)
+        && isValidCounterAt(items, 4);
+    }
+
+    function isValidSettingsDocument(data) {
+      return data.keys().hasOnly([
+          'endHour',
+          'endMinutes',
+          'accentPrimary',
+          'accentSecondary',
+          'backgroundEnabled',
+          'backgroundStyle',
+          'backgroundColorA',
+          'backgroundColorB',
+          'backgroundSpeed',
+          'backgroundIntensity',
+          'showCustomCounters',
+          'updatedAt'
+        ])
+        && hasValidSettingsFields(data)
+        && hasValidUpdatedAt(data);
+    }
+
+    function isValidCountersDocument(data) {
+      return data.keys().hasOnly(['items', 'updatedAt'])
+        && hasValidCounterItems(data.items)
+        && hasValidUpdatedAt(data);
+    }
+
     match /users/{userId} {
-      function isGoogleOwner() {
-        return request.auth != null
-          && request.auth.uid == userId
-          && request.auth.token.firebase.sign_in_provider == 'google.com';
-      }
-
-      function hasValidCounterLimit() {
-        return !('customCounters' in request.resource.data)
-          || request.resource.data.customCounters.size() <= 5;
-      }
-
-      allow read, delete: if isGoogleOwner();
-      allow create, update: if isGoogleOwner() && hasValidCounterLimit();
+      allow read, delete: if isGoogleOwner(userId);
+      allow create, update: if isGoogleOwner(userId)
+        && hasValidProfileFields(request.resource.data);
 
       match /data/{documentId} {
         function isAllowedDocument() {
           return documentId == 'settings' || documentId == 'counters';
         }
 
-        function hasValidItems() {
-          return documentId != 'counters'
-            || (request.resource.data.items is list
-              && request.resource.data.items.size() <= 5);
+        function isValidDocument() {
+          return (documentId == 'settings'
+              && isValidSettingsDocument(request.resource.data))
+            || (documentId == 'counters'
+              && isValidCountersDocument(request.resource.data));
         }
 
-        allow read, delete: if isGoogleOwner() && isAllowedDocument();
-        allow create, update: if isGoogleOwner()
+        allow read, delete: if isGoogleOwner(userId) && isAllowedDocument();
+        allow create, update: if isGoogleOwner(userId)
           && isAllowedDocument()
-          && hasValidItems();
+          && isValidDocument();
       }
     }
   }
