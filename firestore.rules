@@ -275,26 +275,26 @@ service cloud.firestore {
       allow create, update: if isGoogleOwner(userId)
         && hasValidProfileFields(request.resource.data);
 
-      match /data/{documentId} {
-        function isAllowedDocument() {
-          return documentId == 'settings'
-            || documentId == 'counters'
-            || documentId == 'images';
-        }
-
-        function isValidDocument() {
-          return (documentId == 'settings'
-              && isValidSettingsDocument(request.resource.data))
-            || (documentId == 'counters'
-              && isValidCountersDocument(request.resource.data))
-            || (documentId == 'images'
-              && isValidImagesDocument(request.resource.data));
-        }
-
-        allow read, delete: if isGoogleOwner(userId) && isAllowedDocument();
+      match /data/settings {
+        allow read, delete: if isGoogleOwner(userId);
         allow create, update: if isGoogleOwner(userId)
-          && isAllowedDocument()
-          && isValidDocument();
+          && isValidSettingsDocument(request.resource.data);
+      }
+
+      match /data/counters {
+        allow read, delete: if isGoogleOwner(userId);
+        allow create, update: if isGoogleOwner(userId)
+          && isValidCountersDocument(request.resource.data);
+      }
+
+      match /data/images {
+        allow read, delete: if isGoogleOwner(userId);
+        allow create, update: if isGoogleOwner(userId)
+          && isValidImagesDocument(request.resource.data);
+      }
+
+      match /data/{documentId} {
+        allow read, write: if false;
       }
     }
   }

@@ -18,6 +18,14 @@ test("limite de cinco permanece alinhado entre HTML, cliente e rules", () => {
 	assert.match(rules, /items\.size\(\) <= 5/);
 });
 
+test("documentos Firestore usam matches isolados para preservar o orçamento de expressões", () => {
+	const rules = read("firestore.rules");
+	assert.match(rules, /match \/data\/settings \{/);
+	assert.match(rules, /match \/data\/counters \{/);
+	assert.match(rules, /match \/data\/images \{/);
+	assert.doesNotMatch(rules, /function isValidDocument\(\)/);
+});
+
 test("todos os backgrounds da interface possuem descrição no cliente", () => {
 	const html = read("public/index.html");
 	const client = read("public/src/firebase.js");

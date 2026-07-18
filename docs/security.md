@@ -27,6 +27,8 @@ Para `/users/{userId}`:
 Para `/users/{userId}/data/{documentId}`:
 
 - apenas `settings`, `counters` e `images` são permitidos;
+- cada documento usa um `match` literal próprio para não somar os três schemas no
+  limite de expressões das Rules;
 - somente o dono Google pode ler/escrever/excluir;
 - settings validam allowlist, tipos, cores, estilos e ranges;
 - counters validam allowlist, limite cinco e schemas fixo/recorrente;
