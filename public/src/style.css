@@ -461,23 +461,23 @@ body[data-background-enabled="true"] .dashboard-controls {
 	backdrop-filter: blur(16px) saturate(112%);
 }
 body[data-background-enabled="true"] .a-panel {
-	background-color: color-mix(in srgb, var(--bg) 74%, transparent);
+	background-color: color-mix(in srgb, var(--bg) 70%, transparent);
 	backdrop-filter: blur(12px) saturate(108%);
 }
 body[data-background-enabled="true"] .a-panel.featured {
-	background-color: color-mix(in srgb, var(--surface) 82%, transparent);
+	background-color: color-mix(in srgb, var(--surface) 78%, transparent);
 }
 body[data-background-enabled="true"][data-background-style="glass"]
 	.dashboard-controls,
 body[data-background-enabled="true"][data-background-style="glass"] .a-panel {
-	background-color: color-mix(in srgb, var(--surface) 68%, transparent);
+	background-color: color-mix(in srgb, var(--surface) 64%, transparent);
 	backdrop-filter: blur(18px) saturate(125%);
 }
 body[data-background-enabled="true"][data-background-style="glass"]
 	.a-panel.featured {
 	background-color: color-mix(
 		in srgb,
-		var(--accent-secondary) 72%,
+		var(--accent-secondary) 68%,
 		transparent
 	);
 }

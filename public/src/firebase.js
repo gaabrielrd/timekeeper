@@ -344,7 +344,7 @@ function createConstellationParticle() {
 		y: Math.random() * constellationState.height,
 		vx: (Math.random() - 0.5) * 0.22,
 		vy: (Math.random() - 0.5) * 0.22,
-		radius: 1.35 + Math.random() * 2.35,
+		radius: 2 + Math.random() * 3.25,
 	};
 }
 
@@ -455,11 +455,28 @@ function drawConstellation(delta, shouldMove = true) {
 	}
 
 	context.save();
-	context.fillStyle = `rgb(${colorA.r}, ${colorA.g}, ${colorA.b})`;
-	context.shadowColor = `rgba(${colorA.r}, ${colorA.g}, ${colorA.b}, 0.82)`;
+	context.globalCompositeOperation = "screen";
 	for (const particle of constellationState.particles) {
+		const glowRadius = 20 + particle.radius * 11;
+		const glow = context.createRadialGradient(
+			particle.x,
+			particle.y,
+			0,
+			particle.x,
+			particle.y,
+			glowRadius,
+		);
+		glow.addColorStop(0, `rgba(${colorA.r}, ${colorA.g}, ${colorA.b}, 0.26)`);
+		glow.addColorStop(0.22, `rgba(${colorA.r}, ${colorA.g}, ${colorA.b}, 0.12)`);
+		glow.addColorStop(0.55, `rgba(${colorA.r}, ${colorA.g}, ${colorA.b}, 0.04)`);
+		glow.addColorStop(1, `rgba(${colorA.r}, ${colorA.g}, ${colorA.b}, 0)`);
+		context.fillStyle = glow;
+		context.beginPath();
+		context.arc(particle.x, particle.y, glowRadius, 0, Math.PI * 2);
+		context.fill();
+
+		context.fillStyle = `rgb(${colorA.r}, ${colorA.g}, ${colorA.b})`;
 		context.globalAlpha = 0.46 + intensity * 0.0048;
-		context.shadowBlur = 7 + particle.radius * 3.4;
 		context.beginPath();
 		context.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
 		context.fill();
