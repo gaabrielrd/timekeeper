@@ -8,8 +8,8 @@
     "check:syntax": "node --check public/src/time.js && node --check public/src/analytics.js && node --check public/src/firebase.js && node --check scripts/serve-public.cjs",
     "test": "npm run test:unit && npm run test:rules",
     "test:e2e": "playwright test",
-    "test:unit": "node --test --test-isolation=none tests/unit/time.test.cjs tests/contracts/project.test.cjs",
-    "test:rules": "firebase emulators:exec --project demo-timekeeper --only firestore \"node --test --test-isolation=none tests/rules/firestore.test.cjs\""
+    "test:unit": "node --test tests/unit/time.test.cjs tests/contracts/project.test.cjs",
+    "test:rules": "firebase emulators:exec --project demo-timekeeper --only firestore \"node --test tests/rules/firestore.test.cjs\""
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "5.0.1",
