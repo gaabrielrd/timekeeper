@@ -38,7 +38,7 @@ const DEFAULTS = {
 	showCustomCounters: true,
 	customCounters: [],
 };
-const MAX_COUNTERS = 3;
+const MAX_COUNTERS = 5;
 const auth = getAuth(app);
 const db = getFirestore(app);
 const googleProvider = new GoogleAuthProvider();
@@ -76,6 +76,7 @@ const elements = {
 	backgroundIntensityOutput: document.querySelector(
 		"#background-intensity-output",
 	),
+	constellationCanvas: document.querySelector("#constellation-canvas"),
 	settingsState: document.querySelector("#settings-state"),
 	counterForm: document.querySelector("#counter-form"),
 	counterDialog: document.querySelector("#counter-dialog"),
@@ -210,6 +211,10 @@ const BACKGROUND_DESCRIPTIONS = {
 	lava: "Formas quentes que sobem, se fundem e mudam lentamente.",
 	float: "Orbes mais definidos cruzam a tela em trajetórias independentes.",
 	glass: "Faixas translúcidas refratam cor sob superfícies de vidro.",
+	rings: "Arcos concêntricos acompanham segundos e minutos em órbitas lentas.",
+	aurora: "Faixas luminosas atravessam a tela como uma aurora em movimento.",
+	topography: "Linhas de contorno fluem como um mapa topográfico vivo.",
+	constellation: "Pontos flutuantes formam conexões efêmeras e reagem ao cursor.",
 };
 
 function boundedNumber(value, minimum, maximum, fallback) {
@@ -277,6 +282,234 @@ function applyBackground(settings) {
 	elements.backgroundControls
 		.querySelectorAll("input, select")
 		.forEach((control) => (control.disabled = !enabled));
+	updateChronoRings();
+	syncConstellation();
+}
+
+function updateChronoRings() {
+	if (
+		document.body.dataset.backgroundEnabled !== "true" ||
+		document.body.dataset.backgroundStyle !== "rings"
+	) {
+		return;
+	}
+	const now = new Date();
+	const seconds = now.getSeconds() + now.getMilliseconds() / 1000;
+	const minuteSeconds = now.getMinutes() * 60 + seconds;
+	document.documentElement.style.setProperty(
+		"--chrono-seconds-delay",
+		`${-seconds}s`,
+	);
+	document.documentElement.style.setProperty(
+		"--chrono-minutes-delay",
+		`${-minuteSeconds}s`,
+	);
+}
+
+const reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+const constellationState = {
+	context: elements.constellationCanvas.getContext("2d"),
+	dpr: 1,
+	frame: null,
+	height: 0,
+	lastTime: 0,
+	particles: [],
+	pointerX: null,
+	pointerY: null,
+	width: 0,
+};
+
+function constellationIsActive() {
+	return (
+		document.body.dataset.backgroundEnabled === "true" &&
+		document.body.dataset.backgroundStyle === "constellation" &&
+		!document.hidden
+	);
+}
+
+function hexToRgb(color) {
+	const match = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(color);
+	return match
+		? {
+				r: Number.parseInt(match[1], 16),
+				g: Number.parseInt(match[2], 16),
+				b: Number.parseInt(match[3], 16),
+			}
+		: { r: 167, g: 139, b: 250 };
+}
+
+function createConstellationParticle() {
+	return {
+		x: Math.random() * constellationState.width,
+		y: Math.random() * constellationState.height,
+		vx: (Math.random() - 0.5) * 0.22,
+		vy: (Math.random() - 0.5) * 0.22,
+		radius: 1.35 + Math.random() * 2.35,
+	};
+}
+
+function resizeConstellation() {
+	const rectangle = elements.constellationCanvas.getBoundingClientRect();
+	const width = Math.max(1, Math.round(rectangle.width));
+	const height = Math.max(1, Math.round(rectangle.height));
+	const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+	if (
+		width === constellationState.width &&
+		height === constellationState.height &&
+		dpr === constellationState.dpr
+	) {
+		return;
+	}
+	constellationState.width = width;
+	constellationState.height = height;
+	constellationState.dpr = dpr;
+	elements.constellationCanvas.width = Math.round(width * dpr);
+	elements.constellationCanvas.height = Math.round(height * dpr);
+	constellationState.context.setTransform(dpr, 0, 0, dpr, 0, 0);
+	constellationState.particles = [];
+}
+
+function reconcileConstellationParticles() {
+	const intensity = boundedNumber(
+		elements.backgroundIntensity.value,
+		15,
+		100,
+		DEFAULTS.backgroundIntensity,
+	);
+	const areaFactor = Math.max(
+		0.58,
+		Math.min(1.18, Math.sqrt((constellationState.width * constellationState.height) / 921600)),
+	);
+	const targetCount = Math.round((24 + intensity * 0.55) * areaFactor);
+	while (constellationState.particles.length < targetCount) {
+		constellationState.particles.push(createConstellationParticle());
+	}
+	if (constellationState.particles.length > targetCount) {
+		constellationState.particles.length = targetCount;
+	}
+}
+
+function drawConstellation(delta, shouldMove = true) {
+	const context = constellationState.context;
+	const width = constellationState.width;
+	const height = constellationState.height;
+	const intensity = boundedNumber(
+		elements.backgroundIntensity.value,
+		15,
+		100,
+		DEFAULTS.backgroundIntensity,
+	);
+	const speed = boundedNumber(
+		elements.backgroundSpeed.value,
+		20,
+		100,
+		DEFAULTS.backgroundSpeed,
+	);
+	const colorA = hexToRgb(elements.backgroundColorA.value);
+	const colorB = hexToRgb(elements.backgroundColorB.value);
+	const distanceLimit = 94 + intensity * 0.62;
+	const movement = Math.min(delta / 16.67, 2) * (0.38 + speed / 72);
+	context.clearRect(0, 0, width, height);
+
+	for (const particle of constellationState.particles) {
+		if (shouldMove) {
+			particle.x += particle.vx * movement;
+			particle.y += particle.vy * movement;
+			if (particle.x < -8) particle.x = width + 8;
+			if (particle.x > width + 8) particle.x = -8;
+			if (particle.y < -8) particle.y = height + 8;
+			if (particle.y > height + 8) particle.y = -8;
+
+			if (constellationState.pointerX !== null) {
+				const pointerX = particle.x - constellationState.pointerX;
+				const pointerY = particle.y - constellationState.pointerY;
+				const pointerDistance = Math.hypot(pointerX, pointerY);
+				if (pointerDistance > 0 && pointerDistance < 170) {
+					const force = (1 - pointerDistance / 170) * 0.018;
+					particle.x += (pointerX / pointerDistance) * force * delta;
+					particle.y += (pointerY / pointerDistance) * force * delta;
+				}
+			}
+		}
+	}
+
+	context.lineWidth = 0.7;
+	for (let index = 0; index < constellationState.particles.length; index += 1) {
+		const first = constellationState.particles[index];
+		for (
+			let otherIndex = index + 1;
+			otherIndex < constellationState.particles.length;
+			otherIndex += 1
+		) {
+			const second = constellationState.particles[otherIndex];
+			const distance = Math.hypot(first.x - second.x, first.y - second.y);
+			if (distance >= distanceLimit) continue;
+			const alpha =
+				(1 - distance / distanceLimit) * (0.09 + intensity * 0.0024);
+			context.strokeStyle = `rgba(${colorB.r}, ${colorB.g}, ${colorB.b}, ${alpha})`;
+			context.beginPath();
+			context.moveTo(first.x, first.y);
+			context.lineTo(second.x, second.y);
+			context.stroke();
+		}
+	}
+
+	context.save();
+	context.fillStyle = `rgb(${colorA.r}, ${colorA.g}, ${colorA.b})`;
+	context.shadowColor = `rgba(${colorA.r}, ${colorA.g}, ${colorA.b}, 0.82)`;
+	for (const particle of constellationState.particles) {
+		context.globalAlpha = 0.46 + intensity * 0.0048;
+		context.shadowBlur = 7 + particle.radius * 3.4;
+		context.beginPath();
+		context.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
+		context.fill();
+	}
+	context.restore();
+}
+
+function stopConstellation() {
+	if (constellationState.frame !== null) {
+		window.cancelAnimationFrame(constellationState.frame);
+		constellationState.frame = null;
+	}
+	constellationState.context.clearRect(
+		0,
+		0,
+		constellationState.width,
+		constellationState.height,
+	);
+}
+
+function constellationLoop(time) {
+	constellationState.frame = null;
+	if (!constellationIsActive()) {
+		stopConstellation();
+		return;
+	}
+	const delta = constellationState.lastTime
+		? Math.min(time - constellationState.lastTime, 40)
+		: 16.67;
+	constellationState.lastTime = time;
+	drawConstellation(delta);
+	constellationState.frame = window.requestAnimationFrame(constellationLoop);
+}
+
+function syncConstellation() {
+	if (!constellationIsActive()) {
+		stopConstellation();
+		return;
+	}
+	resizeConstellation();
+	reconcileConstellationParticles();
+	if (reducedMotionQuery.matches) {
+		stopConstellation();
+		drawConstellation(0, false);
+		return;
+	}
+	if (constellationState.frame === null) {
+		constellationState.lastTime = 0;
+		constellationState.frame = window.requestAnimationFrame(constellationLoop);
+	}
 }
 
 function openSidebar() {
@@ -567,6 +800,7 @@ function renderCustomCounters(counters) {
 	customProgressBars.forEach(({ bar }) => bar.destroy());
 	customProgressBars = [];
 	elements.customPanels.replaceChildren();
+	elements.customPanels.dataset.count = String(counters.length);
 	counters.forEach((counter, index) => {
 		elements.customPanels.append(createCustomPanel(counter, index));
 	});
@@ -956,7 +1190,7 @@ elements.counterForm.addEventListener("submit", async (event) => {
 	event.preventDefault();
 	elements.counterMessage.textContent = "";
 	if (!editingCounterId && userSettings.customCounters.length >= MAX_COUNTERS) {
-		elements.counterMessage.textContent = "Você já possui três contadores.";
+		elements.counterMessage.textContent = "Você já possui cinco contadores.";
 		return;
 	}
 	const data = new FormData(elements.counterForm);
@@ -1053,4 +1287,16 @@ onAuthStateChanged(auth, (user) => {
 	applyCounters([]);
 });
 
+window.addEventListener("resize", syncConstellation);
+window.addEventListener("pointermove", (event) => {
+	if (!constellationIsActive()) return;
+	constellationState.pointerX = event.clientX;
+	constellationState.pointerY = event.clientY;
+});
+window.addEventListener("blur", () => {
+	constellationState.pointerX = null;
+	constellationState.pointerY = null;
+});
+document.addEventListener("visibilitychange", syncConstellation);
+reducedMotionQuery.addEventListener("change", syncConstellation);
 window.setInterval(updateCustomCounters, 1000);

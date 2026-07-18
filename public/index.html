@@ -39,6 +39,25 @@
 			<span class="ambient-blob blob-three"></span>
 			<span class="ambient-blob blob-four"></span>
 			<span class="ambient-blob blob-five"></span>
+			<div class="chrono-rings">
+				<span class="chrono-ring ring-seconds"></span>
+				<span class="chrono-ring ring-minutes"></span>
+				<span class="chrono-ring ring-orbit-one"></span>
+				<span class="chrono-ring ring-orbit-two"></span>
+				<span class="chrono-core"></span>
+			</div>
+			<svg class="topographic-map" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice">
+				<g>
+					<path d="M86 470C118 300 258 188 432 220C565 245 597 127 753 145C922 164 1085 292 1118 459C1154 638 1004 728 824 692C683 664 608 753 433 716C241 676 53 642 86 470Z" />
+					<path d="M151 473C182 340 291 257 428 275C558 292 624 190 749 201C889 214 1031 322 1054 456C1080 602 958 661 817 634C678 607 598 686 449 656C292 625 119 610 151 473Z" />
+					<path d="M224 469C249 376 331 319 433 329C551 341 634 250 742 259C857 268 968 350 984 451C1002 565 909 596 807 579C675 557 593 620 463 598C343 578 199 567 224 469Z" />
+					<path d="M303 465C323 406 376 375 443 380C548 388 643 310 736 316C825 323 896 380 907 446C919 526 856 539 789 528C674 510 589 556 478 544C395 535 283 531 303 465Z" />
+					<path d="M385 458C397 429 421 420 458 423C548 430 651 368 727 373C787 377 825 406 832 441C838 483 807 486 769 480C670 464 587 493 495 490C446 488 373 489 385 458Z" />
+					<path d="M891 104C946 72 1031 89 1064 143C1097 197 1058 253 993 250C929 247 853 216 858 163C860 139 873 115 891 104Z" />
+					<path d="M925 132C956 114 1008 123 1027 154C1046 184 1022 216 985 214C948 212 905 194 908 164C909 151 916 138 925 132Z" />
+				</g>
+			</svg>
+			<canvas id="constellation-canvas" class="constellation-canvas"></canvas>
 		</div>
 		<div class="dashboard-controls" aria-label="Controles da dashboard">
 			<div class="dashboard-title">
@@ -250,12 +269,12 @@
 				<section class="settings-section counter-settings" aria-labelledby="counter-management-title">
 					<div class="settings-heading">
 						<div>
-							<p class="section-kicker">Até três</p>
+							<p class="section-kicker">Até cinco</p>
 							<h2 id="counter-management-title">Meus contadores</h2>
 						</div>
 						<div class="counter-heading-meta">
 							<span id="counter-sidebar-state" class="live-state compact" data-state="connecting">Conectando...</span>
-							<span id="counter-count" class="counter-count">0 / 3</span>
+							<span id="counter-count" class="counter-count">0 / 5</span>
 						</div>
 					</div>
 
@@ -300,6 +319,10 @@
 								<option value="lava">Lava lamp</option>
 								<option value="float">Blobs flutuantes</option>
 								<option value="glass">Correntes de vidro</option>
+								<option value="rings">Anéis cronológicos</option>
+								<option value="aurora">Aurora orbital</option>
+								<option value="topography">Mapa topográfico</option>
+								<option value="constellation">Constelação dinâmica</option>
 							</select>
 						</label>
 						<p id="background-description" class="setting-help">Formas quentes que sobem, se fundem e mudam lentamente.</p>

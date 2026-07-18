@@ -11,7 +11,7 @@ service cloud.firestore {
 
       function hasValidCounterLimit() {
         return !('customCounters' in request.resource.data)
-          || request.resource.data.customCounters.size() <= 3;
+          || request.resource.data.customCounters.size() <= 5;
       }
 
       allow read, delete: if isGoogleOwner();
@@ -25,7 +25,7 @@ service cloud.firestore {
         function hasValidItems() {
           return documentId != 'counters'
             || (request.resource.data.items is list
-              && request.resource.data.items.size() <= 3);
+              && request.resource.data.items.size() <= 5);
         }
 
         allow read, delete: if isGoogleOwner() && isAllowedDocument();

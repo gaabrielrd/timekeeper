@@ -98,6 +98,12 @@ body[data-background-enabled="true"] .ambient-background {
 		transparent 59%
 	);
 }
+.ambient-background * {
+	animation-play-state: paused;
+}
+body[data-background-enabled="true"] .ambient-background * {
+	animation-play-state: running;
+}
 .ambient-blob {
 	position: absolute;
 	display: block;
@@ -118,6 +124,8 @@ body[data-background-enabled="true"] .ambient-background {
 	animation-timing-function: ease-in-out;
 	animation-iteration-count: infinite;
 	animation-direction: alternate;
+	opacity: 1;
+	transition: opacity 0.5s ease;
 }
 .blob-one {
 	left: 5%;
@@ -223,6 +231,230 @@ body[data-background-style="glass"] .ambient-blob {
 		inset 0 1px 0 rgba(255, 255, 255, 0.2),
 		0 30px 90px color-mix(in srgb, var(--ambient-a) 22%, transparent);
 	animation-name: glass-current;
+}
+.chrono-rings,
+.topographic-map,
+.constellation-canvas {
+	position: absolute;
+	top: 14vmax;
+	left: 14vmax;
+	width: calc(100% - 28vmax);
+	height: calc(100% - 28vmax);
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 0.55s ease;
+}
+body[data-background-style="rings"] .ambient-blob,
+body[data-background-style="topography"] .ambient-blob,
+body[data-background-style="constellation"] .ambient-blob {
+	opacity: 0;
+	animation-play-state: paused;
+}
+.chrono-rings {
+	display: grid;
+	place-items: center;
+	filter: drop-shadow(
+		0 0 28px color-mix(in srgb, var(--ambient-a) 24%, transparent)
+	);
+	transform: translate3d(17vw, 4vh, 0) rotateX(62deg) rotateZ(-12deg) scale(1.35);
+	transform-style: preserve-3d;
+}
+body[data-background-style="rings"] .chrono-rings {
+	opacity: 0.82;
+}
+.chrono-ring {
+	position: absolute;
+	display: block;
+	aspect-ratio: 1;
+	border-radius: 50%;
+	background: conic-gradient(
+		from 15deg,
+		transparent 0 8%,
+		var(--ambient-a) 8% 22%,
+		transparent 22% 41%,
+		color-mix(in srgb, var(--ambient-b) 78%, white) 41% 52%,
+		transparent 52% 76%,
+		var(--ambient-a) 76% 84%,
+		transparent 84% 100%
+	);
+	-webkit-mask: radial-gradient(
+		farthest-side,
+		transparent calc(100% - 3px),
+		#000 calc(100% - 2px)
+	);
+	mask: radial-gradient(
+		farthest-side,
+		transparent calc(100% - 3px),
+		#000 calc(100% - 2px)
+	);
+}
+.ring-seconds {
+	width: min(76vmin, 860px);
+	animation: chrono-orbit 60s linear infinite;
+	animation-delay: var(--chrono-seconds-delay, 0s);
+}
+.ring-minutes {
+	width: min(58vmin, 660px);
+	background: conic-gradient(
+		from 80deg,
+		var(--ambient-b) 0 14%,
+		transparent 14% 38%,
+		var(--ambient-a) 38% 46%,
+		transparent 46% 72%,
+		var(--ambient-b) 72% 88%,
+		transparent 88% 100%
+	);
+	animation: chrono-orbit 3600s linear infinite;
+	animation-delay: var(--chrono-minutes-delay, 0s);
+}
+.ring-orbit-one {
+	width: min(91vmin, 1020px);
+	opacity: 0.46;
+	animation: chrono-orbit var(--ambient-duration) linear infinite;
+}
+.ring-orbit-two {
+	width: min(42vmin, 480px);
+	opacity: 0.58;
+	animation: chrono-orbit calc(var(--ambient-duration) * 0.68) linear infinite
+		reverse;
+}
+.chrono-core {
+	width: min(16vmin, 180px);
+	aspect-ratio: 1;
+	border: 1px solid color-mix(in srgb, var(--ambient-b) 52%, transparent);
+	border-radius: 50%;
+	background: radial-gradient(
+		circle,
+		color-mix(in srgb, var(--ambient-a) 28%, transparent),
+		transparent 68%
+	);
+	box-shadow:
+		0 0 45px color-mix(in srgb, var(--ambient-a) 34%, transparent),
+		inset 0 0 28px color-mix(in srgb, var(--ambient-b) 24%, transparent);
+	animation: chrono-pulse calc(var(--ambient-duration) * 0.16) ease-in-out infinite
+		alternate;
+}
+body[data-background-style="aurora"] .ambient-background {
+	filter: saturate(122%) contrast(104%);
+}
+body[data-background-style="aurora"] .ambient-blob {
+	width: 92vw;
+	aspect-ratio: 5 / 1;
+	border-radius: 46% 54% 62% 38% / 62% 46% 54% 38%;
+	background: linear-gradient(
+		100deg,
+		transparent 4%,
+		color-mix(in srgb, var(--ambient-a) 72%, transparent) 28%,
+		color-mix(in srgb, var(--ambient-b) 76%, transparent) 52%,
+		color-mix(in srgb, var(--ambient-a) 38%, transparent) 72%,
+		transparent 96%
+	);
+	filter: blur(46px);
+	mix-blend-mode: screen;
+	animation-name: aurora-ribbon;
+	animation-timing-function: ease-in-out;
+}
+body[data-background-style="aurora"] .blob-one {
+	left: -25vw;
+	top: 8vh;
+}
+body[data-background-style="aurora"] .blob-two {
+	right: -28vw;
+	top: 34vh;
+}
+body[data-background-style="aurora"] .blob-three {
+	left: 4vw;
+	top: 62vh;
+}
+body[data-background-style="aurora"] .blob-four {
+	right: -10vw;
+	bottom: -4vh;
+}
+body[data-background-style="aurora"] .blob-five {
+	left: -18vw;
+	top: 46vh;
+}
+.topographic-map {
+	overflow: visible;
+	filter: drop-shadow(
+		0 0 12px color-mix(in srgb, var(--ambient-a) 18%, transparent)
+	);
+}
+body[data-background-style="topography"] .topographic-map {
+	opacity: 0.86;
+}
+.topographic-map g {
+	transform-origin: 50% 50%;
+	animation: topographic-drift calc(var(--ambient-duration) * 0.72) ease-in-out
+		infinite alternate;
+}
+.topographic-map path {
+	--topo-x: 2%;
+	--topo-y: -5%;
+	fill: none;
+	stroke: color-mix(in srgb, var(--ambient-a) 76%, transparent);
+	stroke-width: 1.55;
+	stroke-dasharray: 5 9;
+	transform-box: fill-box;
+	transform-origin: center;
+	vector-effect: non-scaling-stroke;
+	animation:
+		topographic-flow calc(var(--ambient-duration) * 0.42) linear infinite,
+		topographic-contour calc(var(--ambient-duration) * 0.58) ease-in-out infinite
+			alternate;
+}
+.topographic-map path:nth-child(even) {
+	stroke: color-mix(in srgb, var(--ambient-b) 70%, transparent);
+	stroke-dasharray: 2 11;
+	animation-direction: reverse, alternate-reverse;
+}
+.topographic-map path:nth-child(3n) {
+	stroke-width: 2.25;
+	opacity: 0.84;
+}
+.topographic-map path:nth-child(2) {
+	--topo-x: -3.5%;
+	--topo-y: 7%;
+	animation-delay: -4s, -11s;
+}
+.topographic-map path:nth-child(3) {
+	--topo-x: 4%;
+	--topo-y: -8%;
+	animation-delay: -12s, -3s;
+}
+.topographic-map path:nth-child(4) {
+	--topo-x: -2%;
+	--topo-y: 9%;
+	animation-duration: calc(var(--ambient-duration) * 0.36),
+		calc(var(--ambient-duration) * 0.46);
+	animation-delay: -7s, -17s;
+}
+.topographic-map path:nth-child(5) {
+	--topo-x: 5%;
+	--topo-y: -6%;
+	animation-delay: -16s, -6s;
+}
+.topographic-map path:nth-child(6) {
+	--topo-x: -4%;
+	--topo-y: 11%;
+	animation-duration: calc(var(--ambient-duration) * 0.5),
+		calc(var(--ambient-duration) * 0.66);
+	animation-delay: -9s, -21s;
+}
+.topographic-map path:nth-child(7) {
+	--topo-x: 3%;
+	--topo-y: -10%;
+	animation-delay: -18s, -13s;
+}
+.constellation-canvas {
+	display: block;
+}
+body[data-background-style="constellation"] .constellation-canvas {
+	opacity: 0.9;
+}
+body:not([data-background-enabled="true"]) .ambient-background *,
+body:not([data-background-enabled="true"]) .ambient-background::after {
+	animation-play-state: paused;
 }
 body[data-background-enabled="true"] .dashboard-controls {
 	background-color: color-mix(in srgb, var(--bg) 82%, transparent);
@@ -606,8 +838,65 @@ main {
 .custom-panels .a-panel {
 	min-height: 290px;
 }
+.custom-panels .a-panel:nth-child(3) {
+	border-right: 1px solid var(--line);
+}
+.custom-panels .a-panel:last-child {
+	border-right: 0;
+}
+.custom-panels .a-panel:nth-child(4) {
+	animation-delay: 0.3s;
+}
+.custom-panels .a-panel:nth-child(5) {
+	animation-delay: 0.4s;
+}
 .custom-panels .panel-index {
 	color: var(--counter-color, var(--accent));
+}
+.custom-panels .panel-title {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+@media (min-width: 901px) {
+	.custom-panels[data-count="4"] {
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+	}
+	.custom-panels[data-count="5"] {
+		grid-template-columns: repeat(5, minmax(0, 1fr));
+	}
+	.custom-panels[data-count="4"] .a-panel {
+		min-height: 275px;
+		padding: 27px clamp(18px, 2vw, 30px) 34px;
+	}
+	.custom-panels[data-count="4"] .panel-main {
+		font-size: clamp(22px, 2.05vw, 34px);
+	}
+	.custom-panels[data-count="4"] .panel-title {
+		font-size: 14px;
+		letter-spacing: 0.11em;
+	}
+	.custom-panels[data-count="5"] .a-panel {
+		min-height: 255px;
+		padding: 24px clamp(14px, 1.3vw, 24px) 32px;
+	}
+	.custom-panels[data-count="5"] .panel-main {
+		font-size: clamp(18px, 1.7vw, 28px);
+	}
+	.custom-panels[data-count="5"] .panel-title {
+		font-size: 12px;
+		letter-spacing: 0.08em;
+	}
+	.custom-panels[data-count="4"] .panel-pre,
+	.custom-panels[data-count="4"] .panel-post {
+		font-size: 12px;
+	}
+	.custom-panels[data-count="5"] .panel-pre,
+	.custom-panels[data-count="5"] .panel-post {
+		font-size: 11px;
+	}
 }
 
 .sidebar-backdrop {
@@ -1333,6 +1622,57 @@ input[type="color"]::-webkit-color-swatch {
 	}
 	to {
 		transform: translateX(32%) skewX(5deg);
+	}
+}
+@keyframes chrono-orbit {
+	to {
+		transform: rotate(360deg);
+	}
+}
+@keyframes chrono-pulse {
+	from {
+		opacity: 0.5;
+		transform: scale(0.92);
+	}
+	to {
+		opacity: 0.95;
+		transform: scale(1.08);
+	}
+}
+@keyframes aurora-ribbon {
+	0% {
+		transform: translate3d(-18%, -12%, 0) rotate(-12deg) scaleX(0.86);
+		border-radius: 42% 58% 61% 39% / 58% 42% 62% 38%;
+	}
+	50% {
+		transform: translate3d(8%, 16%, 0) rotate(5deg) scaleX(1.08);
+		border-radius: 62% 38% 47% 53% / 37% 64% 36% 63%;
+	}
+	100% {
+		transform: translate3d(28%, -6%, 0) rotate(14deg) scaleX(0.94);
+		border-radius: 37% 63% 58% 42% / 66% 36% 64% 34%;
+	}
+}
+@keyframes topographic-flow {
+	to {
+		stroke-dashoffset: -140;
+	}
+}
+@keyframes topographic-drift {
+	from {
+		transform: translate3d(-4%, 6%, 0) scale(1.08) rotate(-2deg);
+	}
+	to {
+		transform: translate3d(5%, -8%, 0) scale(1.18) rotate(2.4deg);
+	}
+}
+@keyframes topographic-contour {
+	from {
+		transform: translate3d(0, 0, 0) scale(0.96) rotate(-1.5deg);
+	}
+	to {
+		transform: translate3d(var(--topo-x), var(--topo-y), 0) scale(1.07)
+			rotate(1.8deg);
 	}
 }
 @keyframes live-pulse {
