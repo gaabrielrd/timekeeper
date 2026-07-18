@@ -3,8 +3,8 @@
 ## Estado atual
 
 O projeto usa Node Test Runner, Playwright e Firebase Emulator Suite. A suíte atual
-contém 20 testes unitários/contratuais, 14 E2E em Chromium (sete cenários em desktop
-e mobile) e 12 testes de Firestore/Storage Rules. GitHub Actions executa todos em pushes,
+contém 23 testes unitários/contratuais, 16 E2E em Chromium (oito cenários em desktop
+e mobile) e 15 testes de Firestore/Storage Rules. GitHub Actions executa todos em pushes,
 pull requests e disparos manuais.
 
 ## Checagens rápidas
@@ -43,6 +43,7 @@ etapa não dependa do encerramento do processo da outra.
 - headers de cache e portas dos emuladores;
 - opt-in local dos emuladores e fallbacks Safari;
 - calendários ordenados com ao menos uma data futura;
+- seed de `generalConfig`, modal com três abas e contrato público/admin;
 - links Markdown locais válidos.
 - limites de 5 MiB/50 MiB alinhados entre UI, cliente, configuração e Storage Rules.
 
@@ -57,6 +58,8 @@ etapa não dependa do encerramento do processo da outra.
 - documentos fora da allowlist negados;
 - leitura do proprietário permitida.
 - metadados de imagens limitados a dez itens válidos.
+- leitura pública de `generalConfig`, escrita exclusiva por administrador Google,
+  bloqueio de autoelevação e proteção do documento de expediente.
 
 ### Storage Rules
 
@@ -71,6 +74,7 @@ etapa não dependa do encerramento do processo da outra.
 - ausência de overflow horizontal em desktop e viewport de iPhone;
 - consentimento negado/aceito antes de carregar Google Analytics;
 - Google OAuth por popup contra Auth Emulator, sem conta real;
+- concessão local de `isAdmin`, seed e CRUD do modal administrativo;
 - criação fixa com início padrão próximo de “agora” e cor própria;
 - edição para recorrente, reordenação, toggle, reload e subscriptions;
 - reautenticação e exclusão integral da conta e dos dados conhecidos.
@@ -122,6 +126,16 @@ Viewports sugeridos: 320, 390, 768, 1024 e 1440 px.
 - Toggle de fundo inicia desligado para conta nova.
 - Estilo, cores, velocidade e intensidade sincronizam em outra aba.
 - Falha de escrita apresenta erro sem deixar estado enganoso.
+
+### Administração
+
+- Usuário sem `isAdmin` não vê a ação de configuração geral.
+- Administrador vê o modal com exatamente três abas.
+- Coleção vazia recebe o seed uma única vez após o login administrativo.
+- Alterar expediente atualiza os contadores padrão em outra aba.
+- Adicionar, editar e remover pagamento/feriado atualiza a lista e o card.
+- Remover todas as datas de um tipo exibe calendário indisponível sem repopular.
+- O modal não cria overflow em 320 px, 390 px, 768 px e desktop.
 
 ### Contadores pessoais
 

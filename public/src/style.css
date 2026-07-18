@@ -501,17 +501,19 @@ input {
 }
 
 .dashboard-controls {
-	position: relative;
-	z-index: 2;
+	position: fixed;
+	z-index: 20;
+	top: 0;
+	right: 0;
+	left: 0;
 	min-height: 72px;
 	padding: 14px clamp(20px, 4vw, 64px);
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
 	border-bottom: 1px solid var(--line);
-	opacity: 0;
-	transform: translateY(12px);
-	animation: page-enter 0.58s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+	background: color-mix(in srgb, var(--bg) 88%, transparent);
+	backdrop-filter: blur(16px) saturate(118%);
 	transition:
 		background-color 0.45s ease,
 		backdrop-filter 0.45s ease;
@@ -672,6 +674,7 @@ select:focus-visible {
 main {
 	position: relative;
 	z-index: 1;
+	padding-top: 72px;
 }
 .overview,
 .weather-section {
@@ -685,6 +688,8 @@ main {
 }
 .weather-section {
 	animation-delay: 1s;
+	transform: none;
+	animation-name: weather-enter;
 }
 
 #top-panels {
@@ -777,7 +782,7 @@ main {
 }
 .custom-counters-section.is-open {
 	grid-template-rows: 1fr;
-	margin-top: clamp(42px, 6vw, 84px);
+	margin-top: clamp(24px, 3vw, 42px);
 	opacity: 1;
 	pointer-events: auto;
 }
@@ -1727,6 +1732,180 @@ input[type="color"]::-webkit-color-swatch {
 .image-library-dialog {
 	width: min(820px, calc(100% - 32px));
 }
+.admin-dialog {
+	width: min(720px, calc(100% - 32px));
+}
+.admin-shell {
+	display: grid;
+	gap: 22px;
+	padding: 26px;
+}
+.admin-entry-button {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	width: 100%;
+	margin-bottom: 8px;
+}
+.admin-tabs {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	border-bottom: 1px solid var(--line);
+}
+.admin-tabs button {
+	position: relative;
+	padding: 12px 8px;
+	border: 0;
+	background: transparent;
+	color: var(--muted);
+	font: inherit;
+	cursor: pointer;
+	transition:
+		color 0.2s ease,
+		background 0.2s ease;
+}
+.admin-tabs button::after {
+	position: absolute;
+	right: 12px;
+	bottom: -1px;
+	left: 12px;
+	height: 2px;
+	background: var(--accent);
+	content: "";
+	transform: scaleX(0);
+	transition: transform 0.2s ease;
+}
+.admin-tabs button:hover,
+.admin-tabs button[aria-selected="true"] {
+	color: var(--text);
+}
+.admin-tabs button[aria-selected="true"]::after {
+	transform: scaleX(1);
+}
+.admin-tab-panel {
+	min-height: 250px;
+}
+.admin-form,
+.admin-date-form {
+	display: grid;
+	gap: 16px;
+}
+.admin-form > .primary-button {
+	justify-self: start;
+}
+.admin-workday-form {
+	padding: 18px;
+	border: 1px solid color-mix(in srgb, var(--line) 78%, transparent);
+	border-radius: 14px;
+	background: color-mix(in srgb, var(--surface-2) 58%, transparent);
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+	backdrop-filter: blur(14px);
+}
+.admin-workday-controls {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	align-items: end;
+	gap: 10px;
+}
+.admin-workday-controls .date-grid {
+	min-width: 0;
+}
+.admin-workday-form input[type="time"] {
+	width: 100%;
+	min-width: 0;
+	padding: 13px 14px;
+	border: 1px solid var(--line);
+	border-radius: 10px;
+	outline: 0;
+	background: var(--bg);
+	color: var(--text);
+	font: inherit;
+	color-scheme: dark;
+}
+.admin-workday-form input[type="time"]:focus {
+	border-color: var(--accent);
+}
+.admin-workday-controls .primary-button {
+	min-height: 46px;
+	padding: 0 16px;
+	white-space: nowrap;
+}
+.admin-weekdays {
+	margin: 0;
+	padding: 0;
+	border: 0;
+}
+.admin-weekdays legend {
+	margin-bottom: 9px;
+	color: var(--muted);
+	font-size: 12px;
+}
+.admin-date-form {
+	grid-template-columns: minmax(0, 1fr) auto auto;
+	align-items: end;
+	gap: 10px;
+	min-height: 112px;
+	padding: 18px;
+	border: 1px solid color-mix(in srgb, var(--line) 78%, transparent);
+	border-radius: 14px;
+	background: color-mix(in srgb, var(--surface-2) 58%, transparent);
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+	backdrop-filter: blur(14px);
+}
+.admin-date-field {
+	min-width: 0;
+}
+.admin-date-form input[type="date"] {
+	width: 100%;
+	min-width: 0;
+	padding: 13px 14px;
+	border: 1px solid var(--line);
+	border-radius: 10px;
+	outline: 0;
+	background: var(--bg);
+	color: var(--text);
+	font: inherit;
+	color-scheme: dark;
+}
+.admin-date-form input[type="date"]:focus {
+	border-color: var(--accent);
+}
+.admin-date-form .primary-button,
+.admin-date-form .secondary-button {
+	min-height: 46px;
+	padding: 0 16px;
+	white-space: nowrap;
+}
+.admin-date-cancel {
+	align-self: end;
+}
+.admin-date-list {
+	display: grid;
+	max-height: min(360px, 45dvh);
+	overflow-y: auto;
+}
+.admin-date-row {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 16px;
+	min-height: 54px;
+	border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+}
+.admin-date-row time {
+	font-family: roboto-mono, monospace;
+	font-size: 14px;
+}
+.admin-date-actions {
+	display: flex;
+	gap: 4px;
+}
+.admin-date-empty {
+	margin: 34px 0;
+	color: var(--muted);
+	text-align: center;
+}
 .image-library-shell {
 	padding: 26px;
 	display: grid;
@@ -2133,6 +2312,8 @@ input[type="color"]::-webkit-color-swatch {
 	gap: 16px;
 }
 .forecast {
+	position: relative;
+	isolation: isolate;
 	overflow: hidden;
 	border: 1px solid var(--line);
 	border-radius: 14px;
@@ -2140,6 +2321,18 @@ input[type="color"]::-webkit-color-swatch {
 	transition:
 		border-color 0.25s,
 		transform 0.25s;
+}
+.forecast::after {
+	content: "";
+	position: absolute;
+	z-index: 2;
+	right: 0;
+	bottom: 0;
+	left: 0;
+	height: 2px;
+	pointer-events: none;
+	background: var(--line);
+	box-shadow: 0 -2px 5px color-mix(in srgb, var(--accent) 16%, transparent);
 }
 
 @keyframes enter {
@@ -2152,6 +2345,11 @@ input[type="color"]::-webkit-color-swatch {
 	to {
 		opacity: 1;
 		transform: translateY(0);
+	}
+}
+@keyframes weather-enter {
+	to {
+		opacity: 1;
 	}
 }
 @keyframes modal-enter {
@@ -2343,8 +2541,43 @@ input[type="color"]::-webkit-color-swatch {
 		grid-template-columns: 1fr 1fr;
 	}
 	.image-library-shell,
-	.counter-dialog .counter-form {
+	.counter-dialog .counter-form,
+	.admin-shell {
 		padding: 20px;
+	}
+	.admin-date-form {
+		grid-template-columns: minmax(0, 1fr) auto auto;
+		gap: 7px;
+		min-height: 104px;
+		padding: 12px;
+	}
+	.admin-date-form input[type="date"] {
+		padding: 12px 10px;
+	}
+	.admin-date-form .primary-button,
+	.admin-date-form .secondary-button {
+		min-height: 44px;
+		padding: 0 10px;
+		font-size: 12px;
+	}
+	.admin-workday-form {
+		padding: 12px;
+	}
+	.admin-workday-controls {
+		grid-template-columns: minmax(0, 1fr) auto;
+		gap: 7px;
+	}
+	.admin-workday-controls .date-grid {
+		grid-template-columns: 1fr 1fr;
+		gap: 7px;
+	}
+	.admin-workday-form input[type="time"] {
+		padding: 12px 10px;
+	}
+	.admin-workday-controls .primary-button {
+		min-height: 44px;
+		padding: 0 10px;
+		font-size: 12px;
 	}
 	.privacy-banner {
 		grid-template-columns: 1fr;
@@ -2358,6 +2591,9 @@ input[type="color"]::-webkit-color-swatch {
 	}
 	.dashboard-controls {
 		min-height: 68px;
+	}
+	main {
+		padding-top: 68px;
 	}
 	#config-wrapper label {
 		display: none;

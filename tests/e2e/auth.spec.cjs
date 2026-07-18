@@ -22,6 +22,30 @@ async function loginWithGoogleEmulator(page, projectName) {
 	return email;
 }
 
+async function grantAdminByEmail(email) {
+	const authResponse = await fetch(
+		"http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/projects/demo-timekeeper/accounts:batchGet?maxResults=1000&key=AIzaSyBOLyOQ6-g3VqotQf7pCej4CAhVXvC0oYY",
+		{ headers: { Authorization: "Bearer owner" } },
+	);
+	const authData = await authResponse.json();
+	const account = authData.users?.find((user) => user.email === email);
+	if (!account) throw new Error(`Conta ${email} não encontrada no Auth Emulator.`);
+	const profileUrl =
+		`http://127.0.0.1:8080/v1/projects/demo-timekeeper/databases/(default)/documents/users/${account.localId}` +
+		"?updateMask.fieldPaths=isAdmin";
+	const profileResponse = await fetch(profileUrl, {
+		method: "PATCH",
+		headers: {
+			Authorization: "Bearer owner",
+			"Content-Type": "application/json",
+		},
+		body: JSON.stringify({ fields: { isAdmin: { booleanValue: true } } }),
+	});
+	if (!profileResponse.ok) {
+		throw new Error(`Falha ao conceder admin no emulador: ${profileResponse.status}`);
+	}
+}
+
 test("usuário cria, edita, reordena e oculta contadores", async (
 	{ page },
 	testInfo,
@@ -56,8 +80,8 @@ test("usuário cria, edita, reordena e oculta contadores", async (
 	await page.getByRole("button", { name: "Editar Entrega E2E" }).click();
 	await page.locator('[name="name"]').fill("Rotina E2E");
 	await page.locator("#counter-type").selectOption("recurring");
-	await page.locator('[name="startTime"]').fill("09:00");
-	await page.locator('[name="endTime"]').fill("18:00");
+	await page.locator('#counter-form [name="startTime"]').fill("09:00");
+	await page.locator('#counter-form [name="endTime"]').fill("18:00");
 	await page.locator("#counter-submit").click();
 	await expect(page.locator("#counter-dialog")).toBeHidden();
 	await expect(page.locator("#counter-list")).toContainText("Rotina E2E");
@@ -93,6 +117,74 @@ test("usuário cria, edita, reordena e oculta contadores", async (
 	await expect(page.locator("#custom-panels .panel-title").first()).toHaveText(
 		"Segundo E2E",
 	);
+});
+
+test("administrador gerencia a configuração geral", async ({ page }, testInfo) => {
+	const email = await loginWithGoogleEmulator(page, testInfo.project.name);
+	await expect(page.locator("#settings-state")).toHaveText("Sincronizado");
+	await grantAdminByEmail(email);
+	await page.locator("#auth-button").click();
+	await expect(page.locator("#open-admin-modal")).toBeVisible();
+	await page.locator("#open-admin-modal").click();
+	await expect(page.locator("#admin-dialog")).toBeVisible();
+	await expect(page.locator('[role="tab"]')).toHaveCount(3);
+
+	await page.getByRole("tab", { name: "Pagamentos" }).click();
+	await expect(page.locator("#admin-payment-list .admin-date-row")).not.toHaveCount(0);
+	const date = testInfo.project.name === "chromium" ? "2027-01-05" : "2027-01-06";
+	const editedDate =
+		testInfo.project.name === "chromium" ? "2027-01-07" : "2027-01-08";
+	await page.locator('#admin-payment-form [name="date"]').fill(date);
+	await page
+		.locator('#admin-payment-form button[type="submit"]')
+		.click();
+	const createdLabel = new Intl.DateTimeFormat("pt-BR", {
+		weekday: "short",
+		day: "2-digit",
+		month: "long",
+		year: "numeric",
+	}).format(new Date(`${date}T12:00:00`));
+	await page.getByRole("button", { name: `Editar ${createdLabel}` }).click();
+	await expect(
+		page.locator("#admin-payment-form .admin-date-cancel"),
+	).toBeVisible();
+	const formLayout = await page.locator("#admin-payment-form").evaluate((form) => {
+		const input = form.querySelector('input[name="date"]').getBoundingClientRect();
+		const save = form
+			.querySelector('button[type="submit"]')
+			.getBoundingClientRect();
+		const cancel = form
+			.querySelector(".admin-date-cancel")
+			.getBoundingClientRect();
+		const card = form.getBoundingClientRect();
+		return {
+			bottoms: [input.bottom, save.bottom, cancel.bottom],
+			cardRight: card.right,
+			cancelRight: cancel.right,
+			inputPaddingTop: Number.parseFloat(getComputedStyle(form.querySelector('input[name="date"]')).paddingTop),
+		};
+	});
+	expect(Math.max(...formLayout.bottoms) - Math.min(...formLayout.bottoms)).toBeLessThan(2);
+	expect(formLayout.cancelRight).toBeLessThanOrEqual(formLayout.cardRight);
+	expect(formLayout.inputPaddingTop).toBeGreaterThanOrEqual(12);
+	await page.locator('#admin-payment-form [name="date"]').fill(editedDate);
+	await page
+		.locator('#admin-payment-form button[type="submit"]')
+		.click();
+	const editedLabel = new Intl.DateTimeFormat("pt-BR", {
+		weekday: "short",
+		day: "2-digit",
+		month: "long",
+		year: "numeric",
+	}).format(new Date(`${editedDate}T12:00:00`));
+	page.once("dialog", (dialog) => dialog.accept());
+	await page.getByRole("button", { name: `Remover ${editedLabel}` }).click();
+	await expect(
+		page.getByRole("button", { name: `Remover ${editedLabel}` }),
+	).toHaveCount(0);
+
+	await page.getByRole("tab", { name: "Feriados" }).click();
+	await expect(page.locator("#admin-holiday-list .admin-date-row")).not.toHaveCount(0);
 });
 
 test("usuário exclui a própria conta e os dados", async ({ page }, testInfo) => {

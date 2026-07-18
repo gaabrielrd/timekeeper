@@ -24,6 +24,27 @@ test("documentos Firestore usam matches isolados para preservar o orçamento de 
 	assert.match(rules, /match \/data\/counters \{/);
 	assert.match(rules, /match \/data\/images \{/);
 	assert.doesNotMatch(rules, /function isValidDocument\(\)/);
+	assert.match(rules, /days\.hasOnly\(\[0, 1, 2, 3, 4, 5, 6\]\)/);
+	assert.doesNotMatch(rules, /function isValidDayAt\(/);
+});
+
+test("configuração geral mantém seed, modal administrativo e regras alinhados", () => {
+	const html = read("public/index.html");
+	const client = read("public/src/firebase.js");
+	const rules = read("firestore.rules");
+	const context = vm.createContext({ Date });
+	vm.runInContext(read("public/src/data.js"), context);
+	const seed = vm.runInContext("GENERAL_CONFIG_SEED", context);
+	assert.equal(seed.filter((item) => item.type === "workday").length, 1);
+	assert.equal(seed.filter((item) => item.type === "payment").length, 12);
+	assert.equal(seed.filter((item) => item.type === "holiday").length, 10);
+	assert.match(html, /id="admin-dialog"/);
+	assert.equal((html.match(/role="tab"/g) || []).length, 3);
+	assert.match(client, /collection\(db, "generalConfig"\)/);
+	assert.match(client, /snapshot\.data\(\)\?\.isAdmin === true/);
+	assert.match(rules, /match \/generalConfig\/\{configId\}/);
+	assert.match(rules, /function isGoogleAdmin\(\)/);
+	assert.match(rules, /allow read: if true;/);
 });
 
 test("todos os backgrounds da interface possuem descrição no cliente", () => {

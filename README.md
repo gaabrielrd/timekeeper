@@ -8,6 +8,8 @@ real com Firebase.
 ## O que o projeto oferece
 
 - Três contadores padrão: expediente, próximo pagamento e próximo feriado.
+- Configuração pública dos contadores padrão sincronizada pelo Firestore.
+- Modal administrativo para expediente, pagamentos e feriados.
 - Configuração do fim do expediente sem exigir login, persistida em cookie.
 - Login e criação de conta exclusivamente pelo Google OAuth.
 - Até cinco contadores pessoais por conta.
@@ -72,7 +74,7 @@ configurado. Veja [Desenvolvimento](docs/development.md).
 │       ├── firebase.js        # Auth, Firestore, Storage, contadores e fundos
 │       ├── analytics.js       # Consentimento e carregamento opcional de métricas
 │       ├── time.js            # Cálculos temporais compartilhados e testáveis
-│       ├── data.js            # Datas anuais de pagamentos e feriados
+│       ├── data.js            # Seed/fallback dos calendários públicos
 │       ├── style.css          # Design system, layout, responsividade e animações
 │       └── *.min.js / assets  # Bibliotecas e recursos locais
 ├── docs/                      # Documentação detalhada
@@ -133,7 +135,8 @@ O índice completo está em [docs/README.md](docs/README.md). Comece por:
 
 ## Estado atual e limitações conhecidas
 
-- Pagamentos e feriados estão cadastrados manualmente para 2026 em `data.js`.
+- O seed inicial de pagamentos e feriados cobre 2026; depois de inicializada, a
+  coleção `generalConfig` pode ser mantida pelo modal administrativo.
 - Os assets ainda não possuem nomes com hash, mas o Hosting agora força revalidação
   de todas as respostas para evitar versões misturadas em Safari/iOS.
 - O login usa popup. WebViews e Safari com bloqueio de popups podem exigir uma

@@ -47,6 +47,7 @@ git diff --check
 - modo visitante e cookies;
 - login/logout Google;
 - leitura e escrita de settings;
+- leitura pública de `generalConfig` e escrita com perfil administrativo;
 - criar, editar, ordenar e excluir contadores;
 - limite de cinco no cliente e nas rules;
 - upload, reutilização, quota e exclusão de imagens;
@@ -90,15 +91,34 @@ Publicar Hosting não atualiza rules automaticamente. Quando UI e rules precisam
 um novo contrato, coordene a ordem para nenhuma versão ficar temporariamente
 incompatível; mudanças retrocompatíveis nas rules podem ser publicadas primeiro.
 
+## Inicialização administrativa
+
+A primeira concessão de administrador não pode ser feita pela aplicação. No
+Firebase Console ou por Admin SDK autenticado, defina `isAdmin: true` no documento
+`users/{uid}` do operador. Não adicione essa flag a settings nem a custom claims sem
+alterar também o contrato das Rules.
+
+Depois do deploy das Rules, o próximo login desse operador:
+
+1. exibe “Configuração geral” no menu da conta;
+2. detecta `generalConfig` completamente vazia;
+3. grava em batch o expediente e as 22 datas presentes no seed de `data.js`.
+
+Confirme no Console a presença de `generalConfig/workday`, 12 documentos
+`payment-*` e 10 documentos `holiday-*`. Se a coleção já tiver qualquer documento,
+o seed automático não sobrescreve nem recria dados.
+
 ## Verificação pós-deploy
 
 1. Abra a URL oficial em janela privada.
 2. Verifique no DevTools se `firebase.js` e `style.css` são a versão esperada.
 3. Faça login e confirme `0 / 5` ou a quantidade real.
 4. Modifique uma preferência e confira outra aba/dispositivo.
-5. Envie uma imagem, reutilize-a em dois cards e confirme a quota.
-6. Teste ao menos um fundo CSS e a constelação canvas.
-7. Monitore console, Firestore/Storage Usage e Authentication no Firebase Console.
+5. Com um admin, abra as três abas e altere uma data temporária.
+6. Em janela privada, confirme que os contadores públicos recebem a atualização.
+7. Envie uma imagem, reutilize-a em dois cards e confirme a quota.
+8. Teste ao menos um fundo CSS e a constelação canvas.
+9. Monitore console, Firestore/Storage Usage e Authentication no Firebase Console.
 
 ## Cache
 
@@ -134,5 +154,6 @@ podem ser bloqueados por Safari, WebViews e políticas de privacidade.
 
 ## Checklist de release anual
 
-Antes da virada do ano, atualize `public/src/data.js`, valide ordem cronológica e
-publique antes que as listas atuais expirem. Veja [Manutenção](maintenance.md).
+Antes da virada do ano, atualize pagamentos e feriados pelo modal administrativo.
+Mantenha `public/src/data.js` atualizado como fallback para novas instalações e
+valide ordem cronológica antes da publicação. Veja [Manutenção](maintenance.md).

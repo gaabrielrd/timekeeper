@@ -33,11 +33,25 @@ Entra somente com uma conta Google. Além do uso básico, pode:
 
 Configurações e contadores são sincronizados em tempo real pelo Firestore.
 
+### Administrador
+
+Um usuário cujo perfil contém `isAdmin: true` recebe a ação “Configuração geral”
+no menu da conta. O modal administrativo possui três abas e permite:
+
+- definir horários e dias do expediente padrão;
+- adicionar, editar e remover datas de pagamento;
+- adicionar, editar e remover datas de feriado.
+
+A flag não pode ser concedida pelo próprio cliente e deve ser administrada por um
+operador privilegiado no Firebase.
+
 ## Contadores padrão
 
 ### Expediente
 
-Evento recorrente de segunda a sexta, das 08:00 até o horário configurado.
+Evento recorrente nos dias e a partir do horário inicial definidos na configuração
+geral. O horário final global é o padrão; visitantes e usuários autenticados ainda
+podem manter seu próprio horário final.
 
 - Durante o período: conta quanto falta para terminar.
 - Fora do período: conta quanto falta para o próximo início.
@@ -45,9 +59,10 @@ Evento recorrente de segunda a sexta, das 08:00 até o horário configurado.
 
 ### Pagamento e feriado
 
-Usam listas cronológicas de datas em `public/src/data.js`. O texto conta até a
-próxima data e a barra representa a passagem entre dois eventos consecutivos.
-As listas precisam ser revisadas a cada ano.
+Usam documentos públicos da coleção `generalConfig`. O texto conta até a próxima
+data e a barra representa a passagem entre dois eventos consecutivos. `data.js`
+mantém somente o seed/fallback usado antes da primeira inicialização remota.
+As listas precisam ser revisadas a cada ano pelo modal administrativo.
 Quando não existe data futura, o card mostra “Calendário indisponível” em vez de
 permanecer silenciosamente preso ao último evento.
 

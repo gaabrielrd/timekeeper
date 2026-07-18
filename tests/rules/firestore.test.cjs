@@ -8,8 +8,11 @@ const {
 	initializeTestEnvironment,
 } = require("@firebase/rules-unit-testing");
 const {
+	collection,
+	deleteDoc,
 	doc,
 	getDoc,
+	getDocs,
 	serverTimestamp,
 	setLogLevel,
 	setDoc,
@@ -104,6 +107,17 @@ function recurringCounter() {
 	};
 }
 
+async function seedProfile(uid, isAdmin = false) {
+	await environment.withSecurityRulesDisabled(async (context) => {
+		await setDoc(doc(context.firestore(), "users", uid), {
+			displayName: uid,
+			email: `${uid}@example.com`,
+			photoURL: "",
+			isAdmin,
+		});
+	});
+}
+
 test("nega leituras sem autenticação e entre usuários", async () => {
 	const anonymous = environment.unauthenticatedContext().firestore();
 	await assertFails(getDoc(doc(anonymous, "users/alice/data/settings")));
@@ -126,6 +140,91 @@ test("permite perfil válido do proprietário Google", async () => {
 			email: "alice@example.com",
 			photoURL: "https://example.com/alice.png",
 			updatedAt: serverTimestamp(),
+		}),
+	);
+	await assertFails(
+		setDoc(doc(googleDb(), "users/alice"), {
+			displayName: "Alice",
+			email: "alice@example.com",
+			photoURL: "https://example.com/alice.png",
+			isAdmin: true,
+			updatedAt: serverTimestamp(),
+		}),
+	);
+});
+
+test("configuração geral é pública e somente administradores Google escrevem", async () => {
+	await seedProfile("admin", true);
+	const workday = {
+		type: "workday",
+		startTime: "08:00",
+		endTime: "17:55",
+		daysOfWeek: [1, 2, 3, 4, 5],
+		updatedAt: serverTimestamp(),
+	};
+	await assertSucceeds(
+		setDoc(doc(googleDb("admin"), "generalConfig/workday"), workday),
+	);
+	await assertSucceeds(
+		setDoc(doc(googleDb("admin"), "generalConfig/payment-2026-08-05"), {
+			type: "payment",
+			dateTime: "2026-08-05T12:00:00",
+			updatedAt: serverTimestamp(),
+		}),
+	);
+	const anonymous = environment.unauthenticatedContext().firestore();
+	await assertSucceeds(getDoc(doc(anonymous, "generalConfig/workday")));
+	await assertSucceeds(getDocs(collection(anonymous, "generalConfig")));
+	await assertFails(
+		setDoc(doc(anonymous, "generalConfig/holiday-2026-09-07"), {
+			type: "holiday",
+			dateTime: "2026-09-07T17:55:00",
+		}),
+	);
+	await seedProfile("member", false);
+	await assertFails(
+		setDoc(doc(googleDb("member"), "generalConfig/holiday-2026-09-07"), {
+			type: "holiday",
+			dateTime: "2026-09-07T17:55:00",
+		}),
+	);
+	await seedProfile("password-admin", true);
+	await assertFails(
+		setDoc(doc(passwordDb("password-admin"), "generalConfig/holiday-2026-09-07"), {
+			type: "holiday",
+			dateTime: "2026-09-07T17:55:00",
+		}),
+	);
+});
+
+test("administrador edita calendários válidos sem poder remover o expediente", async () => {
+	await seedProfile("admin", true);
+	const adminDb = googleDb("admin");
+	const workdayReference = doc(adminDb, "generalConfig/workday");
+	await assertSucceeds(
+		setDoc(workdayReference, {
+			type: "workday",
+			startTime: "09:00",
+			endTime: "18:30",
+			daysOfWeek: [1, 2, 3, 4, 5],
+		}),
+	);
+	await assertFails(deleteDoc(workdayReference));
+	const holidayReference = doc(
+		adminDb,
+		"generalConfig/holiday-2026-12-25",
+	);
+	await assertSucceeds(
+		setDoc(holidayReference, {
+			type: "holiday",
+			dateTime: "2026-12-25T17:55:00",
+		}),
+	);
+	await assertSucceeds(deleteDoc(holidayReference));
+	await assertFails(
+		setDoc(doc(adminDb, "generalConfig/holiday-invalid"), {
+			type: "holiday",
+			dateTime: "25/12/2026",
 		}),
 	);
 });
@@ -156,6 +255,26 @@ test("aceita contadores fixo e recorrente válidos", async () => {
 	await assertSucceeds(
 		setDoc(doc(googleDb(), "users/alice/data/counters"), {
 			items: [fixedCounter(), recurringCounter()],
+			updatedAt: serverTimestamp(),
+		}),
+	);
+});
+
+test("aceita dois contadores recorrentes com imagens e opacidades", async () => {
+	const imageIds = [
+		"11111111-1111-4111-8111-111111111111",
+		"22222222-2222-4222-8222-222222222222",
+	];
+	await assertSucceeds(
+		setDoc(doc(googleDb(), "users/alice/data/counters"), {
+			items: imageIds.map((imageId, index) => ({
+				...recurringCounter(),
+				id: `recurring-${index}`,
+				name: index === 0 ? "Almoço" : "Academia",
+				imageId,
+				imageOpacity: index === 0 ? 51 : 100,
+				overlayOpacity: index === 0 ? 30 : 55,
+			})),
 			updatedAt: serverTimestamp(),
 		}),
 	);

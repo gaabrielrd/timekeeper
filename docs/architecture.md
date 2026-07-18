@@ -49,6 +49,9 @@ Responsável por:
 - inicializar Firebase Auth, Firestore e Storage;
 - autenticar com `GoogleAuthProvider`;
 - preparar/migrar documentos do usuário;
+- assinar a configuração geral pública e popular seu seed quando um administrador
+  encontra a coleção vazia;
+- controlar autorização e CRUD do modal administrativo;
 - assinar configurações, contadores e metadados de imagens com `onSnapshot`;
 - salvar preferências e CRUD de contadores;
 - enviar, reutilizar e excluir imagens privadas da biblioteca;
@@ -58,8 +61,9 @@ Responsável por:
 
 ### Dados de calendário — `public/src/data.js`
 
-Contém arrays globais `pagamentos` e `feriados`. O runtime inline os consome antes
-de `time.js`/`firebase.js`. As datas são estáticas e atualmente cobrem 2026.
+Contém os arrays globais de fallback, `expedientePadrao` e
+`GENERAL_CONFIG_SEED`. O runtime inline os consome antes de `time.js`/`firebase.js`;
+o snapshot de `generalConfig` substitui esses valores em memória quando disponível.
 
 ### Apresentação — `public/src/style.css`
 
@@ -83,6 +87,8 @@ sequenceDiagram
     B->>I: Carrega HTML, data.js, time.js e ProgressBar
     I->>I: Restaura cookies e inicia contadores padrão
     B->>M: Importa módulo ES
+    M->>D: onSnapshot generalConfig (leitura pública)
+    D-->>M: expediente, pagamentos e feriados
     M->>A: onAuthStateChanged
     alt Sem sessão
         M->>M: Aplica defaults + horário dos cookies
@@ -100,6 +106,11 @@ sequenceDiagram
 
 Configurações são gravadas com `setDoc(..., { merge: true })`. Cores e sliders
 têm preview no evento `input` e persistem no evento `change`, reduzindo escritas.
+
+Cada data geral é um documento independente. Ao editar a própria data, um batch
+remove o ID antigo e grava o novo ID determinístico; o expediente usa o documento
+singleton `generalConfig/workday`. As Rules consultam `users/{uid}.isAdmin` antes
+de aceitar qualquer escrita nessa coleção.
 
 Contadores são salvos como um único array ordenado, substituindo o documento para
 remover campos legados fora da allowlist. Criar/editar aguarda a escrita;
@@ -134,7 +145,7 @@ O expediente é modelado como recorrência de segunda a sexta, iniciando às 08:
 | --- | --- | --- |
 | Firebase CDN | SDK Auth/Firestore 12.16.0 | Recursos autenticados não inicializam |
 | Google OAuth | Login único | Aplicação permanece no modo visitante |
-| Firestore | Preferências e contadores | Contadores padrão continuam locais |
+| Firestore | Configuração geral, preferências e contadores | Contadores padrão usam o fallback de `data.js` |
 | Cloud Storage | Imagens dos cards pessoais | Cards continuam sem imagem |
 | Adobe Fonts | Tipografia | Fallback para `system-ui`/monospace |
 | WeatherWidget.io | Previsões | Espaços de clima podem ficar vazios |

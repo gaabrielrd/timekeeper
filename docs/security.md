@@ -22,7 +22,17 @@ Para `/users/{userId}`:
 
 - dono Google pode ler e excluir;
 - pode criar/atualizar somente campos de perfil/legado conhecidos;
+- `isAdmin` é aceito no schema, mas não pode ser criado, alterado ou removido pelo
+  próprio cliente;
 - strings de perfil têm limites e `customCounters` legado aceita no máximo cinco.
+
+Para `/generalConfig/{configId}`:
+
+- qualquer visitante pode ler documentos e listar a coleção;
+- criação, edição e remoção exigem Google OAuth e `isAdmin: true` no perfil;
+- o documento `workday` não pode ser removido;
+- IDs, tipos, horários, dias e `dateTime` seguem allowlists/formatos conhecidos;
+- a consulta do perfil administrativo acontece nas Rules, nunca por confiança na UI.
 
 Para `/users/{userId}/data/{documentId}`:
 
@@ -32,6 +42,8 @@ Para `/users/{userId}/data/{documentId}`:
 - somente o dono Google pode ler/escrever/excluir;
 - settings validam allowlist, tipos, cores, estilos e ranges;
 - counters validam allowlist, limite cinco e schemas fixo/recorrente;
+- o tipo do contador seleciona o schema antes da validação e os dias usam uma
+  allowlist de `0` a `6`, reduzindo o orçamento de expressões sem relaxar dados;
 - nomes, IDs, cores, horários e dias recebem validação de formato/range.
 
 Para `/users/{userId}/counter-images/{slot}` no Cloud Storage:
@@ -41,7 +53,8 @@ Para `/users/{userId}/counter-images/{slot}` no Cloud Storage:
 - cada objeto aceita tipos de imagem conhecidos e no máximo 5 MiB;
 - dez slots tornam impossível exceder 50 MiB por usuário pelas APIs do Storage.
 
-Não existem leituras públicas ou queries de coleção autorizadas.
+`generalConfig` é a única leitura pública e query de coleção autorizada. Perfis,
+settings, contadores e imagens continuam privados por UID.
 
 ## Lacunas conhecidas
 

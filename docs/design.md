@@ -40,8 +40,9 @@ O produto deve permanecer legível quando a fonte externa falhar.
 
 ### Header
 
-Barra de controle com título, horário anônimo ou toggle de contadores, conta e tela
-cheia. Quando o fundo está ligado, usa transparência e blur para preservar contexto.
+Barra de controle fixa com título, horário anônimo ou toggle de contadores, conta e
+tela cheia. Permanece visível durante a rolagem e usa transparência e blur para
+preservar o contexto sobre qualquer fundo.
 
 ### Contadores padrão
 
@@ -56,8 +57,8 @@ Grid desktop em proporção `1.25fr 1fr 1fr`. O expediente é `featured`. Em at�
 - Até 900 px: uma coluna, independentemente da quantidade.
 
 A seção entra por transição de `grid-template-rows`, margem e opacidade, imitando um
-acordeão. Cards mantêm opacidade suficiente para legibilidade, mas deixam o fundo
-animado aparecer.
+acordeão. O intervalo em relação aos contadores padrão é compacto. Cards mantêm
+opacidade suficiente para legibilidade, mas deixam o fundo animado aparecer.
 
 ### Sidebar e modal
 
@@ -68,6 +69,14 @@ edição com uma prévia compacta que reage a nome, cor, imagem e opacidades; ou
 apresenta upload, quota e biblioteca de imagens em uma grade compacta. A seleção de
 cor e imagem compartilha o painel `Visual`; a imagem usa miniatura e ações por ícone
 para preservar espaço vertical.
+
+Administradores recebem um terceiro dialog operacional, mais largo, com três abas:
+expediente, pagamentos e feriados. A navegação usa sublinhado discreto, o expediente
+fica em um formulário curto e os calendários usam listas lineares com ações por
+ícone. O expediente e os controles de data ficam em cards semitransparentes. Início,
+fim e salvar permanecem na mesma linha; nas datas, campo, salvar e cancelar seguem
+o mesmo alinhamento. O conteúdo rolável permanece dentro do modal em telas
+pequenas.
 
 Imagens pessoais usam `cover` para ocupar todo o card. A camada de imagem e a
 sobreposição na cor da superfície têm opacidades independentes; conteúdo temporal e
@@ -96,7 +105,9 @@ custo, e o loop pausa quando o efeito não está ativo ou a página não está v
 
 - Entrada da página: fade-in com `translateY`.
 - Cards: entrada escalonada.
-- Clima: atraso de 1 s para ocultar o flash branco do widget externo.
+- Clima: fade com atraso de 1 s para ocultar o flash branco do widget externo;
+  os iframes não são transladados e uma máscara inferior na cor da borda cobre
+  artefatos de composição do conteúdo externo.
 - Seção pessoal: abertura lenta em acordeão.
 - Sidebar e modal: transições curtas com curva suave.
 - Estados ao vivo: pulso discreto.
@@ -126,6 +137,8 @@ Implementado:
 - `aria-live` nos contadores e mensagens;
 - `aria-hidden`, `aria-expanded`, `aria-pressed` e `inert` nos estados;
 - modal nativo e suporte a Escape;
+- tabs administrativas com `role="tab"`, `aria-selected`, painéis associados e
+  navegação por setas esquerda/direita;
 - `prefers-reduced-motion` reduz animações/transições;
 - cores de input limitadas ao formato hexadecimal.
 

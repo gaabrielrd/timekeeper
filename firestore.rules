@@ -8,9 +8,14 @@ service cloud.firestore {
         && request.auth.token.firebase.sign_in_provider == 'google.com';
     }
 
+    function isGoogleAdmin() {
+      return request.auth != null
+        && request.auth.token.firebase.sign_in_provider == 'google.com'
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+
     function isHexColor(value) {
-      return value is string
-        && value.matches('^#[0-9a-fA-F]{6}$');
+      return value.matches('^#[0-9a-fA-F]{6}$');
     }
 
     function hasValidUpdatedAt(data) {
@@ -19,9 +24,11 @@ service cloud.firestore {
 
     function hasValidSettingsFields(data) {
       return (!('endHour' in data)
-          || (data.endHour is int && data.endHour >= 17 && data.endHour <= 22))
+          || (data.endHour is int && data.endHour >= 0 && data.endHour <= 23))
         && (!('endMinutes' in data)
-          || (data.endMinutes is int && data.endMinutes in [25, 55]))
+          || (data.endMinutes is int
+            && data.endMinutes >= 0
+            && data.endMinutes <= 59))
         && (!('accentPrimary' in data) || isHexColor(data.accentPrimary))
         && (!('accentSecondary' in data) || isHexColor(data.accentSecondary))
         && (!('backgroundEnabled' in data) || data.backgroundEnabled is bool)
@@ -53,6 +60,7 @@ service cloud.firestore {
           'displayName',
           'email',
           'photoURL',
+          'isAdmin',
           'updatedAt',
           'endHour',
           'endMinutes',
@@ -73,6 +81,7 @@ service cloud.firestore {
           || (data.email is string && data.email.size() <= 320))
         && (!('photoURL' in data)
           || (data.photoURL is string && data.photoURL.size() <= 2048))
+        && (!('isAdmin' in data) || data.isAdmin is bool)
         && (!('customCounters' in data)
           || (data.customCounters is list && data.customCounters.size() <= 5))
         && hasValidSettingsFields(data)
@@ -81,28 +90,20 @@ service cloud.firestore {
 
     function hasValidCounterBase(counter) {
       return counter is map
-        && counter.id is string
-        && counter.id.size() > 0
-        && counter.id.size() <= 100
-        && counter.name is string
-        && counter.name.size() > 0
-        && counter.name.size() <= 50
+        && counter.id.matches('^.{1,100}$')
+        && counter.name.matches('^.{1,50}$')
         && (!('createdAt' in counter)
-          || (counter.createdAt is string && counter.createdAt.size() <= 40))
+          || counter.createdAt.matches('^.{0,40}$'))
         && (!('color' in counter)
           || counter.color == null
           || isHexColor(counter.color))
-        && (!('imageId' in counter)
-          || counter.imageId == null
-          || (counter.imageId is string
-            && counter.imageId.size() > 0
-            && counter.imageId.size() <= 100))
-        && (!('imageOpacity' in counter)
-          || (counter.imageOpacity is number
+        && ((!('imageId' in counter) || counter.imageId == null)
+          ? (!('imageOpacity' in counter) && !('overlayOpacity' in counter))
+          : (counter.imageId.matches('^.{1,100}$')
+            && counter.imageOpacity is number
             && counter.imageOpacity >= 0
-            && counter.imageOpacity <= 100))
-        && (!('overlayOpacity' in counter)
-          || (counter.overlayOpacity is number
+            && counter.imageOpacity <= 100
+            && counter.overlayOpacity is number
             && counter.overlayOpacity >= 0
             && counter.overlayOpacity <= 100));
     }
@@ -120,30 +121,17 @@ service cloud.firestore {
           'imageOpacity',
           'overlayOpacity'
         ])
-        && (!('type' in counter) || counter.type == 'fixed')
         && counter.startAtMs is int
         && counter.endAtMs is int
         && counter.startAtMs >= 0
         && counter.endAtMs > counter.startAtMs;
     }
 
-    function isValidDayAt(days, index) {
-      return days.size() <= index
-        ? true
-        : days[index] is int && days[index] >= 0 && days[index] <= 6;
-    }
-
     function hasValidDays(days) {
       return days is list
         && days.size() >= 1
         && days.size() <= 7
-        && isValidDayAt(days, 0)
-        && isValidDayAt(days, 1)
-        && isValidDayAt(days, 2)
-        && isValidDayAt(days, 3)
-        && isValidDayAt(days, 4)
-        && isValidDayAt(days, 5)
-        && isValidDayAt(days, 6);
+        && days.hasOnly([0, 1, 2, 3, 4, 5, 6]);
     }
 
     function isValidRecurringCounter(counter) {
@@ -160,17 +148,17 @@ service cloud.firestore {
           'imageOpacity',
           'overlayOpacity'
         ])
-        && counter.type == 'recurring'
-        && counter.startTime is string
         && counter.startTime.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')
-        && counter.endTime is string
         && counter.endTime.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')
         && hasValidDays(counter.daysOfWeek);
     }
 
     function isValidCounter(counter) {
       return hasValidCounterBase(counter)
-        && (isValidFixedCounter(counter) || isValidRecurringCounter(counter));
+        && (((!('type' in counter) || counter.type == 'fixed')
+            && isValidFixedCounter(counter))
+          || (counter.type == 'recurring'
+            && isValidRecurringCounter(counter)));
     }
 
     function isValidCounterAt(items, index) {
@@ -222,27 +210,13 @@ service cloud.firestore {
           'contentType',
           'createdAt'
         ])
-        && image.id is string
-        && image.id.size() > 0
-        && image.id.size() <= 100
         && image.slot is int
         && image.slot >= 0
         && image.slot <= 9
-        && image.name is string
-        && image.name.size() > 0
-        && image.name.size() <= 120
         && image.size is int
         && image.size > 0
         && image.size <= 5 * 1024 * 1024
-        && image.contentType in [
-          'image/jpeg',
-          'image/png',
-          'image/webp',
-          'image/gif',
-          'image/avif'
-        ]
-        && image.createdAt is string
-        && image.createdAt.size() <= 40;
+        && image.contentType.matches('^image/(jpeg|png|webp|gif|avif)$');
     }
 
     function isValidImageAt(items, index) {
@@ -270,10 +244,55 @@ service cloud.firestore {
         && hasValidUpdatedAt(data);
     }
 
+    function isValidGeneralConfig(configId, data) {
+      return data.keys().hasOnly([
+          'type',
+          'startTime',
+          'endTime',
+          'daysOfWeek',
+          'dateTime',
+          'updatedAt'
+        ])
+        && hasValidUpdatedAt(data)
+        && ((configId == 'workday'
+            && data.type == 'workday'
+            && data.startTime is string
+            && data.startTime.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')
+            && data.endTime is string
+            && data.endTime.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')
+            && hasValidDays(data.daysOfWeek)
+            && !('dateTime' in data))
+          || (configId.matches('^payment-[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+            && data.type == 'payment'
+            && data.dateTime is string
+            && data.dateTime.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$')
+            && !('startTime' in data)
+            && !('endTime' in data)
+            && !('daysOfWeek' in data))
+          || (configId.matches('^holiday-[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+            && data.type == 'holiday'
+            && data.dateTime is string
+            && data.dateTime.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$')
+            && !('startTime' in data)
+            && !('endTime' in data)
+            && !('daysOfWeek' in data)));
+    }
+
+    match /generalConfig/{configId} {
+      allow read: if true;
+      allow create, update: if isGoogleAdmin()
+        && isValidGeneralConfig(configId, request.resource.data);
+      allow delete: if isGoogleAdmin() && configId != 'workday';
+    }
+
     match /users/{userId} {
       allow read, delete: if isGoogleOwner(userId);
-      allow create, update: if isGoogleOwner(userId)
-        && hasValidProfileFields(request.resource.data);
+      allow create: if isGoogleOwner(userId)
+        && hasValidProfileFields(request.resource.data)
+        && !('isAdmin' in request.resource.data);
+      allow update: if isGoogleOwner(userId)
+        && hasValidProfileFields(request.resource.data)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isAdmin']);
 
       match /data/settings {
         allow read, delete: if isGoogleOwner(userId);

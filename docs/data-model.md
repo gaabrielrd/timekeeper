@@ -3,6 +3,7 @@
 ## Visão geral
 
 Cada conta Google possui um documento de perfil e três documentos operacionais.
+Os três contadores padrão usam uma coleção pública separada.
 
 ```text
 users/{uid}
@@ -23,6 +24,17 @@ users/{uid}/data/counters
 users/{uid}/data/images
 ├── items[0..9]
 └── updatedAt
+
+generalConfig/workday
+├── type: "workday"
+├── startTime / endTime
+└── daysOfWeek
+
+generalConfig/payment-YYYY-MM-DD
+└── type: "payment" + dateTime
+
+generalConfig/holiday-YYYY-MM-DD
+└── type: "holiday" + dateTime
 ```
 
 ## Perfil — `/users/{uid}`
@@ -32,18 +44,40 @@ users/{uid}/data/images
 | `displayName` | string | Firebase Auth |
 | `email` | string | Firebase Auth |
 | `photoURL` | string | Firebase Auth |
+| `isAdmin` | boolean opcional | Operação privilegiada |
 | `updatedAt` | timestamp | `serverTimestamp()` |
 
 Esse documento também é a origem do formato legado. `ensureUserData` lê eventuais
 configurações/`customCounters` na raiz, cria os documentos novos se ainda faltarem e
-então substitui a raiz somente pelos campos atuais do perfil.
+então substitui a raiz somente pelos campos atuais do perfil. Quando `isAdmin`
+existe, a normalização preserva o valor; o próprio usuário não pode criá-lo,
+alterá-lo ou removê-lo pelas Rules.
+
+## Configuração geral — `/generalConfig/{configId}`
+
+A coleção inteira pode ser lida sem autenticação para que os contadores padrão
+continuem disponíveis a visitantes. Escritas exigem Google OAuth e `isAdmin: true`
+no perfil do UID autenticado.
+
+| Documento | Campos | Operações no modal |
+| --- | --- | --- |
+| `workday` | `type`, `startTime`, `endTime`, `daysOfWeek`, `updatedAt` | editar |
+| `payment-YYYY-MM-DD` | `type`, `dateTime`, `updatedAt` | criar, editar, excluir |
+| `holiday-YYYY-MM-DD` | `type`, `dateTime`, `updatedAt` | criar, editar, excluir |
+
+`dateTime` usa o formato local `YYYY-MM-DDTHH:mm:ss`. A UI expõe somente a data e
+preserva o horário herdado do seed ao editar. O documento `workday` não pode ser
+excluído. Na primeira sessão de um administrador, uma coleção completamente vazia
+é populada em batch com `GENERAL_CONFIG_SEED` de `public/src/data.js` (1 expediente,
+12 pagamentos e 10 feriados). Uma coleção já inicializada nunca é repopulada após
+remoções intencionais.
 
 ## Configurações — `/users/{uid}/data/settings`
 
 | Campo | Tipo | Padrão | Validação no cliente |
 | --- | --- | --- | --- |
-| `endHour` | number | `17` | opções 17–22 na UI |
-| `endMinutes` | number | `55` | opções 25 ou 55 na UI |
+| `endHour` | number | fim global | inteiro 0–23 |
+| `endMinutes` | number | fim global | inteiro 0–59 |
 | `accentPrimary` | string hex | `#a78bfa` | `#RRGGBB` |
 | `accentSecondary` | string hex | `#362860` | `#RRGGBB` |
 | `backgroundEnabled` | boolean | `false` | boolean estrito ao aplicar |
@@ -147,7 +181,8 @@ pois são configurações não sensíveis acessadas pelo JavaScript.
 
 ## Sincronização e concorrência
 
-Há três subscriptions independentes: settings, counters e metadados de images.
+Há uma subscription pública de `generalConfig` e quatro subscriptions de conta:
+perfil, settings, counters e metadados de images.
 Escritas de contadores substituem o documento completo para remover campos legados
 fora da allowlist. Duas abas podem produzir last-write-wins; `onSnapshot` reconcilia a UI
 com a versão aceita pelo servidor.
@@ -155,6 +190,9 @@ com a versão aceita pelo servidor.
 ## Regras atuais
 
 - Requer usuário autenticado, dono do UID e provedor `google.com`.
+- `generalConfig` permite leitura pública; criação/edição/remoção exige perfil
+  administrativo e o expediente não pode ser removido.
+- O cliente não pode conceder nem alterar sua própria flag `isAdmin`.
 - Subdocumentos permitidos: somente `settings`, `counters` e `images`.
 - Settings aceitam somente chaves conhecidas, tipos e ranges válidos.
 - `counters.items` precisa ser lista e ter até cinco elementos válidos.

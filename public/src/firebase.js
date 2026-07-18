@@ -10,6 +10,7 @@ import {
 	signOut,
 } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
 import {
+	collection,
 	connectFirestoreEmulator,
 	deleteDoc,
 	doc,
@@ -176,6 +177,17 @@ const elements = {
 	imageLibraryMessage: document.querySelector("#image-library-message"),
 	imageLibraryGrid: document.querySelector("#image-library-grid"),
 	imageLibraryEmpty: document.querySelector("#image-library-empty"),
+	openAdminModal: document.querySelector("#open-admin-modal"),
+	adminDialog: document.querySelector("#admin-dialog"),
+	adminDialogClose: document.querySelector("#admin-dialog-close"),
+	adminTabs: Array.from(document.querySelectorAll("[data-admin-tab]")),
+	adminPanels: Array.from(document.querySelectorAll("[data-admin-panel]")),
+	adminWorkdayForm: document.querySelector("#admin-workday-form"),
+	adminPaymentForm: document.querySelector("#admin-payment-form"),
+	adminHolidayForm: document.querySelector("#admin-holiday-form"),
+	adminPaymentList: document.querySelector("#admin-payment-list"),
+	adminHolidayList: document.querySelector("#admin-holiday-list"),
+	adminMessage: document.querySelector("#admin-message"),
 	customSection: document.querySelector("#custom-counters-section"),
 	customPanels: document.querySelector("#custom-panels"),
 	toast: document.querySelector("#app-toast"),
@@ -186,6 +198,8 @@ let userSettings = { ...DEFAULTS };
 let unsubscribeSettings = null;
 let unsubscribeCounters = null;
 let unsubscribeImages = null;
+let unsubscribeProfile = null;
+let unsubscribeGeneralConfig = null;
 let customProgressBars = [];
 let toastTimer = null;
 let editingCounterId = null;
@@ -195,6 +209,10 @@ let imageLoadVersion = 0;
 let activeUploadTask = null;
 let librarySelectsCounter = false;
 let imageLibraryAvailable = true;
+let currentUserIsAdmin = false;
+let generalConfigDocuments = [];
+let generalConfigHasRemoteData = false;
+let generalConfigSnapshotReady = false;
 
 function isHexColor(value) {
 	return /^#[0-9a-f]{6}$/i.test(value || "");
@@ -215,24 +233,38 @@ function guestTimeSettings() {
 	const savedHour = Number(getCookieValue("hourTime"));
 	const savedMinutes = Number(getCookieValue("minutesTime"));
 	return {
-		endHour: [17, 18, 19, 20, 21, 22].includes(savedHour)
+		endHour: Number.isInteger(savedHour) && savedHour >= 0 && savedHour <= 23
 			? savedHour
 			: DEFAULTS.endHour,
-		endMinutes: [25, 55].includes(savedMinutes)
+		endMinutes:
+			Number.isInteger(savedMinutes) && savedMinutes >= 0 && savedMinutes <= 59
 			? savedMinutes
 			: DEFAULTS.endMinutes,
 	};
 }
 
+function ensureSelectValue(select, value) {
+	if (Array.from(select.options).some((option) => option.value === value)) return;
+	const option = document.createElement("option");
+	option.value = value;
+	option.textContent = value.padStart(2, "0");
+	select.append(option);
+}
+
 function syncTimeControls(hour, minutes) {
 	const hourValue = String(hour);
 	const minuteValue = String(minutes);
+	for (const select of [elements.hour, elements.guestHour]) {
+		ensureSelectValue(select, hourValue);
+	}
+	for (const select of [elements.minutes, elements.guestMinutes]) {
+		ensureSelectValue(select, minuteValue);
+	}
 	elements.hour.value = hourValue;
 	elements.minutes.value = minuteValue;
 	elements.guestHour.value = hourValue;
 	elements.guestMinutes.value = minuteValue;
-	window.setHours();
-	window.setMinutes();
+	window.fill?.();
 }
 
 function showToast(message) {
@@ -270,6 +302,134 @@ function countersReference(userId) {
 
 function imagesReference(userId) {
 	return doc(db, "users", userId, "data", "images");
+}
+
+function generalConfigReference(configId) {
+	return doc(db, "generalConfig", configId);
+}
+
+function generalConfigSeed() {
+	return Array.isArray(window.GENERAL_CONFIG_SEED)
+		? window.GENERAL_CONFIG_SEED.map((item) => ({ ...item }))
+		: [];
+}
+
+function normalizeWorkdayConfig(item) {
+	const fallback = generalConfigSeed().find((entry) => entry.id === "workday") || {
+		startTime: "08:00",
+		endTime: "17:55",
+		daysOfWeek: [1, 2, 3, 4, 5],
+	};
+	const timePattern = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
+	const daysOfWeek = [
+		...new Set(
+			(Array.isArray(item?.daysOfWeek) ? item.daysOfWeek : fallback.daysOfWeek)
+				.map(Number)
+				.filter((day) => Number.isInteger(day) && day >= 0 && day <= 6),
+		),
+	].sort((first, second) => first - second);
+	return {
+		id: "workday",
+		type: "workday",
+		startTime: timePattern.test(item?.startTime)
+			? item.startTime
+			: fallback.startTime,
+		endTime: timePattern.test(item?.endTime) ? item.endTime : fallback.endTime,
+		daysOfWeek: daysOfWeek.length ? daysOfWeek : fallback.daysOfWeek,
+	};
+}
+
+function normalizeCalendarConfig(item) {
+	if (!item || !["payment", "holiday"].includes(item.type)) return null;
+	const dateTime = String(item.dateTime || "");
+	if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(dateTime)) return null;
+	const parsed = new Date(dateTime);
+	if (Number.isNaN(parsed.getTime())) return null;
+	return { id: String(item.id || ""), type: item.type, dateTime };
+}
+
+function applyGeneralConfig(documents, hasRemoteData = false) {
+	generalConfigHasRemoteData = hasRemoteData;
+	generalConfigDocuments = documents.length ? documents : generalConfigSeed();
+	const workday = normalizeWorkdayConfig(
+		generalConfigDocuments.find((item) => item.id === "workday"),
+	);
+	const calendars = generalConfigDocuments
+		.map(normalizeCalendarConfig)
+		.filter(Boolean);
+	window.expedientePadrao = workday;
+	window.pagamentos = calendars
+		.filter((item) => item.type === "payment")
+		.map((item) => new Date(item.dateTime))
+		.sort((first, second) => first - second);
+	window.feriados = calendars
+		.filter((item) => item.type === "holiday")
+		.map((item) => new Date(item.dateTime))
+		.sort((first, second) => first - second);
+
+	const [endHour, endMinutes] = workday.endTime.split(":").map(Number);
+	DEFAULTS.endHour = endHour;
+	DEFAULTS.endMinutes = endMinutes;
+	if (
+		!currentUser &&
+		!getCookieValue("hourTime") &&
+		!getCookieValue("minutesTime")
+	) {
+		applySettings({ ...DEFAULTS, endHour, endMinutes });
+	}
+	renderAdminConfig();
+	window.fill?.();
+}
+
+let generalConfigSeedInProgress = false;
+
+async function seedGeneralConfigIfNeeded() {
+	if (
+		!currentUserIsAdmin ||
+		!generalConfigSnapshotReady ||
+		generalConfigHasRemoteData ||
+		generalConfigSeedInProgress
+	) {
+		return;
+	}
+	generalConfigSeedInProgress = true;
+	try {
+		const batch = writeBatch(db);
+		for (const item of generalConfigSeed()) {
+			const { id, ...data } = item;
+			batch.set(generalConfigReference(id), {
+				...data,
+				updatedAt: serverTimestamp(),
+			});
+		}
+		await batch.commit();
+		showToast("Configuração geral inicializada.");
+	} catch (error) {
+		console.error("Falha ao inicializar configuração geral.", error);
+		showToast("Não foi possível inicializar a configuração geral.");
+	} finally {
+		generalConfigSeedInProgress = false;
+	}
+}
+
+function subscribeToGeneralConfig() {
+	unsubscribeGeneralConfig?.();
+	unsubscribeGeneralConfig = onSnapshot(
+		collection(db, "generalConfig"),
+		(snapshot) => {
+			generalConfigSnapshotReady = true;
+			const documents = snapshot.docs.map((item) => ({
+				id: item.id,
+				...item.data(),
+			}));
+			applyGeneralConfig(documents, !snapshot.empty);
+			seedGeneralConfigIfNeeded();
+		},
+		(error) => {
+			console.error("Falha ao acompanhar configuração geral.", error);
+			applyGeneralConfig(generalConfigSeed());
+		},
+	);
 }
 
 function imageStorageReference(userId, slot) {
@@ -1007,6 +1167,192 @@ function syncConstellation() {
 	}
 }
 
+function setAdminAccess(isAdmin) {
+	currentUserIsAdmin = isAdmin === true;
+	elements.openAdminModal.hidden = !currentUserIsAdmin;
+	if (!currentUserIsAdmin && elements.adminDialog.open) {
+		elements.adminDialog.close();
+	}
+	if (currentUserIsAdmin) seedGeneralConfigIfNeeded();
+}
+
+function selectAdminTab(tabName, moveFocus = false) {
+	for (const tab of elements.adminTabs) {
+		const isSelected = tab.dataset.adminTab === tabName;
+		tab.setAttribute("aria-selected", String(isSelected));
+		tab.tabIndex = isSelected ? 0 : -1;
+		if (isSelected && moveFocus) tab.focus();
+	}
+	for (const panel of elements.adminPanels) {
+		panel.hidden = panel.dataset.adminPanel !== tabName;
+	}
+}
+
+function resetAdminDateForm(form) {
+	form.reset();
+	form.elements.editingId.value = "";
+	form.querySelector('[type="submit"]').textContent = "Salvar";
+	form.querySelector(".admin-date-cancel").hidden = true;
+}
+
+function editAdminDate(form, item) {
+	form.elements.editingId.value = item.id;
+	form.elements.date.value = item.dateTime.slice(0, 10);
+	form.querySelector('[type="submit"]').textContent = "Salvar";
+	form.querySelector(".admin-date-cancel").hidden = false;
+	form.elements.date.focus();
+}
+
+function formatAdminDate(dateTime) {
+	const [year, month, day] = dateTime.slice(0, 10).split("-").map(Number);
+	return new Intl.DateTimeFormat("pt-BR", {
+		weekday: "short",
+		day: "2-digit",
+		month: "long",
+		year: "numeric",
+	}).format(new Date(year, month - 1, day, 12));
+}
+
+function adminActionButton(icon, label, handler) {
+	const button = document.createElement("button");
+	button.className = "counter-action";
+	button.type = "button";
+	button.title = label;
+	button.setAttribute("aria-label", label);
+	button.innerHTML = `<i class="material-icons" aria-hidden="true">${icon}</i>`;
+	button.addEventListener("click", handler);
+	return button;
+}
+
+async function deleteAdminDate(item) {
+	if (!currentUserIsAdmin) return;
+	if (!window.confirm(`Remover a data ${formatAdminDate(item.dateTime)}?`)) return;
+	try {
+		await deleteDoc(generalConfigReference(item.id));
+		showToast("Data removida.");
+	} catch (error) {
+		console.error("Falha ao remover data geral.", error);
+		showToast("Não foi possível remover a data.");
+	}
+}
+
+function renderAdminDateList(type, container, form) {
+	const items = generalConfigDocuments
+		.map(normalizeCalendarConfig)
+		.filter((item) => item?.type === type)
+		.sort((first, second) => first.dateTime.localeCompare(second.dateTime));
+	container.replaceChildren();
+	if (!items.length) {
+		const empty = document.createElement("p");
+		empty.className = "admin-date-empty";
+		empty.textContent = "Nenhuma data cadastrada.";
+		container.append(empty);
+		return;
+	}
+	for (const item of items) {
+		const row = document.createElement("div");
+		row.className = "admin-date-row";
+		const time = document.createElement("time");
+		time.dateTime = item.dateTime.slice(0, 10);
+		time.textContent = formatAdminDate(item.dateTime);
+		const actions = document.createElement("div");
+		actions.className = "admin-date-actions";
+		actions.append(
+			adminActionButton("edit", `Editar ${time.textContent}`, () =>
+				editAdminDate(form, item),
+			),
+			adminActionButton("delete_outline", `Remover ${time.textContent}`, () =>
+				deleteAdminDate(item),
+			),
+		);
+		row.append(time, actions);
+		container.append(row);
+	}
+}
+
+function renderAdminConfig() {
+	if (!elements.adminWorkdayForm) return;
+	const workday = normalizeWorkdayConfig(
+		generalConfigDocuments.find((item) => item.id === "workday"),
+	);
+	elements.adminWorkdayForm.elements.startTime.value = workday.startTime;
+	elements.adminWorkdayForm.elements.endTime.value = workday.endTime;
+	const selectedDays = new Set(workday.daysOfWeek);
+	elements.adminWorkdayForm
+		.querySelectorAll('input[name="daysOfWeek"]')
+		.forEach((input) => (input.checked = selectedDays.has(Number(input.value))));
+	renderAdminDateList(
+		"payment",
+		elements.adminPaymentList,
+		elements.adminPaymentForm,
+	);
+	renderAdminDateList(
+		"holiday",
+		elements.adminHolidayList,
+		elements.adminHolidayForm,
+	);
+}
+
+function openAdminDialog() {
+	if (!currentUser || !currentUserIsAdmin) return;
+	closeSidebar();
+	selectAdminTab("workday");
+	elements.adminMessage.textContent = "";
+	renderAdminConfig();
+	elements.adminDialog.showModal();
+	elements.adminDialogClose.focus();
+}
+
+function closeAdminDialog() {
+	if (elements.adminDialog.open) elements.adminDialog.close();
+	resetAdminDateForm(elements.adminPaymentForm);
+	resetAdminDateForm(elements.adminHolidayForm);
+	elements.adminMessage.textContent = "";
+}
+
+async function saveAdminCalendarDate(event, type) {
+	event.preventDefault();
+	if (!currentUserIsAdmin) return;
+	const form = event.currentTarget;
+	const date = String(form.elements.date.value || "");
+	const editingId = String(form.elements.editingId.value || "");
+	if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+	const prefix = type === "payment" ? "payment" : "holiday";
+	const nextId = `${prefix}-${date}`;
+	const existing = generalConfigDocuments.find((item) => item.id === editingId);
+	const duplicate = generalConfigDocuments.some(
+		(item) => item.id === nextId && item.id !== editingId,
+	);
+	if (duplicate) {
+		elements.adminMessage.textContent = "Essa data já está cadastrada.";
+		return;
+	}
+	const defaultTime = type === "payment" ? "12:00:00" : "17:55:00";
+	const preservedTime = existing?.dateTime?.slice(11) || defaultTime;
+	const batch = writeBatch(db);
+	if (editingId && editingId !== nextId) {
+		batch.delete(generalConfigReference(editingId));
+	}
+	batch.set(generalConfigReference(nextId), {
+		type,
+		dateTime: `${date}T${preservedTime}`,
+		updatedAt: serverTimestamp(),
+	});
+	form.querySelector('[type="submit"]').disabled = true;
+	try {
+		await batch.commit();
+		resetAdminDateForm(form);
+		elements.adminMessage.textContent = editingId
+			? "Data atualizada."
+			: "Data adicionada.";
+	} catch (error) {
+		console.error("Falha ao salvar data geral.", error);
+		elements.adminMessage.textContent = "Não foi possível salvar a data.";
+	} finally {
+		form.querySelector('[type="submit"]').disabled = false;
+	}
+}
+
 function openSidebar() {
 	if (!currentUser) return;
 	document.body.classList.add("sidebar-open");
@@ -1470,9 +1816,12 @@ function unsubscribeUserData() {
 	unsubscribeSettings?.();
 	unsubscribeCounters?.();
 	unsubscribeImages?.();
+	unsubscribeProfile?.();
 	unsubscribeSettings = null;
 	unsubscribeCounters = null;
 	unsubscribeImages = null;
+	unsubscribeProfile = null;
+	setAdminAccess(false);
 	imageLoadVersion += 1;
 }
 
@@ -1570,6 +1919,9 @@ async function ensureUserData(user) {
 			displayName: user.displayName || "",
 			email: user.email || "",
 			photoURL: user.photoURL || "",
+			...(typeof legacy.isAdmin === "boolean"
+				? { isAdmin: legacy.isAdmin }
+				: {}),
 			updatedAt: serverTimestamp(),
 		}),
 	);
@@ -1610,6 +1962,14 @@ async function subscribeToUserData(user) {
 	}
 	if (currentUser?.uid !== user.uid) return;
 	setImageLibraryAvailability(imagesAvailable);
+	unsubscribeProfile = onSnapshot(
+		doc(db, "users", user.uid),
+		(snapshot) => setAdminAccess(snapshot.data()?.isAdmin === true),
+		(error) => {
+			console.error("Falha ao acompanhar perfil administrativo.", error);
+			setAdminAccess(false);
+		},
+	);
 
 	unsubscribeSettings = onSnapshot(
 		settingsReference(user.uid),
@@ -1797,6 +2157,69 @@ elements.authButton.addEventListener("click", async () => {
 
 elements.sidebarBackdrop.addEventListener("click", closeSidebar);
 elements.sidebarClose.addEventListener("click", closeSidebar);
+elements.openAdminModal.addEventListener("click", openAdminDialog);
+elements.adminDialogClose.addEventListener("click", closeAdminDialog);
+elements.adminDialog.addEventListener("click", (event) => {
+	if (event.target === elements.adminDialog) closeAdminDialog();
+});
+elements.adminDialog.addEventListener("close", () => {
+	resetAdminDateForm(elements.adminPaymentForm);
+	resetAdminDateForm(elements.adminHolidayForm);
+	elements.adminMessage.textContent = "";
+});
+for (const [index, tab] of elements.adminTabs.entries()) {
+	tab.addEventListener("click", () => selectAdminTab(tab.dataset.adminTab));
+	tab.addEventListener("keydown", (event) => {
+		if (!["ArrowLeft", "ArrowRight"].includes(event.key)) return;
+		event.preventDefault();
+		const direction = event.key === "ArrowRight" ? 1 : -1;
+		const nextIndex =
+			(index + direction + elements.adminTabs.length) % elements.adminTabs.length;
+		selectAdminTab(elements.adminTabs[nextIndex].dataset.adminTab, true);
+	});
+}
+elements.adminWorkdayForm.addEventListener("submit", async (event) => {
+	event.preventDefault();
+	if (!currentUserIsAdmin) return;
+	const data = new FormData(elements.adminWorkdayForm);
+	const startTime = String(data.get("startTime") || "");
+	const endTime = String(data.get("endTime") || "");
+	const daysOfWeek = [...new Set(data.getAll("daysOfWeek").map(Number))].sort(
+		(first, second) => first - second,
+	);
+	if (!daysOfWeek.length) {
+		elements.adminMessage.textContent = "Selecione pelo menos um dia de expediente.";
+		return;
+	}
+	const submit = elements.adminWorkdayForm.querySelector('[type="submit"]');
+	submit.disabled = true;
+	try {
+		await setDoc(generalConfigReference("workday"), {
+			type: "workday",
+			startTime,
+			endTime,
+			daysOfWeek,
+			updatedAt: serverTimestamp(),
+		});
+		elements.adminMessage.textContent = "Expediente padrão atualizado.";
+	} catch (error) {
+		console.error("Falha ao salvar expediente geral.", error);
+		elements.adminMessage.textContent = "Não foi possível salvar o expediente.";
+	} finally {
+		submit.disabled = false;
+	}
+});
+elements.adminPaymentForm.addEventListener("submit", (event) =>
+	saveAdminCalendarDate(event, "payment"),
+);
+elements.adminHolidayForm.addEventListener("submit", (event) =>
+	saveAdminCalendarDate(event, "holiday"),
+);
+for (const form of [elements.adminPaymentForm, elements.adminHolidayForm]) {
+	form.querySelector(".admin-date-cancel").addEventListener("click", () =>
+		resetAdminDateForm(form),
+	);
+}
 elements.openCounterModal.addEventListener("click", () => openCounterDialog());
 elements.openImageLibrary.addEventListener("click", () => openImageLibrary());
 elements.chooseCounterImage.addEventListener("click", () =>
@@ -1888,7 +2311,8 @@ document.addEventListener("keydown", (event) => {
 	if (
 		event.key === "Escape" &&
 		!elements.counterDialog.open &&
-		!elements.imageLibraryDialog.open
+		!elements.imageLibraryDialog.open &&
+		!elements.adminDialog.open
 	) {
 		closeSidebar();
 	}
@@ -2078,6 +2502,7 @@ onAuthStateChanged(auth, (user) => {
 	activeUploadTask?.cancel();
 	activeUploadTask = null;
 	closeImageLibrary();
+	closeAdminDialog();
 	closeSidebar();
 	userImages = [];
 	imageUrls = new Map();
@@ -2086,6 +2511,8 @@ onAuthStateChanged(auth, (user) => {
 	applySettings({ ...DEFAULTS, ...guestTimeSettings() });
 	applyCounters([]);
 });
+
+subscribeToGeneralConfig();
 
 window.addEventListener("resize", syncConstellation);
 window.addEventListener("pointermove", (event) => {

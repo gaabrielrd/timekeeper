@@ -475,6 +475,15 @@
 
 				<footer class="sidebar-footer">
 					<button
+						id="open-admin-modal"
+						class="secondary-button admin-entry-button"
+						type="button"
+						hidden
+					>
+						<i class="material-icons" aria-hidden="true">settings</i>
+						Configuração geral
+					</button>
+					<button
 						id="sign-out-button"
 						class="text-button"
 						type="button"
@@ -822,6 +831,186 @@
 				</p>
 			</div>
 		</dialog>
+		<dialog
+			id="admin-dialog"
+			class="counter-dialog admin-dialog"
+			aria-labelledby="admin-dialog-title"
+		>
+			<div class="admin-shell">
+				<div class="modal-heading">
+					<div>
+						<p class="section-kicker">Administração</p>
+						<h2 id="admin-dialog-title">Configuração geral</h2>
+					</div>
+					<button
+						id="admin-dialog-close"
+						class="icon-button"
+						type="button"
+						aria-label="Fechar configuração geral"
+					>
+						<i class="material-icons">close</i>
+					</button>
+				</div>
+				<div
+					class="admin-tabs"
+					role="tablist"
+					aria-label="Configurações gerais"
+				>
+					<button
+						id="admin-tab-workday"
+						type="button"
+						role="tab"
+						aria-selected="true"
+						aria-controls="admin-panel-workday"
+						data-admin-tab="workday"
+					>
+						Expediente
+					</button>
+					<button
+						id="admin-tab-payments"
+						type="button"
+						role="tab"
+						aria-selected="false"
+						aria-controls="admin-panel-payments"
+						data-admin-tab="payments"
+						tabindex="-1"
+					>
+						Pagamentos
+					</button>
+					<button
+						id="admin-tab-holidays"
+						type="button"
+						role="tab"
+						aria-selected="false"
+						aria-controls="admin-panel-holidays"
+						data-admin-tab="holidays"
+						tabindex="-1"
+					>
+						Feriados
+					</button>
+				</div>
+				<section
+					id="admin-panel-workday"
+					class="admin-tab-panel"
+					role="tabpanel"
+					aria-labelledby="admin-tab-workday"
+					data-admin-panel="workday"
+				>
+					<form id="admin-workday-form" class="admin-form admin-workday-form">
+						<div class="admin-workday-controls">
+							<div class="date-grid">
+								<label class="field-label"
+									>Início<input name="startTime" type="time" required
+								/></label>
+								<label class="field-label"
+									>Fim<input name="endTime" type="time" required
+								/></label>
+							</div>
+							<button class="primary-button" type="submit">
+								Salvar expediente
+							</button>
+						</div>
+						<fieldset class="admin-weekdays">
+							<legend>Dias de expediente</legend>
+							<div class="weekday-options">
+								<label
+									><input name="daysOfWeek" type="checkbox" value="1" /><span
+										>Seg</span
+									></label
+								>
+								<label
+									><input name="daysOfWeek" type="checkbox" value="2" /><span
+										>Ter</span
+									></label
+								>
+								<label
+									><input name="daysOfWeek" type="checkbox" value="3" /><span
+										>Qua</span
+									></label
+								>
+								<label
+									><input name="daysOfWeek" type="checkbox" value="4" /><span
+										>Qui</span
+									></label
+								>
+								<label
+									><input name="daysOfWeek" type="checkbox" value="5" /><span
+										>Sex</span
+									></label
+								>
+								<label
+									><input name="daysOfWeek" type="checkbox" value="6" /><span
+										>Sáb</span
+									></label
+								>
+								<label
+									><input name="daysOfWeek" type="checkbox" value="0" /><span
+										>Dom</span
+									></label
+								>
+							</div>
+						</fieldset>
+					</form>
+				</section>
+				<section
+					id="admin-panel-payments"
+					class="admin-tab-panel"
+					role="tabpanel"
+					aria-labelledby="admin-tab-payments"
+					data-admin-panel="payments"
+					hidden
+				>
+					<form id="admin-payment-form" class="admin-date-form">
+						<input name="editingId" type="hidden" />
+						<label class="field-label admin-date-field"
+							>Data de pagamento<input name="date" type="date" required
+						/></label>
+						<button class="primary-button" type="submit">Salvar</button>
+						<button
+							class="secondary-button admin-date-cancel"
+							type="button"
+							hidden
+						>
+							Cancelar
+						</button>
+					</form>
+					<div
+						id="admin-payment-list"
+						class="admin-date-list"
+						aria-live="polite"
+					></div>
+				</section>
+				<section
+					id="admin-panel-holidays"
+					class="admin-tab-panel"
+					role="tabpanel"
+					aria-labelledby="admin-tab-holidays"
+					data-admin-panel="holidays"
+					hidden
+				>
+					<form id="admin-holiday-form" class="admin-date-form">
+						<input name="editingId" type="hidden" />
+						<label class="field-label admin-date-field"
+							>Data de feriado<input name="date" type="date" required
+						/></label>
+						<button class="primary-button" type="submit">Salvar</button>
+						<button
+							class="secondary-button admin-date-cancel"
+							type="button"
+							hidden
+						>
+							Cancelar
+						</button>
+					</form>
+					<div
+						id="admin-holiday-list"
+						class="admin-date-list"
+						aria-live="polite"
+					></div>
+				</section>
+				<p id="admin-message" class="form-message" aria-live="polite"></p>
+			</div>
+		</dialog>
 		<div
 			id="app-toast"
 			class="app-toast"
@@ -881,10 +1070,14 @@
 
 			function fill() {
 				var now = new Date();
+				var workdayConfig = window.expedientePadrao || {
+					startTime: "08:00",
+					daysOfWeek: [1, 2, 3, 4, 5],
+				};
 				var workdayState = resolveRecurringState(
 					{
 						type: "recurring",
-						startTime: "08:00",
+						startTime: workdayConfig.startTime,
 						endTime:
 							String(document.querySelector("#config-hora").value).padStart(
 								2,
@@ -895,7 +1088,7 @@
 								2,
 								"0",
 							),
-						daysOfWeek: [1, 2, 3, 4, 5],
+						daysOfWeek: workdayConfig.daysOfWeek,
 					},
 					now,
 				);

@@ -2,19 +2,20 @@
 
 ## Rotina anual obrigatória
 
-`public/src/data.js` contém datas de pagamentos e feriados de 2026. Antes da virada
-do ano:
+`generalConfig` é a fonte ao vivo dos calendários, enquanto `public/src/data.js`
+continua sendo o seed/fallback de uma instalação vazia. Antes da virada do ano:
 
 1. confirme a política de pagamento e os feriados desejados;
-2. substitua/estenda os arrays com datas do próximo ano;
-3. mantenha os arrays estritamente em ordem crescente;
-4. use horários locais explícitos para evitar mudança involuntária de data;
-5. teste dezembro do ano atual e janeiro do próximo com relógio simulado;
-6. publique antes da última data cadastrada.
+2. adicione/edite as datas ao vivo pelo modal administrativo;
+3. replique o calendário em `data.js` para manter o fallback atualizado;
+4. mantenha arrays e documentos estritamente em ordem crescente;
+5. use horários locais explícitos para evitar mudança involuntária de data;
+6. teste dezembro do ano atual e janeiro do próximo com relógio simulado;
+7. publique o fallback antes da última data cadastrada.
 
-Quando todas as datas já passaram, `findNext` devolve a última data do array e o
-contador fica em zero. Isso deve ser tratado como sinal operacional de calendário
-vencido.
+Quando todas as datas já passaram, `findNext` devolve `null` e o card mostra
+“Calendário indisponível”. Isso deve ser tratado como sinal operacional de
+calendário vencido.
 
 ## Revisão periódica
 
@@ -46,8 +47,8 @@ O SDK é importado por URL versionada em `public/src/firebase.js`. Ao atualizar:
 
 ### Alta
 
-1. Atualizar calendários antes do fim de 2026; a CI falhará quando não houver data
-   futura.
+1. Atualizar a coleção e seu fallback antes do fim de 2026; a CI falhará quando não
+   houver data futura no seed.
 2. Criar ambiente Firebase de staging separado para testes integrados.
 3. Validar OAuth, canvas e cache em Safari/iPhone real por release; a CI simula o
    viewport móvel em Chromium, não o motor WebKit do aparelho.
