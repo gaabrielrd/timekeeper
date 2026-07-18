@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   test:
-    name: Syntax, unit, contracts and Firestore rules
+    name: Syntax, unit, browser E2E and Firestore rules
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -37,8 +37,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
       - name: Run syntax, unit and contract checks
         run: npm run check
+
+      - name: Run browser end-to-end tests
+        run: npm run test:e2e
 
       - name: Test Firestore security rules
         run: npm run test:rules

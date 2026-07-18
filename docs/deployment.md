@@ -29,6 +29,7 @@ firebase use
 ```bash
 npm ci
 npm run check
+npm run test:e2e
 npm run test:rules
 git diff --check
 ```

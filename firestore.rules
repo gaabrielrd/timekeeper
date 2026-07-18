@@ -99,16 +99,16 @@ service cloud.firestore {
           'id',
           'name',
           'type',
-          'startAt',
-          'endAt',
+          'startAtMs',
+          'endAtMs',
           'color',
           'createdAt'
         ])
         && (!('type' in counter) || counter.type == 'fixed')
-        && counter.startAt is string
-        && counter.startAt.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}T.*Z$')
-        && counter.endAt is string
-        && counter.endAt.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}T.*Z$');
+        && counter.startAtMs is int
+        && counter.endAtMs is int
+        && counter.startAtMs >= 0
+        && counter.endAtMs > counter.startAtMs;
     }
 
     function isValidDayAt(days, index) {

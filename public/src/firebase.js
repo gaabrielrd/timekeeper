@@ -2,13 +2,16 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/fireba
 import {
 	GoogleAuthProvider,
 	connectAuthEmulator,
+	deleteUser,
 	getAuth,
 	onAuthStateChanged,
+	reauthenticateWithPopup,
 	signInWithPopup,
 	signOut,
 } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
 import {
 	connectFirestoreEmulator,
+	deleteDoc,
 	doc,
 	getDoc,
 	getFirestore,
@@ -17,14 +20,22 @@ import {
 	setDoc,
 } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
 
-const app = initializeApp({
+const useLocalEmulators =
+	["localhost", "127.0.0.1"].includes(window.location.hostname) &&
+	new URLSearchParams(window.location.search).has("emulators");
+const firebaseConfig = {
 	apiKey: "AIzaSyBOLyOQ6-g3VqotQf7pCej4CAhVXvC0oYY",
 	authDomain: "timekeeper-d9a0a.firebaseapp.com",
 	projectId: "timekeeper-d9a0a",
 	storageBucket: "timekeeper-d9a0a.firebasestorage.app",
 	messagingSenderId: "190447151292",
 	appId: "1:190447151292:web:ccee2963c0e8eeb9f688b9",
-});
+};
+if (useLocalEmulators) {
+	firebaseConfig.authDomain = "demo-timekeeper.firebaseapp.com";
+	firebaseConfig.projectId = "demo-timekeeper";
+}
+const app = initializeApp(firebaseConfig);
 
 const DEFAULTS = {
 	endHour: 17,
@@ -43,9 +54,6 @@ const DEFAULTS = {
 const MAX_COUNTERS = 5;
 const auth = getAuth(app);
 const db = getFirestore(app);
-const useLocalEmulators =
-	["localhost", "127.0.0.1"].includes(window.location.hostname) &&
-	new URLSearchParams(window.location.search).has("emulators");
 if (useLocalEmulators) {
 	connectAuthEmulator(auth, "http://127.0.0.1:9099", {
 		disableWarnings: true,
@@ -72,6 +80,7 @@ const elements = {
 	sidebarName: document.querySelector("#sidebar-name"),
 	sidebarEmail: document.querySelector("#sidebar-email"),
 	signOutButton: document.querySelector("#sign-out-button"),
+	deleteAccountButton: document.querySelector("#delete-account-button"),
 	hour: document.querySelector("#config-hora"),
 	minutes: document.querySelector("#config-minutos"),
 	accentPrimary: document.querySelector("#accent-primary"),
@@ -571,6 +580,10 @@ function friendlyAuthError(error) {
 			"Este domínio ainda não está autorizado para o login Google.",
 		"auth/network-request-failed":
 			"Falha de rede durante o login. Verifique sua conexão.",
+		"auth/user-mismatch":
+			"Escolha a mesma conta Google para confirmar a exclusão.",
+		"auth/requires-recent-login":
+			"Entre novamente com a mesma conta antes de excluir seus dados.",
 	};
 	return messages[error.code] || "Não foi possível entrar com o Google.";
 }
@@ -743,7 +756,7 @@ function formatDateRange(counter) {
 		hour: "2-digit",
 		minute: "2-digit",
 	});
-	return `${formatter.format(new Date(counter.startAt))} → ${formatter.format(new Date(counter.endAt))}`;
+	return `${formatter.format(new Date(counter.startAtMs))} → ${formatter.format(new Date(counter.endAtMs))}`;
 }
 
 function renderCounterList(counters) {
@@ -871,16 +884,81 @@ function applySettings(data) {
 	updateCustomVisibility(currentCounters);
 }
 
+function createCounterId() {
+	return crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`;
+}
+
+function normalizeCounter(counter) {
+	if (!counter || typeof counter !== "object") return null;
+	const type = counter.type === "recurring" ? "recurring" : "fixed";
+	const name = String(counter.name || "").trim().slice(0, 50);
+	if (!name) return null;
+	const normalized = {
+		id: String(counter.id || createCounterId()).slice(0, 100),
+		name,
+		type,
+		color: isHexColor(counter.color) ? counter.color : null,
+		createdAt:
+			typeof counter.createdAt === "string"
+				? counter.createdAt.slice(0, 40)
+				: new Date().toISOString(),
+	};
+	if (type === "recurring") {
+		const startTime = String(counter.startTime || "");
+		const endTime = String(counter.endTime || "");
+		const daysOfWeek = [
+			...new Set(
+				(Array.isArray(counter.daysOfWeek) ? counter.daysOfWeek : [])
+					.map(Number)
+					.filter(
+						(day) => Number.isInteger(day) && day >= 0 && day <= 6,
+					),
+			),
+		].sort((first, second) => first - second);
+		if (
+			!/^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(startTime) ||
+			!/^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(endTime) ||
+			daysOfWeek.length === 0
+		) {
+			return null;
+		}
+		return {
+			...normalized,
+			startTime,
+			endTime,
+			daysOfWeek,
+		};
+	}
+	const startAtMs = Number.isInteger(counter.startAtMs)
+		? counter.startAtMs
+		: new Date(counter.startAt).getTime();
+	const endAtMs = Number.isInteger(counter.endAtMs)
+		? counter.endAtMs
+		: new Date(counter.endAt).getTime();
+	if (
+		!Number.isInteger(startAtMs) ||
+		startAtMs < 0 ||
+		!Number.isInteger(endAtMs) ||
+		endAtMs <= startAtMs
+	) {
+		return null;
+	}
+	return {
+		...normalized,
+		startAtMs,
+		endAtMs,
+	};
+}
+
+function normalizeCounters(counters) {
+	return (Array.isArray(counters) ? counters : [])
+		.slice(0, MAX_COUNTERS)
+		.map(normalizeCounter)
+		.filter(Boolean);
+}
+
 function applyCounters(counters) {
-	userSettings.customCounters = Array.isArray(counters)
-		? counters
-				.filter((counter) => counter && typeof counter === "object")
-				.slice(0, MAX_COUNTERS)
-				.map((counter) => ({
-					...counter,
-					type: counter.type === "recurring" ? "recurring" : "fixed",
-				}))
-		: [];
+	userSettings.customCounters = normalizeCounters(counters);
 	renderCustomCounters(userSettings.customCounters);
 }
 
@@ -958,9 +1036,7 @@ async function ensureUserData(user) {
 	if (!countersSnapshot.exists()) {
 		writes.push(
 			setDoc(countersDoc, {
-				items: Array.isArray(legacy.customCounters)
-					? legacy.customCounters.slice(0, MAX_COUNTERS)
-					: [],
+				items: normalizeCounters(legacy.customCounters),
 				updatedAt: serverTimestamp(),
 			}),
 		);
@@ -1094,10 +1170,10 @@ function openCounterDialog(counter = null) {
 			.querySelectorAll('input[name="daysOfWeek"]')
 			.forEach((input) => (input.checked = selectedDays.has(Number(input.value))));
 	} else {
-		const startDate = counter ? new Date(counter.startAt) : new Date();
+		const startDate = counter ? new Date(counter.startAtMs) : new Date();
 		if (!counter) startDate.setSeconds(0, 0);
 		const endDate = counter
-			? new Date(counter.endAt)
+			? new Date(counter.endAtMs)
 			: new Date(startDate.getTime() + 24 * 60 * 60 * 1000);
 		elements.counterForm.elements.startAt.value = toLocalInputValue(startDate);
 		elements.counterForm.elements.endAt.value = toLocalInputValue(endDate);
@@ -1152,6 +1228,33 @@ elements.customVisibilityButton.addEventListener("click", async () => {
 elements.signOutButton.addEventListener("click", async () => {
 	closeSidebar();
 	await signOut(auth);
+});
+elements.deleteAccountButton.addEventListener("click", async () => {
+	if (!currentUser) return;
+	const confirmed = window.confirm(
+		"Excluir permanentemente sua conta, configurações e contadores? Esta ação não pode ser desfeita.",
+	);
+	if (!confirmed) return;
+
+	const userToDelete = currentUser;
+	elements.deleteAccountButton.disabled = true;
+	try {
+		await reauthenticateWithPopup(userToDelete, googleProvider);
+		const userRef = doc(db, "users", userToDelete.uid);
+		await Promise.all([
+			deleteDoc(doc(db, "users", userToDelete.uid, "data", "settings")),
+			deleteDoc(doc(db, "users", userToDelete.uid, "data", "counters")),
+		]);
+		await deleteDoc(userRef);
+		await deleteUser(userToDelete);
+		closeSidebar();
+		showToast("Conta e dados excluídos permanentemente.");
+	} catch (error) {
+		console.error("Falha ao excluir a conta.", error);
+		showToast(friendlyAuthError(error));
+	} finally {
+		elements.deleteAccountButton.disabled = false;
+	}
 });
 document.addEventListener("keydown", (event) => {
 	if (event.key === "Escape" && !elements.counterDialog.open) closeSidebar();
@@ -1271,8 +1374,8 @@ elements.counterForm.addEventListener("submit", async (event) => {
 		}
 		schedule = {
 			type,
-			startAt: startAt.toISOString(),
-			endAt: endAt.toISOString(),
+			startAtMs: startAt.getTime(),
+			endAtMs: endAt.getTime(),
 		};
 	}
 	const existingCounter = editingCounterId
@@ -1283,10 +1386,7 @@ elements.counterForm.addEventListener("submit", async (event) => {
 		return;
 	}
 	const counter = {
-		id:
-			existingCounter?.id ||
-			crypto.randomUUID?.() ||
-			`${Date.now()}-${Math.random()}`,
+		id: existingCounter?.id || createCounterId(),
 		name,
 		...schedule,
 		color: data.get("colorEnabled") ? String(data.get("color")) : null,

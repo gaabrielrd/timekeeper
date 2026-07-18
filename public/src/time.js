@@ -123,8 +123,12 @@
 		if ((counter.type || "fixed") === "recurring") {
 			return resolveRecurringState(counter, now);
 		}
-		const start = new Date(counter.startAt);
-		const end = new Date(counter.endAt);
+		const start = Number.isInteger(counter.startAtMs)
+			? new Date(counter.startAtMs)
+			: new Date(counter.startAt);
+		const end = Number.isInteger(counter.endAtMs)
+			? new Date(counter.endAtMs)
+			: new Date(counter.endAt);
 		if (
 			Number.isNaN(start.getTime()) ||
 			Number.isNaN(end.getTime()) ||
@@ -162,4 +166,3 @@
 		resolveRecurringState,
 	};
 });
-

@@ -63,9 +63,11 @@ configurado. Veja [Desenvolvimento](docs/development.md).
 .
 ├── public/
 │   ├── index.html             # Estrutura, contadores padrão e runtime legado
+│   ├── privacy.html           # Política e controles de privacidade
 │   ├── 404.html               # Página 404 padrão do Firebase
 │   └── src/
 │       ├── firebase.js        # Auth, Firestore, contadores pessoais e fundos
+│       ├── analytics.js       # Consentimento e carregamento opcional de métricas
 │       ├── time.js            # Cálculos temporais compartilhados e testáveis
 │       ├── data.js            # Datas anuais de pagamentos e feriados
 │       ├── style.css          # Design system, layout, responsividade e animações
@@ -101,6 +103,7 @@ Antes de publicar:
 ```bash
 npm ci
 npm run check
+npm run test:e2e
 npm run test:rules
 firebase deploy --only hosting,firestore:rules
 ```
@@ -131,11 +134,11 @@ O índice completo está em [docs/README.md](docs/README.md). Comece por:
 - O login usa popup. WebViews e Safari com bloqueio de popups podem exigir uma
   estratégia de redirect no futuro.
 - As regras validam ownership, provedor Google, allowlist de campos, ranges e os
-  schemas fixo/recorrente; comparações semânticas entre datas ainda ficam no cliente.
+  schemas fixo/recorrente, inclusive `endAtMs > startAtMs` no servidor.
 - A aplicação depende de serviços externos para fonte, clima, SDK Firebase e
-  analytics.
-- A CI cobre sintaxe, lógica temporal, contratos/documentação e regras. Ainda faltam
-  testes reais de navegador e um ambiente Firebase de staging separado.
+  analytics; métricas só carregam após consentimento explícito.
+- A CI cobre sintaxe, lógica temporal, contratos/documentação, E2E Chromium em
+  desktop/mobile e rules. Ainda faltam um Safari/iPhone real e staging separado.
 - A auditoria não encontra vulnerabilidades de produção; a versão atual da
   `firebase-tools` possui advisories moderados em dependências transitivas de dev.
 

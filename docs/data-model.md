@@ -70,7 +70,7 @@ usado para novas escritas.
 | `name` | string | obrigatório; UI limita a 50 caracteres |
 | `type` | `fixed` ou `recurring` | desconhecido é normalizado para `fixed` |
 | `color` | string hex ou `null` | `null` herda o destaque principal |
-| `createdAt` | string ISO | preservado em edições |
+| `createdAt` | string ISO | metadado preservado em edições |
 
 ### Período fixo
 
@@ -79,14 +79,18 @@ usado para novas escritas.
   "id": "uuid",
   "name": "Férias",
   "type": "fixed",
-  "startAt": "2026-07-17T15:00:00.000Z",
-  "endAt": "2026-07-31T15:00:00.000Z",
+  "startAtMs": 1784296800000,
+  "endAtMs": 1785506400000,
   "color": "#22c55e",
   "createdAt": "2026-07-17T15:00:00.000Z"
 }
 ```
 
-Datas são salvas em UTC/ISO e exibidas no fuso local do navegador.
+`startAtMs` e `endAtMs` são inteiros Unix epoch em milissegundos. Isso mantém o
+instante independente do fuso, permite às rules exigir `endAtMs > startAtMs` e é
+exibido no fuso local do navegador. O cliente converte strings `startAt`/`endAt`
+ISO de contas legadas para o formato numérico na próxima escrita. Entradas legadas
+irrecuperáveis são ignoradas individualmente para não bloquear a migração das demais.
 
 ### Evento recorrente
 
@@ -129,12 +133,13 @@ com a versão aceita pelo servidor.
 - Settings aceitam somente chaves conhecidas, tipos e ranges válidos.
 - `counters.items` precisa ser lista e ter até cinco elementos válidos.
 - Cada contador valida ID, nome, cor, chaves e o schema fixo/recorrente.
-- Horários recorrentes e dias da semana são validados por formato/range.
+- Horários recorrentes e dias da semana são validados por formato/range; períodos
+  fixos exigem inteiros não negativos e fim posterior ao início.
 - O documento raiz legado também limita `customCounters` a cinco.
 - Não há índices compostos porque não existem queries de coleção.
 
-As rules não conseguem comparar semanticamente as strings ISO de início/fim nem
-garantem unicidade dos dias recorrentes; o cliente normaliza e valida esses pontos.
+As rules ainda não garantem unicidade dos dias recorrentes; o cliente remove
+duplicatas e ordena esses valores antes de escrever.
 Detalhes estão em [Segurança](security.md).
 
 ## Alterando o schema

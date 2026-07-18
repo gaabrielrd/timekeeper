@@ -16,21 +16,7 @@
 		<script src="src/data.js"></script>
 		<script src="src/time.js"></script>
 		<script src="src/progressbar.min.js"></script>
-
-		<!-- Google tag (gtag.js) -->
-		<script
-			async
-			src="https://www.googletagmanager.com/gtag/js?id=G-77L2BHYR8X"
-		></script>
-		<script>
-			window.dataLayer = window.dataLayer || [];
-			function gtag() {
-				dataLayer.push(arguments);
-			}
-			gtag("js", new Date());
-
-			gtag("config", "G-77L2BHYR8X");
-		</script>
+		<script defer src="src/analytics.js"></script>
 	</head>
 
 	<body>
@@ -354,6 +340,10 @@
 					<i class="material-icons" aria-hidden="true">logout</i>
 					Sair da conta
 				</button>
+				<button id="delete-account-button" class="text-button danger-button" type="button">
+					<i class="material-icons" aria-hidden="true">delete_forever</i>
+					Excluir conta e dados
+				</button>
 			</footer>
 		</aside>
 
@@ -411,6 +401,30 @@
 			</form>
 		</dialog>
 		<div id="app-toast" class="app-toast" role="status" aria-live="polite"></div>
+		<section
+			id="privacy-banner"
+			class="privacy-banner"
+			aria-labelledby="privacy-title"
+			hidden
+		>
+			<div class="privacy-copy">
+				<p class="section-kicker">Privacidade</p>
+				<h2 id="privacy-title">Você decide sobre métricas</h2>
+				<p>
+					Podemos usar o Google Analytics para entender o uso do Timekeeper.
+					Nenhum contador ou horário pessoal é enviado.
+					<a href="privacy.html">Saiba mais</a>.
+				</p>
+			</div>
+			<div class="privacy-actions">
+				<button id="privacy-decline" class="secondary-button" type="button">
+					Não permitir
+				</button>
+				<button id="privacy-accept" class="primary-button" type="button">
+					Permitir métricas
+				</button>
+			</div>
+		</section>
 
 		<script type="module" src="src/firebase.js"></script>
 

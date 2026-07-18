@@ -165,7 +165,8 @@ no cliente.
 ## Evoluções arquiteturais recomendadas
 
 1. Extrair o restante do script inline e eliminar dependência de globais.
-2. Adicionar smoke tests reais de navegador para visitante e autenticação.
+2. Ampliar os E2E Chromium existentes com regressão visual e uma matriz WebKit/
+   Firefox, sem substituir a validação de OAuth em iPhone real.
 3. Versionar ou gerar nomes com hash para CSS/JS e usar cache `immutable`.
 4. Criar staging Firebase separado de produção.
 5. Considerar `signInWithRedirect` como fallback para Safari/WebViews.
@@ -173,6 +174,8 @@ no cliente.
 ## Automação de qualidade
 
 - Node Test Runner cobre cálculos puros e contratos entre HTML/JS/config/docs.
+- Playwright cobre visitante, privacidade, Google Auth Emulator, CRUD, ordenação,
+  persistência e exclusão de conta em desktop/mobile Chromium.
 - Firebase Emulator + `@firebase/rules-unit-testing` cobre autorização e schemas.
 - GitHub Actions usa Node 22 e Java 21 em pushes/PRs.
 - O teste de calendário falha quando pagamentos/feriados não têm data futura,

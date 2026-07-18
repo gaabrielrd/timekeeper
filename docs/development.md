@@ -64,13 +64,16 @@ de criar dados de teste.
 
 ```bash
 npm run check
+npm run test:e2e
 npm run test:rules
 git diff --check
 ```
 
 `npm run check` verifica sintaxe, cálculos temporais, contratos entre arquivos,
-calendários e links da documentação. `npm run test:rules` inicia o emulador e testa
-autorização/schema. O JavaScript inline é compilado como parte dos contratos.
+calendários e links da documentação. `npm run test:e2e` inicia servidor estático,
+Auth/Firestore Emulator e Chromium para fluxos visitante e autenticado em desktop e
+mobile. `npm run test:rules` inicia o emulador e testa autorização/schema. O
+JavaScript inline é compilado como parte dos contratos.
 
 A mesma suíte roda em `.github/workflows/ci.yml` com Node 22 e Java 21.
 

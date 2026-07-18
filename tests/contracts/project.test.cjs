@@ -51,6 +51,29 @@ test("scripts locais essenciais carregam antes do runtime inline", () => {
 	assert.ok(progressIndex > timeIndex && progressIndex < inlineRuntime);
 });
 
+test("Analytics depende de consentimento explícito", () => {
+	const html = read("public/index.html");
+	const analytics = read("public/src/analytics.js");
+	assert.match(html, /<script defer src="src\/analytics\.js"><\/script>/);
+	assert.doesNotMatch(html, /googletagmanager\.com/);
+	assert.match(analytics, /timekeeper:analytics-consent/);
+	assert.match(analytics, /consent === "granted"/);
+	assert.match(analytics, /google-analytics-script/);
+	assert.ok(fs.existsSync(path.join(root, "public/privacy.html")));
+});
+
+test("exclusão de conta remove dados após reautenticação Google", () => {
+	const html = read("public/index.html");
+	const client = read("public/src/firebase.js");
+	const privacy = read("public/privacy.html");
+	assert.match(html, /id="delete-account-button"/);
+	assert.match(client, /reauthenticateWithPopup\(userToDelete, googleProvider\)/);
+	assert.match(client, /deleteDoc\(doc\(db, "users", userToDelete\.uid, "data", "settings"\)\)/);
+	assert.match(client, /deleteDoc\(doc\(db, "users", userToDelete\.uid, "data", "counters"\)\)/);
+	assert.match(client, /deleteUser\(userToDelete\)/);
+	assert.match(privacy, /Excluir conta e dados/);
+});
+
 test("Hosting evita cache misto e emuladores usam portas documentadas", () => {
 	const config = JSON.parse(read("firebase.json"));
 	const noCacheSources = config.hosting.headers
@@ -83,7 +106,7 @@ test("JavaScript inline do HTML compila", () => {
 	const scripts = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)]
 		.map((match) => match[1].trim())
 		.filter(Boolean);
-	assert.ok(scripts.length >= 2);
+	assert.ok(scripts.length >= 1);
 	for (const [index, script] of scripts.entries()) {
 		assert.doesNotThrow(
 			() => new vm.Script(script, { filename: `index-inline-${index}.js` }),

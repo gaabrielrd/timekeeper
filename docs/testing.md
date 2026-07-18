@@ -2,21 +2,24 @@
 
 ## Estado atual
 
-O projeto usa Node Test Runner e Firebase Emulator Suite. A suíte atual contém 17
-testes unitários/contratuais e 9 testes de Firestore Rules. GitHub Actions executa
-todos em pushes, pull requests e disparos manuais.
+O projeto usa Node Test Runner, Playwright e Firebase Emulator Suite. A suíte atual
+contém 19 testes unitários/contratuais, 12 E2E em Chromium (seis cenários em desktop
+e mobile) e 9 testes de Firestore Rules. GitHub Actions executa todos em pushes,
+pull requests e disparos manuais.
 
 ## Checagens rápidas
 
 ```bash
 npm ci
 npm run check
+npm run test:e2e
 npm run test:rules
 git diff --check
 ```
 
-`npm test` executa unit/contratos + rules em sequência. Java 21+ é obrigatório para
-o emulador Firestore.
+`npm test` executa unit/contratos + rules em sequência. `npm run test:e2e` é
+separado porque instala/usa Chromium e sobe Auth + Firestore Emulator. Java 21+ é
+obrigatório para os emuladores Firebase.
 
 ## Cobertura automatizada
 
@@ -50,6 +53,19 @@ o emulador Firestore.
 - nomes, cores, horários e dias inválidos negados;
 - documentos fora da allowlist negados;
 - leitura do proprietário permitida.
+
+### Navegador E2E
+
+- visitante, três contadores padrão e persistência do expediente em cookie;
+- ausência de overflow horizontal em desktop e viewport de iPhone;
+- consentimento negado/aceito antes de carregar Google Analytics;
+- Google OAuth por popup contra Auth Emulator, sem conta real;
+- criação fixa com início padrão próximo de “agora” e cor própria;
+- edição para recorrente, reordenação, toggle, reload e subscriptions;
+- reautenticação e exclusão integral da conta e dos dados conhecidos.
+
+Os E2E usam `demo-timekeeper` e só ativam emuladores com `?emulators=1` em
+localhost. Nenhum teste automatizado escreve no projeto Firebase de produção.
 
 Também confira o console do navegador sem filtros. Erros de bloqueadores em Google
 Analytics podem ser separados de erros do produto, mas devem ser entendidos.
@@ -141,8 +157,8 @@ Repita isolamento com duas contas: nenhuma deve ler documentos da outra.
 
 Ordem sugerida:
 
-1. Criar smoke tests Playwright para visitante e UI responsiva.
-2. Cobrir login Google via Auth Emulator em teste de navegador.
-3. Adicionar formatter/lint para HTML, CSS e JS.
-4. Capturar screenshots de regressão para os sete backgrounds.
-5. Medir desempenho da constelação em viewport móvel.
+1. Adicionar formatter/lint para HTML, CSS e JS.
+2. Capturar screenshots de regressão para os sete backgrounds.
+3. Medir desempenho da constelação em viewport móvel.
+4. Executar uma matriz complementar em Firefox/WebKit, mantendo iPhone Safari real
+   no checklist de release para OAuth e comportamento de cache.

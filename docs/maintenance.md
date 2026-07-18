@@ -49,7 +49,8 @@ O SDK é importado por URL versionada em `public/src/firebase.js`. Ao atualizar:
 1. Atualizar calendários antes do fim de 2026; a CI falhará quando não houver data
    futura.
 2. Criar ambiente Firebase de staging separado para testes integrados.
-3. Adicionar smoke tests de navegador, especialmente Auth em Safari/iOS.
+3. Validar OAuth, canvas e cache em Safari/iPhone real por release; a CI simula o
+   viewport móvel em Chromium, não o motor WebKit do aparelho.
 
 ### Média
 
@@ -58,14 +59,13 @@ O SDK é importado por URL versionada em `public/src/firebase.js`. Ao atualizar:
 3. Adicionar formatter/lint e screenshots de regressão.
 4. Criar página 404 coerente ou remover rewrite global se houver rotas reais.
 5. Migrar assets para nomes com hash e cache `immutable`.
+6. Integrar error tracking sem conteúdo pessoal e alertas de orçamento/uso.
 
 ### Baixa
 
-1. Definir ambientes staging/production.
-2. Medir desempenho dos fundos em aparelhos de entrada.
-3. Revisar feedback de leitores de tela atualizado a cada segundo.
-4. Documentar política de privacidade e consentimento de analytics.
-5. Reavaliar advisories transitivos da Firebase CLI em cada atualização.
+1. Medir desempenho dos fundos em aparelhos de entrada.
+2. Revisar feedback de leitores de tela atualizado a cada segundo.
+3. Reavaliar advisories transitivos da Firebase CLI em cada atualização.
 
 ## Adicionando um background
 

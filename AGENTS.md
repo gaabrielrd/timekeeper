@@ -66,7 +66,8 @@ Qualquer alteração exige atualizar e testar as três.
 
 ### Contadores
 
-- `fixed`: exige `startAt < endAt`, armazenados como strings ISO.
+- `fixed`: exige `startAtMs < endAtMs`, armazenados como inteiros em milissegundos
+  desde Unix epoch; o cliente ainda lê strings ISO legadas durante a migração.
 - `recurring`: exige `startTime`, `endTime` e pelo menos um dia entre 0 e 6.
 - Eventos que atravessam a meia-noite são válidos; o fim passa ao dia seguinte.
 - O início padrão de um novo contador fixo é o horário atual; o fim é 24 h depois.
@@ -83,7 +84,8 @@ Qualquer alteração exige atualizar e testar as três.
 - Ao adicionar um background, atualize HTML, `BACKGROUND_DESCRIPTIONS`, aplicação,
   CSS/runtime, reduced motion e checklist visual.
 - Respeite `prefers-reduced-motion` e mantenha foco, `aria-*`, `inert` e teclado.
-- Evite dependências novas para mudanças pequenas. O projeto não tem package manager.
+- Evite dependências novas para mudanças pequenas. O npm serve apenas a testes e
+  automação; o runtime publicado continua sem build e sem dependências empacotadas.
 - Use caminhos relativos a `public/` em assets hospedados.
 
 ## Direção visual
@@ -108,6 +110,7 @@ npm run check
 Para Auth/Firestore ou regras, execute também (Java 21+):
 
 ```bash
+npm run test:e2e
 npm run test:rules
 git diff --check
 ```
@@ -124,8 +127,8 @@ Depois teste manualmente o fluxo afetado. Para mudanças em Auth/Firestore:
 Para UI, verifique 320 px, 390 px, 768 px e desktop, com fundos desligados e
 ligados. Em alterações de animação, teste também reduced motion.
 
-A CI em `.github/workflows/ci.yml` repete syntax, unit, contracts e rules em todo
-push e em pull requests.
+A CI em `.github/workflows/ci.yml` repete syntax, unit, contracts, E2E desktop/mobile
+e rules em todo push e em pull requests.
 
 ## Deploy
 

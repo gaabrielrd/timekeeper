@@ -36,9 +36,8 @@ Não existem leituras públicas ou queries de coleção autorizadas.
 
 ## Lacunas conhecidas
 
-As rules ainda não conseguem/implementam:
+As rules ainda não implementam:
 
-- comparar semanticamente `startAt < endAt` em strings ISO;
 - garantir que `daysOfWeek` não contenha duplicatas;
 - tornar `createdAt` imutável durante edição;
 - limitar tamanho total do documento além dos campos individuais;
@@ -52,9 +51,11 @@ usuários. O cliente valida ordem de datas e normaliza dias antes da escrita.
 1. Avaliar Firebase App Check para reduzir abuso automatizado.
 2. Tornar `createdAt` imutável quando a compatibilidade legada permitir.
 3. Criar alertas de orçamento/uso no projeto Firebase.
-4. Adicionar testes de navegador que cubram o fluxo real de Auth.
+4. Validar periodicamente Auth e exclusão de conta em Safari/iPhone real.
 
-As rules possuem nove testes no Firestore Emulator e rodam na CI.
+As rules possuem nove testes no Firestore Emulator e rodam na CI. Os fluxos Google
+OAuth emulado, CRUD, reordenação, persistência e exclusão de conta também rodam em
+E2E Chromium desktop/mobile.
 
 ## Dependências de desenvolvimento
 
@@ -88,14 +89,15 @@ fazem sanitização.
 
 ## Privacidade e terceiros
 
-- Google Analytics recebe métricas conforme o script configurado no HTML.
+- Google Analytics só é carregado depois de consentimento explícito persistido no
+  navegador; contadores e horários pessoais não são enviados pelo código do app.
 - WeatherWidget.io recebe requests do navegador e localização selecionada no link.
 - Adobe Typekit e Firebase CDN recebem requests de assets.
 - Firebase armazena email, nome e URL da foto no perfil do usuário.
 
-Uma publicação pública deve ter política de privacidade e, conforme o público/região,
-consentimento apropriado para analytics/cookies. Os cookies de expediente são
-funcionais; analytics é uma finalidade diferente.
+`public/privacy.html` documenta essas finalidades. Os cookies de expediente são
+funcionais; Analytics é opcional e separado. A conta e os três documentos conhecidos
+podem ser apagados pelo usuário após reautenticação Google no menu da conta.
 
 ## Resposta a incidente
 

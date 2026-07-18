@@ -72,6 +72,16 @@ test("contador fixo calcula progresso e rejeita intervalo inválido", () => {
 	);
 	assert.equal(invalid.phase, "invalid");
 	assert.equal(invalid.progress, 0);
+
+	const numeric = resolveCounterState(
+		{
+			type: "fixed",
+			startAtMs: localDate(2026, 7, 1, 8).getTime(),
+			endAtMs: localDate(2026, 7, 1, 10).getTime(),
+		},
+		localDate(2026, 7, 1, 9),
+	);
+	assert.equal(numeric.progress, 0.5);
 });
 
 test("recorrência fica ativa durante o evento e aponta para o fim", () => {
@@ -136,4 +146,3 @@ test("dias inválidos e duplicados não quebram a resolução", () => {
 	);
 	assert.equal(state.phase, "active");
 });
-

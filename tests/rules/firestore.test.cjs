@@ -57,8 +57,8 @@ function fixedCounter(index = 1) {
 		id: `fixed-${index}`,
 		name: `Contador ${index}`,
 		type: "fixed",
-		startAt: "2026-07-17T12:00:00.000Z",
-		endAt: "2026-07-18T12:00:00.000Z",
+		startAtMs: Date.parse("2026-07-17T12:00:00.000Z"),
+		endAtMs: Date.parse("2026-07-18T12:00:00.000Z"),
 		color: null,
 		createdAt: "2026-07-17T12:00:00.000Z",
 	};
@@ -154,6 +154,7 @@ test("rejeita schema, horários, dias e cores inválidos", async () => {
 	const reference = doc(googleDb(), "users/alice/data/counters");
 	const invalidCounters = [
 		{ ...fixedCounter(), name: "" },
+		{ ...fixedCounter(), endAtMs: fixedCounter().startAtMs },
 		{ ...fixedCounter(), color: "purple" },
 		{ ...fixedCounter(), unexpected: true },
 		{ ...recurringCounter(), startTime: "25:00" },
