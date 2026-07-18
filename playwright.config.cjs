@@ -31,7 +31,7 @@ module.exports = defineConfig({
 		},
 		{
 			command:
-				"firebase emulators:start --project demo-timekeeper --only auth,firestore",
+				"firebase emulators:start --project demo-timekeeper --only auth,firestore,storage",
 			url: "http://127.0.0.1:4000",
 			reuseExistingServer: !process.env.CI,
 			timeout: 60000,

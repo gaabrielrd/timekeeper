@@ -4,7 +4,7 @@
 
 O Timekeeper é uma Single Page Application estática, servida pelo Firebase Hosting.
 Não existe backend próprio: autenticação e persistência são fornecidas pelo Firebase
-diretamente ao navegador, protegidas por regras do Firestore.
+diretamente ao navegador, protegidas por regras do Firestore e do Storage.
 
 ```mermaid
 flowchart LR
@@ -12,6 +12,7 @@ flowchart LR
     H --> A["HTML, CSS, JS e assets"]
     A --> AUTH["Firebase Authentication"]
     A --> DB["Cloud Firestore"]
+    A --> S["Cloud Storage"]
     A --> W["WeatherWidget.io"]
     A --> F["Adobe Fonts"]
     A --> G["Google Analytics"]
@@ -45,11 +46,12 @@ por `window`, eliminando duplicação da regra temporal.
 
 Responsável por:
 
-- inicializar Firebase Auth e Firestore;
+- inicializar Firebase Auth, Firestore e Storage;
 - autenticar com `GoogleAuthProvider`;
 - preparar/migrar documentos do usuário;
-- assinar configurações e contadores com `onSnapshot`;
+- assinar configurações, contadores e metadados de imagens com `onSnapshot`;
 - salvar preferências e CRUD de contadores;
+- enviar, reutilizar e excluir imagens privadas da biblioteca;
 - renderizar cards e lista de gerenciamento;
 - aplicar cores e fundos;
 - executar canvas da constelação e sincronizar anéis cronológicos.
@@ -99,7 +101,8 @@ sequenceDiagram
 Configurações são gravadas com `setDoc(..., { merge: true })`. Cores e sliders
 têm preview no evento `input` e persistem no evento `change`, reduzindo escritas.
 
-Contadores são salvos como um único array ordenado. Criar/editar aguarda a escrita;
+Contadores são salvos como um único array ordenado, substituindo o documento para
+remover campos legados fora da allowlist. Criar/editar aguarda a escrita;
 excluir e reordenar são otimistas:
 
 ```mermaid
@@ -132,6 +135,7 @@ O expediente é modelado como recorrência de segunda a sexta, iniciando às 08:
 | Firebase CDN | SDK Auth/Firestore 12.16.0 | Recursos autenticados não inicializam |
 | Google OAuth | Login único | Aplicação permanece no modo visitante |
 | Firestore | Preferências e contadores | Contadores padrão continuam locais |
+| Cloud Storage | Imagens dos cards pessoais | Cards continuam sem imagem |
 | Adobe Fonts | Tipografia | Fallback para `system-ui`/monospace |
 | WeatherWidget.io | Previsões | Espaços de clima podem ficar vazios |
 | Google Analytics | Métricas | Produto continua funcional |
@@ -174,9 +178,9 @@ no cliente.
 ## Automação de qualidade
 
 - Node Test Runner cobre cálculos puros e contratos entre HTML/JS/config/docs.
-- Playwright cobre visitante, privacidade, Google Auth Emulator, CRUD, ordenação,
+- Playwright cobre visitante, privacidade, Google Auth Emulator, CRUD, imagens,
   persistência e exclusão de conta em desktop/mobile Chromium.
-- Firebase Emulator + `@firebase/rules-unit-testing` cobre autorização e schemas.
+- Firebase Emulator + `@firebase/rules-unit-testing` cobre Firestore e Storage Rules.
 - GitHub Actions usa Node 22 e Java 21 em pushes/PRs.
 - O teste de calendário falha quando pagamentos/feriados não têm data futura,
   transformando uma manutenção anual em sinal automático da CI.

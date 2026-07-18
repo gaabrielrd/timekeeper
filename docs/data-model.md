@@ -2,7 +2,7 @@
 
 ## Visão geral
 
-Cada conta Google possui um documento de perfil e dois documentos operacionais.
+Cada conta Google possui um documento de perfil e três documentos operacionais.
 
 ```text
 users/{uid}
@@ -17,7 +17,11 @@ users/{uid}/data/settings
 └── updatedAt
 
 users/{uid}/data/counters
-├── items[0..5]
+├── items[0..4]
+└── updatedAt
+
+users/{uid}/data/images
+├── items[0..9]
 └── updatedAt
 ```
 
@@ -31,7 +35,8 @@ users/{uid}/data/counters
 | `updatedAt` | timestamp | `serverTimestamp()` |
 
 Esse documento também é a origem do formato legado. `ensureUserData` lê eventuais
-configurações/`customCounters` na raiz e cria os documentos novos se ainda faltarem.
+configurações/`customCounters` na raiz, cria os documentos novos se ainda faltarem e
+então substitui a raiz somente pelos campos atuais do perfil.
 
 ## Configurações — `/users/{uid}/data/settings`
 
@@ -71,6 +76,9 @@ usado para novas escritas.
 | `type` | `fixed` ou `recurring` | desconhecido é normalizado para `fixed` |
 | `color` | string hex ou `null` | `null` herda o destaque principal |
 | `createdAt` | string ISO | metadado preservado em edições |
+| `imageId` | string ou `null` | referência a `data/images.items[].id` |
+| `imageOpacity` | number | 0–100; cliente persiste inteiro, rules aceitam number |
+| `overlayOpacity` | number | 0–100; cliente persiste inteiro, rules aceitam number |
 
 ### Período fixo
 
@@ -109,6 +117,24 @@ irrecuperáveis são ignoradas individualmente para não bloquear a migração d
 
 `daysOfWeek` segue `Date.getDay()`: `0` domingo, `1` segunda, ..., `6` sábado.
 
+## Biblioteca de imagens — `/users/{uid}/data/images`
+
+O documento contém até dez metadados ordenados por slot. Os bytes ficam no Cloud
+Storage em `/users/{uid}/counter-images/{slot}`, onde `slot` vai de 0 a 9.
+
+| Campo | Tipo | Regra |
+| --- | --- | --- |
+| `id` | string | UUID estável usado pelos contadores |
+| `slot` | inteiro | 0–9; determina o único objeto físico |
+| `name` | string | nome original limitado a 120 caracteres |
+| `size` | inteiro | 1 byte a 5 MiB |
+| `contentType` | string | JPEG, PNG, WebP, GIF ou AVIF |
+| `createdAt` | string ISO | data do upload no cliente |
+
+Cada imagem pode ser referenciada por vários contadores sem duplicar bytes. Excluir
+uma imagem limpa todas as referências a seu `imageId`. Dez slots de no máximo 5 MiB
+impõem 50 MiB por usuário nas Storage Rules, independentemente dos metadados.
+
 ## Dados locais do visitante
 
 | Cookie | Conteúdo | Duração |
@@ -121,18 +147,19 @@ pois são configurações não sensíveis acessadas pelo JavaScript.
 
 ## Sincronização e concorrência
 
-Há duas subscriptions independentes: uma para settings e outra para counters.
-Escritas de contadores substituem semanticamente o array completo via merge no
-documento. Duas abas podem produzir last-write-wins; `onSnapshot` reconcilia a UI
+Há três subscriptions independentes: settings, counters e metadados de images.
+Escritas de contadores substituem o documento completo para remover campos legados
+fora da allowlist. Duas abas podem produzir last-write-wins; `onSnapshot` reconcilia a UI
 com a versão aceita pelo servidor.
 
 ## Regras atuais
 
 - Requer usuário autenticado, dono do UID e provedor `google.com`.
-- Subdocumentos permitidos: somente `settings` e `counters`.
+- Subdocumentos permitidos: somente `settings`, `counters` e `images`.
 - Settings aceitam somente chaves conhecidas, tipos e ranges válidos.
 - `counters.items` precisa ser lista e ter até cinco elementos válidos.
-- Cada contador valida ID, nome, cor, chaves e o schema fixo/recorrente.
+- Cada contador valida ID, nome, cor, imagem, opacidades e o schema fixo/recorrente.
+- Images aceitam até dez metadados válidos; Storage limita dono, tipo, slot e bytes.
 - Horários recorrentes e dias da semana são validados por formato/range; períodos
   fixos exigem inteiros não negativos e fim posterior ao início.
 - O documento raiz legado também limita `customCounters` a cinco.

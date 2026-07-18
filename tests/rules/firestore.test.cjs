@@ -14,12 +14,22 @@ const {
 	setLogLevel,
 	setDoc,
 } = require("firebase/firestore");
+const {
+	deleteObject,
+	getBytes,
+	ref,
+	uploadBytes,
+} = require("firebase/storage");
 
 setLogLevel("silent");
 
 const projectId = "demo-timekeeper";
 const rules = fs.readFileSync(
 	path.resolve(__dirname, "../../firestore.rules"),
+	"utf8",
+);
+const storageRules = fs.readFileSync(
+	path.resolve(__dirname, "../../storage.rules"),
 	"utf8",
 );
 
@@ -29,11 +39,13 @@ test.before(async () => {
 	environment = await initializeTestEnvironment({
 		projectId,
 		firestore: { rules },
+		storage: { rules: storageRules },
 	});
 });
 
 test.afterEach(async () => {
 	await environment.clearFirestore();
+	await environment.clearStorage();
 });
 
 test.after(async () => {
@@ -52,6 +64,18 @@ function passwordDb(uid = "alice") {
 	}).firestore();
 }
 
+function googleStorage(uid = "alice") {
+	return environment.authenticatedContext(uid, {
+		firebase: { sign_in_provider: "google.com" },
+	}).storage();
+}
+
+function passwordStorage(uid = "alice") {
+	return environment.authenticatedContext(uid, {
+		firebase: { sign_in_provider: "password" },
+	}).storage();
+}
+
 function fixedCounter(index = 1) {
 	return {
 		id: `fixed-${index}`,
@@ -60,6 +84,9 @@ function fixedCounter(index = 1) {
 		startAtMs: Date.parse("2026-07-17T12:00:00.000Z"),
 		endAtMs: Date.parse("2026-07-18T12:00:00.000Z"),
 		color: null,
+		imageId: "image-1",
+		imageOpacity: 100,
+		overlayOpacity: 55,
 		createdAt: "2026-07-17T12:00:00.000Z",
 	};
 }
@@ -156,6 +183,8 @@ test("rejeita schema, horários, dias e cores inválidos", async () => {
 		{ ...fixedCounter(), name: "" },
 		{ ...fixedCounter(), endAtMs: fixedCounter().startAtMs },
 		{ ...fixedCounter(), color: "purple" },
+		{ ...fixedCounter(), imageOpacity: 101 },
+		{ ...fixedCounter(), overlayOpacity: -1 },
 		{ ...fixedCounter(), unexpected: true },
 		{ ...recurringCounter(), startTime: "25:00" },
 		{ ...recurringCounter(), daysOfWeek: [] },
@@ -177,4 +206,80 @@ test("documentos válidos podem ser lidos pelo proprietário", async () => {
 	await assertSucceeds(setDoc(reference, { items: [fixedCounter()] }));
 	const snapshot = await assertSucceeds(getDoc(reference));
 	assert.equal(snapshot.data().items.length, 1);
+});
+
+test("aceita metadados de até dez imagens e rejeita schema inválido", async () => {
+	const reference = doc(googleDb(), "users/alice/data/images");
+	const image = (slot = 0) => ({
+		id: `image-${slot}`,
+		slot,
+		name: `Imagem ${slot}.png`,
+		size: 1024,
+		contentType: "image/png",
+		createdAt: "2026-07-18T12:00:00.000Z",
+	});
+	await assertSucceeds(
+		setDoc(reference, {
+			items: Array.from({ length: 10 }, (_, slot) => image(slot)),
+			updatedAt: serverTimestamp(),
+		}),
+	);
+	await assertFails(
+		setDoc(reference, {
+			items: Array.from({ length: 11 }, (_, slot) => image(slot % 10)),
+		}),
+	);
+	await assertFails(setDoc(reference, { items: [{ ...image(), size: 5242881 }] }));
+	await assertFails(setDoc(reference, { items: [{ ...image(), admin: true }] }));
+});
+
+test("Storage mantém imagens privadas e exige Google OAuth", async () => {
+	const path = "users/alice/counter-images/0";
+	const bytes = new Uint8Array([137, 80, 78, 71]);
+	await assertFails(
+		uploadBytes(ref(environment.unauthenticatedContext().storage(), path), bytes, {
+			contentType: "image/png",
+		}),
+	);
+	await assertFails(
+		uploadBytes(ref(passwordStorage(), path), bytes, { contentType: "image/png" }),
+	);
+	await assertSucceeds(
+		uploadBytes(ref(googleStorage(), path), bytes, { contentType: "image/png" }),
+	);
+	await assertFails(getBytes(ref(googleStorage("bob"), path)));
+	await assertSucceeds(getBytes(ref(googleStorage(), path)));
+	await assertSucceeds(deleteObject(ref(googleStorage(), path)));
+});
+
+test("Storage limita cada arquivo a 5 MiB e cada usuário a dez slots", async () => {
+	const ownerStorage = googleStorage();
+	await assertSucceeds(
+		uploadBytes(
+			ref(ownerStorage, "users/alice/counter-images/0"),
+			new Uint8Array(5 * 1024 * 1024),
+			{ contentType: "image/jpeg" },
+		),
+	);
+	await assertFails(
+		uploadBytes(
+			ref(ownerStorage, "users/alice/counter-images/1"),
+			new Uint8Array(5 * 1024 * 1024 + 1),
+			{ contentType: "image/jpeg" },
+		),
+	);
+	await assertFails(
+		uploadBytes(
+			ref(ownerStorage, "users/alice/counter-images/1"),
+			new Uint8Array([1]),
+			{ contentType: "image/svg+xml" },
+		),
+	);
+	await assertFails(
+		uploadBytes(
+			ref(ownerStorage, "users/alice/counter-images/10"),
+			new Uint8Array([1]),
+			{ contentType: "image/png" },
+		),
+	);
 });

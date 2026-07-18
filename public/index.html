@@ -33,15 +33,33 @@
 				<span class="chrono-ring ring-orbit-two"></span>
 				<span class="chrono-core"></span>
 			</div>
-			<svg class="topographic-map" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice">
+			<svg
+				class="topographic-map"
+				viewBox="0 0 1200 800"
+				preserveAspectRatio="xMidYMid slice"
+			>
 				<g>
-					<path d="M86 470C118 300 258 188 432 220C565 245 597 127 753 145C922 164 1085 292 1118 459C1154 638 1004 728 824 692C683 664 608 753 433 716C241 676 53 642 86 470Z" />
-					<path d="M151 473C182 340 291 257 428 275C558 292 624 190 749 201C889 214 1031 322 1054 456C1080 602 958 661 817 634C678 607 598 686 449 656C292 625 119 610 151 473Z" />
-					<path d="M224 469C249 376 331 319 433 329C551 341 634 250 742 259C857 268 968 350 984 451C1002 565 909 596 807 579C675 557 593 620 463 598C343 578 199 567 224 469Z" />
-					<path d="M303 465C323 406 376 375 443 380C548 388 643 310 736 316C825 323 896 380 907 446C919 526 856 539 789 528C674 510 589 556 478 544C395 535 283 531 303 465Z" />
-					<path d="M385 458C397 429 421 420 458 423C548 430 651 368 727 373C787 377 825 406 832 441C838 483 807 486 769 480C670 464 587 493 495 490C446 488 373 489 385 458Z" />
-					<path d="M891 104C946 72 1031 89 1064 143C1097 197 1058 253 993 250C929 247 853 216 858 163C860 139 873 115 891 104Z" />
-					<path d="M925 132C956 114 1008 123 1027 154C1046 184 1022 216 985 214C948 212 905 194 908 164C909 151 916 138 925 132Z" />
+					<path
+						d="M86 470C118 300 258 188 432 220C565 245 597 127 753 145C922 164 1085 292 1118 459C1154 638 1004 728 824 692C683 664 608 753 433 716C241 676 53 642 86 470Z"
+					/>
+					<path
+						d="M151 473C182 340 291 257 428 275C558 292 624 190 749 201C889 214 1031 322 1054 456C1080 602 958 661 817 634C678 607 598 686 449 656C292 625 119 610 151 473Z"
+					/>
+					<path
+						d="M224 469C249 376 331 319 433 329C551 341 634 250 742 259C857 268 968 350 984 451C1002 565 909 596 807 579C675 557 593 620 463 598C343 578 199 567 224 469Z"
+					/>
+					<path
+						d="M303 465C323 406 376 375 443 380C548 388 643 310 736 316C825 323 896 380 907 446C919 526 856 539 789 528C674 510 589 556 478 544C395 535 283 531 303 465Z"
+					/>
+					<path
+						d="M385 458C397 429 421 420 458 423C548 430 651 368 727 373C787 377 825 406 832 441C838 483 807 486 769 480C670 464 587 493 495 490C446 488 373 489 385 458Z"
+					/>
+					<path
+						d="M891 104C946 72 1031 89 1064 143C1097 197 1058 253 993 250C929 247 853 216 858 163C860 139 873 115 891 104Z"
+					/>
+					<path
+						d="M925 132C956 114 1008 123 1027 154C1046 184 1022 216 985 214C948 212 905 194 908 164C909 151 916 138 925 132Z"
+					/>
 				</g>
 			</svg>
 			<canvas id="constellation-canvas" class="constellation-canvas"></canvas>
@@ -56,7 +74,11 @@
 				<div id="guest-time-config" class="guest-time-config">
 					<label for="guest-config-hora">Encerrar expediente</label>
 					<div class="time-selects compact-time-selects">
-						<select id="guest-config-hora" onchange="setGuestHours()" aria-label="Hora do fim do expediente">
+						<select
+							id="guest-config-hora"
+							onchange="setGuestHours()"
+							aria-label="Hora do fim do expediente"
+						>
 							<option value="17">17</option>
 							<option value="18">18</option>
 							<option value="19">19</option>
@@ -65,24 +87,48 @@
 							<option value="22">22</option>
 						</select>
 						<span>:</span>
-						<select id="guest-config-minutos" onchange="setGuestMinutes()" aria-label="Minutos do fim do expediente">
+						<select
+							id="guest-config-minutos"
+							onchange="setGuestMinutes()"
+							aria-label="Minutos do fim do expediente"
+						>
 							<option value="55">55</option>
 							<option value="25">25</option>
 						</select>
 					</div>
 				</div>
 
-				<button id="custom-visibility-button" class="header-tool-button" type="button" aria-pressed="true" title="Ocultar contadores personalizados" hidden>
-					<i id="custom-visibility-icon" class="material-icons" aria-hidden="true">visibility</i>
+				<button
+					id="custom-visibility-button"
+					class="header-tool-button"
+					type="button"
+					aria-pressed="true"
+					title="Ocultar contadores personalizados"
+					hidden
+				>
+					<i
+						id="custom-visibility-icon"
+						class="material-icons"
+						aria-hidden="true"
+						>visibility</i
+					>
 					<span>Meus contadores</span>
 				</button>
 
-				<button id="auth-button" class="account-button" type="button" aria-haspopup="true" aria-expanded="false">
+				<button
+					id="auth-button"
+					class="account-button"
+					type="button"
+					aria-haspopup="true"
+					aria-expanded="false"
+				>
 					<span id="account-avatar" class="account-avatar" aria-hidden="true">
 						<i class="material-icons">person</i>
 					</span>
 					<span id="account-label">Entrar com Google</span>
-					<i class="material-icons account-chevron" aria-hidden="true">chevron_right</i>
+					<i class="material-icons account-chevron" aria-hidden="true"
+						>chevron_right</i
+					>
 				</button>
 
 				<button
@@ -131,14 +177,24 @@
 					</article>
 				</div>
 
-				<section id="custom-counters-section" class="custom-counters-section" aria-labelledby="custom-counters-title" aria-hidden="true">
+				<section
+					id="custom-counters-section"
+					class="custom-counters-section"
+					aria-labelledby="custom-counters-title"
+					aria-hidden="true"
+				>
 					<div class="custom-counters-reveal">
 						<div class="section-heading">
 							<div>
 								<p class="section-kicker">Sua conta</p>
 								<h2 id="custom-counters-title">Meus contadores</h2>
 							</div>
-							<span id="counter-live-state" class="live-state" data-state="connecting">Conectando...</span>
+							<span
+								id="counter-live-state"
+								class="live-state"
+								data-state="connecting"
+								>Conectando...</span
+							>
 						</div>
 						<div id="custom-panels" class="custom-panels"></div>
 					</div>
@@ -211,8 +267,20 @@
 			</section>
 		</main>
 
-		<button id="sidebar-backdrop" class="sidebar-backdrop" type="button" aria-label="Fechar menu" tabindex="-1"></button>
-		<aside id="account-sidebar" class="account-sidebar" aria-hidden="true" aria-labelledby="sidebar-title" inert>
+		<button
+			id="sidebar-backdrop"
+			class="sidebar-backdrop"
+			type="button"
+			aria-label="Fechar menu"
+			tabindex="-1"
+		></button>
+		<aside
+			id="account-sidebar"
+			class="account-sidebar"
+			aria-hidden="true"
+			aria-labelledby="sidebar-title"
+			inert
+		>
 			<header class="sidebar-header">
 				<div class="sidebar-identity">
 					<img id="sidebar-avatar" alt="" />
@@ -221,7 +289,12 @@
 						<span id="sidebar-email"></span>
 					</div>
 				</div>
-				<button id="sidebar-close" class="icon-button" type="button" aria-label="Fechar menu">
+				<button
+					id="sidebar-close"
+					class="icon-button"
+					type="button"
+					aria-label="Fechar menu"
+				>
 					<i class="material-icons">close</i>
 				</button>
 			</header>
@@ -235,9 +308,15 @@
 						</div>
 						<span class="save-state" id="settings-state">Sincronizado</span>
 					</div>
-					<label class="field-label" for="config-hora">Encerrar expediente</label>
+					<label class="field-label" for="config-hora"
+						>Encerrar expediente</label
+					>
 					<div class="time-selects sidebar-time-selects">
-						<select id="config-hora" onchange="setHours()" aria-label="Hora do fim do expediente">
+						<select
+							id="config-hora"
+							onchange="setHours()"
+							aria-label="Hora do fim do expediente"
+						>
 							<option value="17">17</option>
 							<option value="18">18</option>
 							<option value="19">19</option>
@@ -246,21 +325,33 @@
 							<option value="22">22</option>
 						</select>
 						<span>:</span>
-						<select id="config-minutos" onchange="setMinutes()" aria-label="Minutos do fim do expediente">
+						<select
+							id="config-minutos"
+							onchange="setMinutes()"
+							aria-label="Minutos do fim do expediente"
+						>
 							<option value="55">55</option>
 							<option value="25">25</option>
 						</select>
 					</div>
 				</section>
 
-				<section class="settings-section counter-settings" aria-labelledby="counter-management-title">
+				<section
+					class="settings-section counter-settings"
+					aria-labelledby="counter-management-title"
+				>
 					<div class="settings-heading">
 						<div>
 							<p class="section-kicker">Até cinco</p>
 							<h2 id="counter-management-title">Meus contadores</h2>
 						</div>
 						<div class="counter-heading-meta">
-							<span id="counter-sidebar-state" class="live-state compact" data-state="connecting">Conectando...</span>
+							<span
+								id="counter-sidebar-state"
+								class="live-state compact"
+								data-state="connecting"
+								>Conectando...</span
+							>
 							<span id="counter-count" class="counter-count">0 / 5</span>
 						</div>
 					</div>
@@ -269,6 +360,14 @@
 					<button id="open-counter-modal" class="primary-button" type="button">
 						<i class="material-icons" aria-hidden="true">add</i>
 						<span id="open-counter-modal-label">Novo contador</span>
+					</button>
+					<button
+						id="open-image-library"
+						class="secondary-button library-button"
+						type="button"
+					>
+						<i class="material-icons" aria-hidden="true">photo_library</i>
+						Biblioteca de imagens
 					</button>
 				</section>
 
@@ -312,58 +411,244 @@
 								<option value="constellation">Constelação dinâmica</option>
 							</select>
 						</label>
-						<p id="background-description" class="setting-help">Formas quentes que sobem, se fundem e mudam lentamente.</p>
+						<p id="background-description" class="setting-help">
+							Formas quentes que sobem, se fundem e mudam lentamente.
+						</p>
 						<div class="color-fields background-color-fields">
 							<label class="color-field">
 								<span>Cor A</span>
-								<input id="background-color-a" type="color" value="#7c3aed" disabled />
+								<input
+									id="background-color-a"
+									type="color"
+									value="#7c3aed"
+									disabled
+								/>
 							</label>
 							<label class="color-field">
 								<span>Cor B</span>
-								<input id="background-color-b" type="color" value="#0ea5e9" disabled />
+								<input
+									id="background-color-b"
+									type="color"
+									value="#0ea5e9"
+									disabled
+								/>
 							</label>
 						</div>
 						<label class="range-field">
-							<span>Velocidade <output id="background-speed-output" for="background-speed">Normal</output></span>
-							<input id="background-speed" type="range" min="20" max="100" step="1" value="55" disabled />
+							<span
+								>Velocidade
+								<output id="background-speed-output" for="background-speed"
+									>Normal</output
+								></span
+							>
+							<input
+								id="background-speed"
+								type="range"
+								min="20"
+								max="100"
+								step="1"
+								value="55"
+								disabled
+							/>
 						</label>
 						<label class="range-field">
-							<span>Intensidade <output id="background-intensity-output" for="background-intensity">55%</output></span>
-							<input id="background-intensity" type="range" min="15" max="100" step="1" value="55" disabled />
+							<span
+								>Intensidade
+								<output
+									id="background-intensity-output"
+									for="background-intensity"
+									>55%</output
+								></span
+							>
+							<input
+								id="background-intensity"
+								type="range"
+								min="15"
+								max="100"
+								step="1"
+								value="55"
+								disabled
+							/>
 						</label>
 					</div>
 				</section>
-			</div>
 
-			<footer class="sidebar-footer">
-				<button id="sign-out-button" class="text-button" type="button">
-					<i class="material-icons" aria-hidden="true">logout</i>
-					Sair da conta
-				</button>
-				<button id="delete-account-button" class="text-button danger-button" type="button">
-					<i class="material-icons" aria-hidden="true">delete_forever</i>
-					Excluir conta e dados
-				</button>
-			</footer>
+				<footer class="sidebar-footer">
+					<button
+						id="sign-out-button"
+						class="text-button"
+						type="button"
+						style="margin-bottom: 12px"
+					>
+						Sair da conta
+					</button>
+					<button
+						id="delete-account-button"
+						class="text-button danger-button"
+						type="button"
+					>
+						<i class="material-icons" aria-hidden="true">delete_forever</i>
+						Excluir conta e dados
+					</button>
+				</footer>
+			</div>
 		</aside>
 
-		<dialog id="counter-dialog" class="counter-dialog" aria-labelledby="counter-dialog-title">
+		<dialog
+			id="counter-dialog"
+			class="counter-dialog"
+			aria-labelledby="counter-dialog-title"
+		>
 			<form id="counter-form" class="counter-form">
 				<div class="modal-heading">
 					<div>
-						<p id="counter-dialog-kicker" class="section-kicker">Novo contador</p>
+						<p id="counter-dialog-kicker" class="section-kicker">
+							Novo contador
+						</p>
 						<h2 id="counter-dialog-title">Criar contador</h2>
 					</div>
-					<button id="counter-dialog-close" class="icon-button" type="button" aria-label="Fechar">
+					<button
+						id="counter-dialog-close"
+						class="icon-button"
+						type="button"
+						aria-label="Fechar"
+					>
 						<i class="material-icons">close</i>
 					</button>
 				</div>
-				<label class="field-label">Nome<input name="name" type="text" maxlength="50" placeholder="Ex.: Férias" required /></label>
+				<section class="counter-live-preview" aria-label="Prévia do contador">
+					<span class="counter-live-preview-label">Prévia do card</span>
+					<div
+						id="counter-preview-card"
+						class="counter-preview-card"
+						aria-hidden="true"
+					>
+						<div class="counter-preview-media">
+							<div
+								id="counter-preview-image"
+								class="counter-preview-image"
+							></div>
+							<div
+								id="counter-preview-overlay"
+								class="counter-preview-overlay"
+							></div>
+						</div>
+						<div class="counter-preview-top">
+							<span class="counter-preview-index">04</span>
+							<strong id="counter-preview-title">Nome do contador</strong>
+						</div>
+						<span class="counter-preview-pre">Ainda faltam</span>
+						<strong class="counter-preview-time">12d 08h 42m</strong>
+						<span id="counter-preview-post" class="counter-preview-post"
+							>para Nome do contador.</span
+						>
+						<span class="counter-preview-progress"></span>
+					</div>
+				</section>
+				<label class="field-label"
+					>Nome<input
+						name="name"
+						type="text"
+						maxlength="50"
+						placeholder="Ex.: Férias"
+						required
+				/></label>
 				<label class="color-option">
-					<input id="counter-color-enabled" name="colorEnabled" type="checkbox" />
+					<input
+						id="counter-color-enabled"
+						name="colorEnabled"
+						type="checkbox"
+					/>
 					<span>Usar uma cor própria</span>
-					<input id="counter-color" name="color" type="color" value="#a78bfa" disabled />
+					<input
+						id="counter-color"
+						name="color"
+						type="color"
+						value="#a78bfa"
+						disabled
+					/>
 				</label>
+				<fieldset class="counter-image-fields">
+					<legend>Imagem do card</legend>
+					<div class="counter-image-selection">
+						<div
+							id="counter-image-preview"
+							class="counter-image-preview"
+							aria-hidden="true"
+						>
+							<i class="material-icons">image</i>
+						</div>
+						<div>
+							<strong id="counter-image-name">Sem imagem</strong>
+						</div>
+						<div class="counter-image-actions">
+							<button
+								id="choose-counter-image"
+								class="icon-button counter-image-action"
+								type="button"
+								aria-label="Escolher imagem da biblioteca"
+								title="Escolher imagem"
+							>
+								<i class="material-icons">photo_library</i>
+							</button>
+							<button
+								id="remove-counter-image"
+								class="icon-button counter-image-action"
+								type="button"
+								aria-label="Remover imagem do card"
+								title="Remover imagem"
+								disabled
+							>
+								<i class="material-icons">close</i>
+							</button>
+						</div>
+					</div>
+					<input id="counter-image-id" name="imageId" type="hidden" />
+					<div
+						id="counter-image-opacity-controls"
+						class="counter-image-opacity-controls"
+						hidden
+					>
+						<label class="range-field">
+							<span
+								>Opacidade da imagem
+								<output
+									id="counter-image-opacity-output"
+									for="counter-image-opacity"
+									>100%</output
+								></span
+							>
+							<input
+								id="counter-image-opacity"
+								name="imageOpacity"
+								type="range"
+								min="0"
+								max="100"
+								step="1"
+								value="100"
+							/>
+						</label>
+						<label class="range-field">
+							<span
+								>Opacidade da sobreposição
+								<output
+									id="counter-overlay-opacity-output"
+									for="counter-overlay-opacity"
+									>55%</output
+								></span
+							>
+							<input
+								id="counter-overlay-opacity"
+								name="overlayOpacity"
+								type="range"
+								min="0"
+								max="100"
+								step="1"
+								value="55"
+							/>
+						</label>
+					</div>
+				</fieldset>
 				<label class="field-label">
 					Tipo
 					<select id="counter-type" name="type" class="field-control">
@@ -373,34 +658,176 @@
 				</label>
 				<div id="fixed-schedule-fields" class="schedule-fields">
 					<div class="date-grid">
-						<label class="field-label">Início<input name="startAt" type="datetime-local" required /></label>
-						<label class="field-label">Fim<input name="endAt" type="datetime-local" required /></label>
+						<label class="field-label"
+							>Início<input name="startAt" type="datetime-local" required
+						/></label>
+						<label class="field-label"
+							>Fim<input name="endAt" type="datetime-local" required
+						/></label>
 					</div>
 				</div>
-				<fieldset id="recurring-schedule-fields" class="schedule-fields recurring-schedule-fields" hidden disabled>
+				<fieldset
+					id="recurring-schedule-fields"
+					class="schedule-fields recurring-schedule-fields"
+					hidden
+					disabled
+				>
 					<div class="date-grid">
-						<label class="field-label">Hora inicial<input name="startTime" type="time" value="08:00" required /></label>
-						<label class="field-label">Hora final<input name="endTime" type="time" value="17:00" required /></label>
+						<label class="field-label"
+							>Hora inicial<input
+								name="startTime"
+								type="time"
+								value="08:00"
+								required
+						/></label>
+						<label class="field-label"
+							>Hora final<input
+								name="endTime"
+								type="time"
+								value="17:00"
+								required
+						/></label>
 					</div>
 					<legend>Dias da semana</legend>
 					<div class="weekday-options">
-						<label><input name="daysOfWeek" type="checkbox" value="1" checked /><span>Seg</span></label>
-						<label><input name="daysOfWeek" type="checkbox" value="2" checked /><span>Ter</span></label>
-						<label><input name="daysOfWeek" type="checkbox" value="3" checked /><span>Qua</span></label>
-						<label><input name="daysOfWeek" type="checkbox" value="4" checked /><span>Qui</span></label>
-						<label><input name="daysOfWeek" type="checkbox" value="5" checked /><span>Sex</span></label>
-						<label><input name="daysOfWeek" type="checkbox" value="6" /><span>Sáb</span></label>
-						<label><input name="daysOfWeek" type="checkbox" value="0" /><span>Dom</span></label>
+						<label
+							><input
+								name="daysOfWeek"
+								type="checkbox"
+								value="1"
+								checked
+							/><span>Seg</span></label
+						>
+						<label
+							><input
+								name="daysOfWeek"
+								type="checkbox"
+								value="2"
+								checked
+							/><span>Ter</span></label
+						>
+						<label
+							><input
+								name="daysOfWeek"
+								type="checkbox"
+								value="3"
+								checked
+							/><span>Qua</span></label
+						>
+						<label
+							><input
+								name="daysOfWeek"
+								type="checkbox"
+								value="4"
+								checked
+							/><span>Qui</span></label
+						>
+						<label
+							><input
+								name="daysOfWeek"
+								type="checkbox"
+								value="5"
+								checked
+							/><span>Sex</span></label
+						>
+						<label
+							><input name="daysOfWeek" type="checkbox" value="6" /><span
+								>Sáb</span
+							></label
+						>
+						<label
+							><input name="daysOfWeek" type="checkbox" value="0" /><span
+								>Dom</span
+							></label
+						>
 					</div>
 				</fieldset>
 				<p id="counter-message" class="form-message" aria-live="polite"></p>
 				<div class="modal-actions">
-					<button id="counter-dialog-cancel" class="secondary-button" type="button">Cancelar</button>
-					<button id="counter-submit" class="primary-button" type="submit">Criar contador</button>
+					<button
+						id="counter-dialog-cancel"
+						class="secondary-button"
+						type="button"
+					>
+						Cancelar
+					</button>
+					<button id="counter-submit" class="primary-button" type="submit">
+						Criar contador
+					</button>
 				</div>
 			</form>
 		</dialog>
-		<div id="app-toast" class="app-toast" role="status" aria-live="polite"></div>
+		<dialog
+			id="image-library-dialog"
+			class="counter-dialog image-library-dialog"
+			aria-labelledby="image-library-title"
+		>
+			<div class="image-library-shell">
+				<div class="modal-heading">
+					<div>
+						<p class="section-kicker">Seus arquivos</p>
+						<h2 id="image-library-title">Biblioteca de imagens</h2>
+					</div>
+					<button
+						id="image-library-close"
+						class="icon-button"
+						type="button"
+						aria-label="Fechar biblioteca"
+					>
+						<i class="material-icons">close</i>
+					</button>
+				</div>
+				<div class="library-usage" aria-live="polite">
+					<span id="image-library-usage">0 B de 50 MB usados</span>
+					<span id="image-library-count">0 / 10 imagens</span>
+				</div>
+				<div class="library-usage-track" aria-hidden="true">
+					<span id="image-library-usage-bar"></span>
+				</div>
+				<label
+					id="image-upload-dropzone"
+					class="image-upload-dropzone"
+					for="image-upload-input"
+				>
+					<input
+						id="image-upload-input"
+						type="file"
+						accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
+					/>
+					<i class="material-icons" aria-hidden="true">image</i>
+					<span
+						><strong>Enviar imagem</strong
+						><small>JPG, PNG, WebP, GIF ou AVIF · até 5 MB</small></span
+					>
+				</label>
+				<div id="image-upload-progress" class="image-upload-progress" hidden>
+					<span id="image-upload-label">Enviando...</span>
+					<progress id="image-upload-progress-bar" max="100" value="0">
+						0%
+					</progress>
+				</div>
+				<p
+					id="image-library-message"
+					class="form-message"
+					aria-live="polite"
+				></p>
+				<div
+					id="image-library-grid"
+					class="image-library-grid"
+					aria-live="polite"
+				></div>
+				<p id="image-library-empty" class="image-library-empty">
+					Nenhuma imagem enviada. Adicione uma para personalizar seus
+					contadores.
+				</p>
+			</div>
+		</dialog>
+		<div
+			id="app-toast"
+			class="app-toast"
+			role="status"
+			aria-live="polite"
+		></div>
 		<section
 			id="privacy-banner"
 			class="privacy-banner"
@@ -459,9 +886,15 @@
 						type: "recurring",
 						startTime: "08:00",
 						endTime:
-							String(document.querySelector("#config-hora").value).padStart(2, "0") +
+							String(document.querySelector("#config-hora").value).padStart(
+								2,
+								"0",
+							) +
 							":" +
-							String(document.querySelector("#config-minutos").value).padStart(2, "0"),
+							String(document.querySelector("#config-minutos").value).padStart(
+								2,
+								"0",
+							),
 						daysOfWeek: [1, 2, 3, 4, 5],
 					},
 					now,

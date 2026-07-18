@@ -70,6 +70,8 @@ test("exclusão de conta remove dados após reautenticação Google", () => {
 	assert.match(client, /reauthenticateWithPopup\(userToDelete, googleProvider\)/);
 	assert.match(client, /deleteDoc\(doc\(db, "users", userToDelete\.uid, "data", "settings"\)\)/);
 	assert.match(client, /deleteDoc\(doc\(db, "users", userToDelete\.uid, "data", "counters"\)\)/);
+	assert.match(client, /deleteDoc\(doc\(db, "users", userToDelete\.uid, "data", "images"\)\)/);
+	assert.match(client, /deleteObject\(imageStorageReference\(userToDelete\.uid, slot\)\)/);
 	assert.match(client, /deleteUser\(userToDelete\)/);
 	assert.match(privacy, /Excluir conta e dados/);
 });
@@ -90,7 +92,9 @@ test("Hosting evita cache misto e emuladores usam portas documentadas", () => {
 	assert.equal(config.emulators.auth.port, 9099);
 	assert.equal(config.emulators.firestore.port, 8080);
 	assert.equal(config.emulators.hosting.port, 5000);
+	assert.equal(config.emulators.storage.port, 9199);
 	assert.equal(rulesTestConfig.emulators.firestore.port, 8081);
+	assert.equal(rulesTestConfig.emulators.storage.port, 9198);
 	assert.equal(rulesTestConfig.emulators.ui.enabled, false);
 });
 
@@ -100,8 +104,35 @@ test("cliente ativa emuladores apenas por opt-in local e inclui fallback Safari"
 	assert.match(client, /has\("emulators"\)/);
 	assert.match(client, /connectAuthEmulator\(auth/);
 	assert.match(client, /connectFirestoreEmulator\(db/);
+	assert.match(client, /connectStorageEmulator\(storage/);
 	assert.doesNotMatch(client, /Object\.hasOwn\(/);
 	assert.match(client, /reducedMotionQuery\.addListener\(syncConstellation\)/);
+});
+
+test("limites da biblioteca permanecem alinhados entre UI, cliente e Storage", () => {
+	const html = read("public/index.html");
+	const client = read("public/src/firebase.js");
+	const storageRules = read("storage.rules");
+	const config = JSON.parse(read("firebase.json"));
+	assert.match(html, /0 B de 50 MB usados/);
+	assert.match(html, /0 \/ 10 imagens/);
+	assert.match(html, /até 5 MB/);
+	assert.match(client, /const MAX_IMAGES = 10;/);
+	assert.match(client, /const MAX_IMAGE_BYTES = 5 \* 1024 \* 1024;/);
+	assert.match(storageRules, /request\.resource\.size <= 5 \* 1024 \* 1024/);
+	assert.match(storageRules, /slot\.matches\('\^\[0-9\]\$'\)/);
+	assert.equal(config.storage.rules, "storage.rules");
+});
+
+test("editor de contador possui prévia ao vivo e ações compactas de imagem", () => {
+	const html = read("public/index.html");
+	const client = read("public/src/firebase.js");
+	assert.match(html, /id="counter-preview-card"/);
+	assert.match(html, /id="counter-preview-image"/);
+	assert.match(html, /aria-label="Escolher imagem da biblioteca"/);
+	assert.match(html, /aria-label="Remover imagem do card"/);
+	assert.match(client, /function updateCounterPreview\(\)/);
+	assert.match(client, /elements\.counterColor\.addEventListener\("input", updateCounterPreview\)/);
 });
 
 test("JavaScript inline do HTML compila", () => {

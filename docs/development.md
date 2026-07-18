@@ -29,7 +29,7 @@ projeto atual. Login só é necessário para recursos remotos da CLI.
 Para testar os assets como o Firebase Hosting os serve, sem tocar em produção:
 
 ```bash
-firebase emulators:start --only hosting,auth,firestore --project demo-timekeeper
+firebase emulators:start --only hosting,auth,firestore,storage --project demo-timekeeper
 ```
 
 Abra `http://127.0.0.1:5000/?emulators=1`.
@@ -39,15 +39,15 @@ HTML/CSS, mas o comportamento de rewrites pode ser diferente.
 
 Não use `file://`: imports de módulo, CORS e autenticação dependem de uma origem.
 
-## Emuladores Auth e Firestore
+## Emuladores Auth, Firestore e Storage
 
 O cliente conecta aos emuladores somente quando duas condições são verdadeiras:
 
 1. hostname é `localhost` ou `127.0.0.1`;
 2. a URL contém `?emulators=1`.
 
-As portas versionadas do app são Hosting 5000, Auth 9099, Firestore 8080 e UI 4000.
-A suíte isolada de Rules usa Firestore 8081 por meio de
+As portas versionadas do app são Hosting 5000, Auth 9099, Firestore 8080, Storage
+9199 e UI 4000. A suíte isolada de Rules usa Firestore 8081 e Storage 9198 por meio de
 `firebase.rules-test.json`, evitando colisão com o emulador dos E2E. Sem o parâmetro,
 mesmo em localhost, o SDK usa o projeto configurado; confira a URL antes de criar
 dados de teste.
@@ -86,6 +86,7 @@ A mesma suíte roda em `.github/workflows/ci.yml` com Node 22 e Java 21.
 | Data de pagamento/feriado | `public/src/data.js` |
 | Cálculo padrão/recorrente | `public/src/time.js` e testes unitários |
 | Auth, live data ou CRUD | `public/src/firebase.js`, `firestore.rules` |
+| Biblioteca de imagens | HTML, JS, CSS, Firestore Rules e `storage.rules` |
 | Campo de configuração | HTML, JS, rules e `docs/data-model.md` |
 | Estilo visual/layout | `public/src/style.css` e talvez HTML |
 | Novo fundo | HTML, CSS/JS, descrição e docs de design |
@@ -103,10 +104,11 @@ falha da lógica central. O widget meteorológico é carregado depois do evento 
 1. Crie um projeto e uma aplicação Web no Firebase.
 2. Ative Authentication > Google.
 3. Crie o banco Firestore.
-4. Substitua a configuração de `initializeApp`.
-5. Atualize `.firebaserc` com o novo project ID.
-6. Publique `firestore.rules` antes de testar usuários reais.
-7. Adicione localhost e os domínios de preview/produção aos domínios autorizados.
+4. Provisione o Cloud Storage na região apropriada.
+5. Substitua a configuração de `initializeApp`.
+6. Atualize `.firebaserc` com o novo project ID.
+7. Publique Firestore e Storage Rules antes de testar usuários reais.
+8. Adicione localhost e os domínios de preview/produção aos domínios autorizados.
 
 Não compartilhe service accounts. A configuração Web do Firebase pode estar no
 cliente; a segurança real é fornecida pelas rules.

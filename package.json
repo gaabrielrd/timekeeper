@@ -9,7 +9,7 @@
     "test": "npm run test:unit && npm run test:rules",
     "test:e2e": "playwright test",
     "test:unit": "node --test tests/unit/time.test.cjs tests/contracts/project.test.cjs",
-    "test:rules": "firebase emulators:exec --config firebase.rules-test.json --project demo-timekeeper --only firestore \"node --test tests/rules/firestore.test.cjs\""
+    "test:rules": "firebase emulators:exec --config firebase.rules-test.json --project demo-timekeeper --only firestore,storage \"node --test tests/rules/firestore.test.cjs\""
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "5.0.1",

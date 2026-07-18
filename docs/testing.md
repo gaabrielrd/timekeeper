@@ -3,8 +3,8 @@
 ## Estado atual
 
 O projeto usa Node Test Runner, Playwright e Firebase Emulator Suite. A suíte atual
-contém 19 testes unitários/contratuais, 12 E2E em Chromium (seis cenários em desktop
-e mobile) e 9 testes de Firestore Rules. GitHub Actions executa todos em pushes,
+contém 20 testes unitários/contratuais, 14 E2E em Chromium (sete cenários em desktop
+e mobile) e 12 testes de Firestore/Storage Rules. GitHub Actions executa todos em pushes,
 pull requests e disparos manuais.
 
 ## Checagens rápidas
@@ -18,9 +18,9 @@ git diff --check
 ```
 
 `npm test` executa unit/contratos + rules em sequência. `npm run test:e2e` é
-separado porque instala/usa Chromium e sobe Auth + Firestore Emulator. Java 21+ é
-obrigatório para os emuladores Firebase. Os E2E usam Firestore 8080; as Rules usam
-a configuração dedicada `firebase.rules-test.json` na porta 8081, de modo que uma
+separado porque instala/usa Chromium e sobe Auth, Firestore e Storage Emulator. Java
+21+ é obrigatório para os emuladores Firebase. Os E2E usam Firestore 8080 e Storage
+9199; as Rules usam a configuração dedicada nas portas 8081 e 9198, de modo que uma
 etapa não dependa do encerramento do processo da outra.
 
 ## Cobertura automatizada
@@ -44,6 +44,7 @@ etapa não dependa do encerramento do processo da outra.
 - opt-in local dos emuladores e fallbacks Safari;
 - calendários ordenados com ao menos uma data futura;
 - links Markdown locais válidos.
+- limites de 5 MiB/50 MiB alinhados entre UI, cliente, configuração e Storage Rules.
 
 ### Firestore Rules
 
@@ -55,6 +56,14 @@ etapa não dependa do encerramento do processo da outra.
 - nomes, cores, horários e dias inválidos negados;
 - documentos fora da allowlist negados;
 - leitura do proprietário permitida.
+- metadados de imagens limitados a dez itens válidos.
+
+### Storage Rules
+
+- acesso anônimo, cruzado e por provedor não Google negado;
+- imagens conhecidas de até 5 MiB aceitas;
+- arquivo maior, SVG e slot fora de 0–9 negados;
+- leitura e exclusão permitidas somente ao proprietário.
 
 ### Navegador E2E
 
@@ -65,6 +74,7 @@ etapa não dependa do encerramento do processo da outra.
 - criação fixa com início padrão próximo de “agora” e cor própria;
 - edição para recorrente, reordenação, toggle, reload e subscriptions;
 - reautenticação e exclusão integral da conta e dos dados conhecidos.
+- upload, associação, opacidades e remoção de imagem do card.
 
 Os E2E usam `demo-timekeeper` e só ativam emuladores com `?emulators=1` em
 localhost. Nenhum teste automatizado escreve no projeto Firebase de produção.
@@ -128,6 +138,16 @@ Viewports sugeridos: 320, 390, 768, 1024 e 1440 px.
 - O botão do header só aparece com ao menos um contador.
 - Ocultar/mostrar abre a seção com animação de acordeão.
 
+### Biblioteca de imagens
+
+- Arquivos acima de 5 MiB e tipos não permitidos são rejeitados antes do upload.
+- A décima primeira imagem é impedida e a quota mostra até 50 MiB.
+- A mesma imagem pode ser escolhida em mais de um contador.
+- Opacidades de imagem e sobreposição persistem em outra aba.
+- Remover do card preserva a imagem na biblioteca.
+- Excluir da biblioteca limpa todos os cards que a referenciam.
+- Excluir a conta remove os dez slots do Storage antes de apagar o usuário.
+
 ## Checklist visual
 
 - Header e cards mantêm contraste sobre todos os fundos.
@@ -135,7 +155,8 @@ Viewports sugeridos: 320, 390, 768, 1024 e 1440 px.
 - Em desktop, quatro/cinco permanecem na mesma linha.
 - Em mobile, todos viram uma coluna sem overflow X.
 - Sidebar não cria rolagem horizontal.
-- Modal cabe no viewport e campos recorrentes trocam sem salto abrupto.
+- Modais cabem no viewport; biblioteca e campos recorrentes não criam overflow.
+- Imagens usam `cover` e o texto mantém contraste em opacidades representativas.
 - Weather widgets não piscam branco durante a entrada.
 - Entrada da página e acordeão são suaves.
 - Anéis cronológicos não dão pop a cada segundo.

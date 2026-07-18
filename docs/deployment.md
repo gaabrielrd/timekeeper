@@ -10,9 +10,17 @@ todo deploy continua manual.
 
 - Firebase Hosting: conteúdo de `public/`.
 - Firestore Rules: `firestore.rules`.
+- Storage Rules: `storage.rules`.
 - Firestore Indexes: `firestore.indexes.json`, hoje vazio.
 
 O Hosting reescreve todas as rotas para `/index.html`.
+
+## Provisionamento do Storage
+
+O cliente aponta para o bucket existente `timekeeper-d9a0a.appspot.com` do
+projeto `timekeeper-d9a0a`. Ao provisioná-lo pela primeira vez, selecione `us-east1`;
+a localização do bucket não pode ser alterada depois. O código não cria nem move o
+bucket: provisionamento e deploy de rules continuam ações remotas explícitas.
 
 ## Pré-deploy
 
@@ -41,6 +49,7 @@ git diff --check
 - leitura e escrita de settings;
 - criar, editar, ordenar e excluir contadores;
 - limite de cinco no cliente e nas rules;
+- upload, reutilização, quota e exclusão de imagens;
 - atualização em duas abas;
 - desktop e Safari móvel;
 - fundos desligado, CSS e canvas;
@@ -65,10 +74,10 @@ Mudança apenas em conteúdo estático:
 firebase deploy --only hosting
 ```
 
-Mudança que também altera autorização ou contrato de contadores:
+Mudança que também altera autorização, contadores ou biblioteca de imagens:
 
 ```bash
-firebase deploy --only hosting,firestore:rules
+firebase deploy --only hosting,firestore:rules,storage
 ```
 
 Mudança de índices:
@@ -87,8 +96,9 @@ incompatível; mudanças retrocompatíveis nas rules podem ser publicadas primei
 2. Verifique no DevTools se `firebase.js` e `style.css` são a versão esperada.
 3. Faça login e confirme `0 / 5` ou a quantidade real.
 4. Modifique uma preferência e confira outra aba/dispositivo.
-5. Teste ao menos um fundo CSS e a constelação canvas.
-6. Monitore console, Firestore Usage e Authentication no Firebase Console.
+5. Envie uma imagem, reutilize-a em dois cards e confirme a quota.
+6. Teste ao menos um fundo CSS e a constelação canvas.
+7. Monitore console, Firestore/Storage Usage e Authentication no Firebase Console.
 
 ## Cache
 

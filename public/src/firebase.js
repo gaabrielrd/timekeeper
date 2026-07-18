@@ -18,7 +18,16 @@ import {
 	onSnapshot,
 	serverTimestamp,
 	setDoc,
+	writeBatch,
 } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
+import {
+	connectStorageEmulator,
+	deleteObject,
+	getDownloadURL,
+	getStorage,
+	ref,
+	uploadBytesResumable,
+} from "https://www.gstatic.com/firebasejs/12.16.0/firebase-storage.js";
 
 const useLocalEmulators =
 	["localhost", "127.0.0.1"].includes(window.location.hostname) &&
@@ -27,7 +36,7 @@ const firebaseConfig = {
 	apiKey: "AIzaSyBOLyOQ6-g3VqotQf7pCej4CAhVXvC0oYY",
 	authDomain: "timekeeper-d9a0a.firebaseapp.com",
 	projectId: "timekeeper-d9a0a",
-	storageBucket: "timekeeper-d9a0a.firebasestorage.app",
+	storageBucket: "timekeeper-d9a0a.appspot.com",
 	messagingSenderId: "190447151292",
 	appId: "1:190447151292:web:ccee2963c0e8eeb9f688b9",
 };
@@ -52,13 +61,25 @@ const DEFAULTS = {
 	customCounters: [],
 };
 const MAX_COUNTERS = 5;
+const MAX_IMAGES = 10;
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_USER_IMAGE_BYTES = MAX_IMAGES * MAX_IMAGE_BYTES;
+const ALLOWED_IMAGE_TYPES = new Set([
+	"image/jpeg",
+	"image/png",
+	"image/webp",
+	"image/gif",
+	"image/avif",
+]);
 const auth = getAuth(app);
 const db = getFirestore(app);
+const storage = getStorage(app);
 if (useLocalEmulators) {
 	connectAuthEmulator(auth, "http://127.0.0.1:9099", {
 		disableWarnings: true,
 	});
 	connectFirestoreEmulator(db, "127.0.0.1", 8080);
+	connectStorageEmulator(storage, "127.0.0.1", 9199);
 	document.body.dataset.emulators = "true";
 }
 const googleProvider = new GoogleAuthProvider();
@@ -105,8 +126,14 @@ const elements = {
 	counterDialogTitle: document.querySelector("#counter-dialog-title"),
 	counterDialogClose: document.querySelector("#counter-dialog-close"),
 	counterDialogCancel: document.querySelector("#counter-dialog-cancel"),
+	counterPreviewCard: document.querySelector("#counter-preview-card"),
+	counterPreviewImage: document.querySelector("#counter-preview-image"),
+	counterPreviewOverlay: document.querySelector("#counter-preview-overlay"),
+	counterPreviewTitle: document.querySelector("#counter-preview-title"),
+	counterPreviewPost: document.querySelector("#counter-preview-post"),
 	openCounterModal: document.querySelector("#open-counter-modal"),
 	openCounterModalLabel: document.querySelector("#open-counter-modal-label"),
+	openImageLibrary: document.querySelector("#open-image-library"),
 	counterList: document.querySelector("#counter-list"),
 	counterCount: document.querySelector("#counter-count"),
 	counterLiveState: document.querySelector("#counter-live-state"),
@@ -120,6 +147,35 @@ const elements = {
 	recurringScheduleFields: document.querySelector(
 		"#recurring-schedule-fields",
 	),
+	counterImageId: document.querySelector("#counter-image-id"),
+	counterImagePreview: document.querySelector("#counter-image-preview"),
+	counterImageName: document.querySelector("#counter-image-name"),
+	chooseCounterImage: document.querySelector("#choose-counter-image"),
+	removeCounterImage: document.querySelector("#remove-counter-image"),
+	counterImageOpacityControls: document.querySelector(
+		"#counter-image-opacity-controls",
+	),
+	counterImageOpacity: document.querySelector("#counter-image-opacity"),
+	counterImageOpacityOutput: document.querySelector(
+		"#counter-image-opacity-output",
+	),
+	counterOverlayOpacity: document.querySelector("#counter-overlay-opacity"),
+	counterOverlayOpacityOutput: document.querySelector(
+		"#counter-overlay-opacity-output",
+	),
+	imageLibraryDialog: document.querySelector("#image-library-dialog"),
+	imageLibraryClose: document.querySelector("#image-library-close"),
+	imageLibraryUsage: document.querySelector("#image-library-usage"),
+	imageLibraryCount: document.querySelector("#image-library-count"),
+	imageLibraryUsageBar: document.querySelector("#image-library-usage-bar"),
+	imageUploadDropzone: document.querySelector("#image-upload-dropzone"),
+	imageUploadInput: document.querySelector("#image-upload-input"),
+	imageUploadProgress: document.querySelector("#image-upload-progress"),
+	imageUploadLabel: document.querySelector("#image-upload-label"),
+	imageUploadProgressBar: document.querySelector("#image-upload-progress-bar"),
+	imageLibraryMessage: document.querySelector("#image-library-message"),
+	imageLibraryGrid: document.querySelector("#image-library-grid"),
+	imageLibraryEmpty: document.querySelector("#image-library-empty"),
 	customSection: document.querySelector("#custom-counters-section"),
 	customPanels: document.querySelector("#custom-panels"),
 	toast: document.querySelector("#app-toast"),
@@ -129,9 +185,16 @@ let currentUser = null;
 let userSettings = { ...DEFAULTS };
 let unsubscribeSettings = null;
 let unsubscribeCounters = null;
+let unsubscribeImages = null;
 let customProgressBars = [];
 let toastTimer = null;
 let editingCounterId = null;
+let userImages = [];
+let imageUrls = new Map();
+let imageLoadVersion = 0;
+let activeUploadTask = null;
+let librarySelectsCounter = false;
+let imageLibraryAvailable = true;
 
 function isHexColor(value) {
 	return /^#[0-9a-f]{6}$/i.test(value || "");
@@ -203,6 +266,396 @@ function settingsReference(userId) {
 
 function countersReference(userId) {
 	return doc(db, "users", userId, "data", "counters");
+}
+
+function imagesReference(userId) {
+	return doc(db, "users", userId, "data", "images");
+}
+
+function imageStorageReference(userId, slot) {
+	return ref(storage, `users/${userId}/counter-images/${slot}`);
+}
+
+function formatBytes(bytes) {
+	if (bytes < 1024) return `${bytes} B`;
+	if (bytes < 1024 * 1024) return `${Math.ceil(bytes / 1024)} KB`;
+	return `${new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 }).format(bytes / (1024 * 1024))} MB`;
+}
+
+function normalizeImage(image) {
+	if (!image || typeof image !== "object") return null;
+	const slot = Number(image.slot);
+	const size = Number(image.size);
+	const contentType = String(image.contentType || "");
+	const id = String(image.id || "").slice(0, 100);
+	const name = String(image.name || "").trim().slice(0, 120);
+	if (
+		!id ||
+		!name ||
+		!Number.isInteger(slot) ||
+		slot < 0 ||
+		slot >= MAX_IMAGES ||
+		!Number.isInteger(size) ||
+		size <= 0 ||
+		size > MAX_IMAGE_BYTES ||
+		!ALLOWED_IMAGE_TYPES.has(contentType)
+	) {
+		return null;
+	}
+	return {
+		id,
+		slot,
+		name,
+		size,
+		contentType,
+		createdAt:
+			typeof image.createdAt === "string"
+				? image.createdAt.slice(0, 40)
+				: new Date().toISOString(),
+	};
+}
+
+function normalizeImages(images) {
+	const seenIds = new Set();
+	const seenSlots = new Set();
+	return (Array.isArray(images) ? images : [])
+		.map(normalizeImage)
+		.filter((image) => {
+			if (!image || seenIds.has(image.id) || seenSlots.has(image.slot)) return false;
+			seenIds.add(image.id);
+			seenSlots.add(image.slot);
+			return true;
+		})
+		.sort((first, second) => first.slot - second.slot)
+		.slice(0, MAX_IMAGES);
+}
+
+function selectedImage() {
+	return userImages.find((image) => image.id === elements.counterImageId.value);
+}
+
+function updateCounterPreview() {
+	const name = elements.counterForm.elements.name.value.trim() || "Nome do contador";
+	const color = elements.counterColorEnabled.checked
+		? elements.counterColor.value
+		: userSettings.accentPrimary;
+	const image = selectedImage();
+	const imageUrl = image ? imageUrls.get(image.id) : "";
+	const imageOpacity = boundedNumber(
+		elements.counterImageOpacity.value,
+		0,
+		100,
+		100,
+	);
+	const overlayOpacity = boundedNumber(
+		elements.counterOverlayOpacity.value,
+		0,
+		100,
+		55,
+	);
+
+	elements.counterPreviewTitle.textContent = name;
+	elements.counterPreviewPost.textContent = `para ${name}.`;
+	elements.counterPreviewCard.style.setProperty("--counter-preview-accent", color);
+	elements.counterPreviewCard.classList.toggle("has-image", Boolean(imageUrl));
+	elements.counterPreviewImage.style.backgroundImage = imageUrl
+		? `url(${JSON.stringify(imageUrl)})`
+		: "";
+	elements.counterPreviewImage.style.opacity = imageUrl
+		? String(imageOpacity / 100)
+		: "0";
+	elements.counterPreviewOverlay.style.opacity = imageUrl
+		? String(overlayOpacity / 100)
+		: "0";
+}
+
+function setSelectedCounterImage(imageId = null) {
+	const requestedId =
+		typeof imageId === "string" && imageId.trim() ? imageId.trim() : "";
+	const image = userImages.find((item) => item.id === requestedId) || null;
+	const url = image ? imageUrls.get(image.id) : "";
+	elements.counterImageId.value = requestedId;
+	elements.counterImageName.textContent = image
+		? image.name
+		: requestedId
+			? "Imagem indisponível"
+			: "Sem imagem";
+	elements.counterImagePreview.classList.toggle("has-image", Boolean(url));
+	elements.counterImagePreview.style.backgroundImage = url
+		? `url(${JSON.stringify(url)})`
+		: "";
+	elements.removeCounterImage.disabled = !requestedId;
+	elements.counterImageOpacityControls.hidden = !requestedId;
+	updateCounterPreview();
+}
+
+function syncCounterOpacityOutputs() {
+	elements.counterImageOpacityOutput.textContent = `${elements.counterImageOpacity.value}%`;
+	elements.counterOverlayOpacityOutput.textContent = `${elements.counterOverlayOpacity.value}%`;
+	updateCounterPreview();
+}
+
+function renderImageLibrary() {
+	const usedBytes = userImages.reduce((total, image) => total + image.size, 0);
+	const usage = Math.min(100, (usedBytes / MAX_USER_IMAGE_BYTES) * 100);
+	elements.imageLibraryUsage.textContent = `${formatBytes(usedBytes)} de 50 MB usados`;
+	elements.imageLibraryCount.textContent = `${userImages.length} / ${MAX_IMAGES} imagens`;
+	elements.imageLibraryUsageBar.style.width = `${usage}%`;
+	elements.imageUploadInput.disabled =
+		!imageLibraryAvailable ||
+		Boolean(activeUploadTask) ||
+		userImages.length >= MAX_IMAGES;
+	elements.imageUploadDropzone.classList.toggle(
+		"is-disabled",
+		elements.imageUploadInput.disabled,
+	);
+	elements.imageLibraryEmpty.hidden = userImages.length > 0;
+	elements.imageLibraryGrid.replaceChildren();
+
+	userImages.forEach((image) => {
+		const item = document.createElement("article");
+		item.className = "library-image-item";
+		item.classList.toggle(
+			"is-selected",
+			image.id === elements.counterImageId.value,
+		);
+		const select = document.createElement("button");
+		select.type = "button";
+		select.className = "library-image-select";
+		select.disabled = !librarySelectsCounter;
+		select.setAttribute(
+			"aria-label",
+			librarySelectsCounter
+				? `Usar ${image.name} neste contador`
+				: `Imagem ${image.name}`,
+		);
+		const thumbnail = document.createElement("span");
+		thumbnail.className = "library-image-thumbnail";
+		const url = imageUrls.get(image.id);
+		if (url) {
+			const preview = document.createElement("img");
+			preview.src = url;
+			preview.alt = "";
+			preview.loading = "lazy";
+			thumbnail.append(preview);
+		} else {
+			const icon = document.createElement("i");
+			icon.className = "material-icons";
+			icon.textContent = "broken_image";
+			thumbnail.append(icon);
+		}
+		const copy = document.createElement("span");
+		copy.className = "library-image-copy";
+		const name = document.createElement("strong");
+		name.textContent = image.name;
+		const size = document.createElement("small");
+		size.textContent = formatBytes(image.size);
+		copy.append(name, size);
+		select.append(thumbnail, copy);
+		select.addEventListener("click", () => {
+			setSelectedCounterImage(image.id);
+			renderImageLibrary();
+			elements.imageLibraryDialog.close();
+		});
+		const remove = document.createElement("button");
+		remove.type = "button";
+		remove.className = "library-image-delete";
+		remove.title = `Excluir ${image.name}`;
+		remove.setAttribute("aria-label", `Excluir imagem ${image.name}`);
+		remove.innerHTML = '<i class="material-icons" aria-hidden="true">delete_outline</i>';
+		remove.addEventListener("click", () => deleteLibraryImage(image));
+		item.append(select, remove);
+		elements.imageLibraryGrid.append(item);
+	});
+}
+
+async function loadImageUrls(images, userId) {
+	const version = ++imageLoadVersion;
+	const entries = await Promise.all(
+		images.map(async (image) => {
+			try {
+				return [image.id, await getDownloadURL(imageStorageReference(userId, image.slot))];
+			} catch (error) {
+				console.error(`Falha ao carregar a imagem ${image.id}.`, error);
+				return [image.id, ""];
+			}
+		}),
+	);
+	if (version !== imageLoadVersion || currentUser?.uid !== userId) return;
+	imageUrls = new Map(entries.filter(([, url]) => url));
+	renderImageLibrary();
+	renderCustomCounters(userSettings.customCounters);
+	setSelectedCounterImage(elements.counterImageId.value || null);
+}
+
+function applyImages(images, userId) {
+	userImages = normalizeImages(images);
+	renderImageLibrary();
+	loadImageUrls(userImages, userId);
+}
+
+async function saveImages(images) {
+	if (!currentUser) return false;
+	try {
+		await setDoc(
+			imagesReference(currentUser.uid),
+			{ items: images.slice(0, MAX_IMAGES), updatedAt: serverTimestamp() },
+			{ merge: true },
+		);
+		return true;
+	} catch (error) {
+		console.error("Falha ao salvar biblioteca de imagens.", error);
+		showToast("Não foi possível sincronizar a biblioteca de imagens.");
+		return false;
+	}
+}
+
+function openImageLibrary(selectForCounter = false) {
+	if (!currentUser) return;
+	if (!imageLibraryAvailable) {
+		showToast("Publique as novas regras do Firebase para ativar a biblioteca.");
+		return;
+	}
+	librarySelectsCounter = selectForCounter;
+	elements.imageLibraryMessage.textContent = "";
+	renderImageLibrary();
+	if (!selectForCounter) closeSidebar();
+	elements.imageLibraryDialog.showModal();
+	window.requestAnimationFrame(() => elements.imageLibraryClose.focus());
+}
+
+function closeImageLibrary() {
+	if (elements.imageLibraryDialog.open) elements.imageLibraryDialog.close();
+}
+
+function setImageLibraryAvailability(isAvailable) {
+	imageLibraryAvailable = isAvailable;
+	elements.openImageLibrary.disabled = !isAvailable;
+	elements.chooseCounterImage.disabled = !isAvailable;
+	const message = isAvailable
+		? ""
+		: "A biblioteca aguarda a publicação das novas regras do Firebase.";
+	elements.openImageLibrary.title = message;
+	elements.chooseCounterImage.title = message;
+	renderImageLibrary();
+}
+
+function setUploadState(progress = null, label = "Enviando...") {
+	const isUploading = progress !== null;
+	elements.imageUploadProgress.hidden = !isUploading;
+	elements.imageUploadLabel.textContent = label;
+	elements.imageUploadProgressBar.value = progress || 0;
+	renderImageLibrary();
+}
+
+async function uploadLibraryImage(file) {
+	if (!currentUser || !file) return;
+	elements.imageLibraryMessage.textContent = "";
+	if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
+		elements.imageLibraryMessage.textContent = "Use uma imagem JPG, PNG, WebP, GIF ou AVIF.";
+		return;
+	}
+	if (!file.size || file.size > MAX_IMAGE_BYTES) {
+		elements.imageLibraryMessage.textContent = "A imagem precisa ter no máximo 5 MB.";
+		return;
+	}
+	const occupiedSlots = new Set(userImages.map((image) => image.slot));
+	const slot = Array.from({ length: MAX_IMAGES }, (_, index) => index).find(
+		(index) => !occupiedSlots.has(index),
+	);
+	if (slot === undefined) {
+		elements.imageLibraryMessage.textContent = "Sua biblioteca já possui 10 imagens.";
+		return;
+	}
+
+	const ownerId = currentUser.uid;
+	const image = {
+		id: createCounterId(),
+		slot,
+		name: file.name.slice(0, 120),
+		size: file.size,
+		contentType: file.type,
+		createdAt: new Date().toISOString(),
+	};
+	activeUploadTask = uploadBytesResumable(
+		imageStorageReference(ownerId, slot),
+		file,
+		{ contentType: file.type, customMetadata: { imageId: image.id } },
+	);
+	setUploadState(0);
+	try {
+		await new Promise((resolve, reject) => {
+			activeUploadTask.on(
+				"state_changed",
+				(snapshot) => {
+					const progress = Math.round(
+						(snapshot.bytesTransferred / snapshot.totalBytes) * 100,
+					);
+					setUploadState(progress, `Enviando ${progress}%`);
+				},
+				reject,
+				resolve,
+			);
+		});
+		if (currentUser?.uid !== ownerId) return;
+		const nextImages = [...userImages, image].sort(
+			(first, second) => first.slot - second.slot,
+		);
+		if (!(await saveImages(nextImages))) {
+			await deleteObject(imageStorageReference(ownerId, slot));
+			return;
+		}
+		elements.imageLibraryMessage.textContent = "Imagem adicionada à biblioteca.";
+	} catch (error) {
+		console.error("Falha no upload da imagem.", error);
+		elements.imageLibraryMessage.textContent =
+			"Não foi possível enviar a imagem. Verifique sua conexão e tente novamente.";
+	} finally {
+		activeUploadTask = null;
+		elements.imageUploadInput.value = "";
+		setUploadState(null);
+	}
+}
+
+async function deleteLibraryImage(image) {
+	if (!currentUser) return;
+	const affectedCounters = userSettings.customCounters.filter(
+		(counter) => counter.imageId === image.id,
+	).length;
+	const suffix = affectedCounters
+		? ` Ela será removida de ${affectedCounters} ${affectedCounters === 1 ? "contador" : "contadores"}.`
+		: "";
+	if (!window.confirm(`Excluir “${image.name}” da biblioteca?${suffix}`)) return;
+
+	const ownerId = currentUser.uid;
+	const nextImages = userImages.filter((item) => item.id !== image.id);
+	const nextCounters = userSettings.customCounters.map((counter) =>
+		counter.imageId === image.id ? withoutCounterImage(counter) : counter,
+	);
+	try {
+		const batch = writeBatch(db);
+		batch.set(imagesReference(ownerId), {
+			items: nextImages,
+			updatedAt: serverTimestamp(),
+		});
+		if (affectedCounters) {
+			batch.set(countersReference(ownerId), {
+				items: nextCounters,
+				updatedAt: serverTimestamp(),
+			});
+		}
+		await batch.commit();
+		try {
+			await deleteObject(imageStorageReference(ownerId, image.slot));
+		} catch (error) {
+			if (error.code !== "storage/object-not-found") throw error;
+		}
+		if (elements.counterImageId.value === image.id) setSelectedCounterImage();
+		showToast("Imagem excluída da biblioteca.");
+	} catch (error) {
+		console.error("Falha ao excluir imagem.", error);
+		showToast("Não foi possível excluir a imagem.");
+	}
 }
 
 function applyAccents(primary, secondary) {
@@ -647,12 +1100,22 @@ async function saveCounters(counters) {
 		await setDoc(
 			countersReference(currentUser.uid),
 			{ items: counters.slice(0, MAX_COUNTERS), updatedAt: serverTimestamp() },
-			{ merge: true },
 		);
 		setCounterState("Ao vivo", "live");
 		return true;
 	} catch (error) {
 		console.error("Falha ao salvar contadores.", error);
+		console.table(
+			counters.map((counter, index) => ({
+				index,
+				type: counter.type,
+				fields: Object.keys(counter).sort().join(", "),
+				imageIdType: typeof counter.imageId,
+				imageIdLength: counter.imageId?.length,
+				imageOpacity: counter.imageOpacity,
+				overlayOpacity: counter.overlayOpacity,
+			})),
+		);
 		setCounterState("Erro de conexão", "error");
 		showToast("Não foi possível sincronizar os contadores.");
 		return false;
@@ -688,6 +1151,21 @@ function createCustomPanel(counter, index) {
 		"--counter-color",
 		counter.color || "var(--accent)",
 	);
+	const imageUrl = counter.imageId ? imageUrls.get(counter.imageId) : "";
+	if (imageUrl) {
+		const media = document.createElement("div");
+		media.className = "counter-card-media";
+		media.setAttribute("aria-hidden", "true");
+		const image = document.createElement("div");
+		image.className = "counter-card-image";
+		image.style.backgroundImage = `url(${JSON.stringify(imageUrl)})`;
+		image.style.opacity = String(counter.imageOpacity / 100);
+		const overlay = document.createElement("div");
+		overlay.className = "counter-card-overlay";
+		overlay.style.opacity = String(counter.overlayOpacity / 100);
+		media.append(image, overlay);
+		panel.append(media);
+	}
 
 	const top = document.createElement("div");
 	top.className = "panel-top";
@@ -698,6 +1176,19 @@ function createCustomPanel(counter, index) {
 	title.className = "panel-title";
 	title.textContent = counter.name;
 	top.append(panelIndex, title);
+	if (counter.imageId) {
+		const removeImage = document.createElement("button");
+		removeImage.type = "button";
+		removeImage.className = "counter-card-image-remove";
+		removeImage.title = `Remover imagem de ${counter.name}`;
+		removeImage.setAttribute(
+			"aria-label",
+			`Remover imagem do contador ${counter.name}`,
+		);
+		removeImage.innerHTML = '<i class="material-icons" aria-hidden="true">close</i>';
+		removeImage.addEventListener("click", () => removeImageFromCounter(counter));
+		top.append(removeImage);
+	}
 
 	const pre = document.createElement("p");
 	pre.className = "panel-pre";
@@ -903,6 +1394,19 @@ function normalizeCounter(counter) {
 				? counter.createdAt.slice(0, 40)
 				: new Date().toISOString(),
 	};
+	const imageId =
+		typeof counter.imageId === "string" && counter.imageId.trim()
+			? counter.imageId.trim().slice(0, 100)
+			: null;
+	if (imageId) {
+		normalized.imageId = imageId;
+		normalized.imageOpacity = Math.round(
+			boundedNumber(counter.imageOpacity, 0, 100, 100),
+		);
+		normalized.overlayOpacity = Math.round(
+			boundedNumber(counter.overlayOpacity, 0, 100, 55),
+		);
+	}
 	if (type === "recurring") {
 		const startTime = String(counter.startTime || "");
 		const endTime = String(counter.endTime || "");
@@ -965,36 +1469,55 @@ function applyCounters(counters) {
 function unsubscribeUserData() {
 	unsubscribeSettings?.();
 	unsubscribeCounters?.();
+	unsubscribeImages?.();
 	unsubscribeSettings = null;
 	unsubscribeCounters = null;
+	unsubscribeImages = null;
+	imageLoadVersion += 1;
+}
+
+async function accountDataOperation(label, operation) {
+	try {
+		return await operation();
+	} catch (error) {
+		error.accountOperation = label;
+		console.error(`Falha na operação Firebase: ${label}.`, error);
+		throw error;
+	}
 }
 
 async function ensureUserData(user) {
 	const profileReference = doc(db, "users", user.uid);
 	const settingsDoc = settingsReference(user.uid);
 	const countersDoc = countersReference(user.uid);
-	const [legacySnapshot, settingsSnapshot, countersSnapshot] =
-		await Promise.all([
+	const imagesDoc = imagesReference(user.uid);
+	const [legacySnapshot, settingsSnapshot, countersSnapshot] = await Promise.all([
+		accountDataOperation(`ler users/${user.uid}`, () =>
 			getDoc(profileReference),
-			getDoc(settingsDoc),
-			getDoc(countersDoc),
-		]);
-	const legacy = legacySnapshot.exists() ? legacySnapshot.data() : {};
-	const writes = [
-		setDoc(
-			profileReference,
-			{
-				displayName: user.displayName || "",
-				email: user.email || "",
-				photoURL: user.photoURL || "",
-				updatedAt: serverTimestamp(),
-			},
-			{ merge: true },
 		),
-	];
+		accountDataOperation(`ler users/${user.uid}/data/settings`, () =>
+			getDoc(settingsDoc),
+		),
+		accountDataOperation(`ler users/${user.uid}/data/counters`, () =>
+			getDoc(countersDoc),
+		),
+	]);
+	let imagesSnapshot = null;
+	let imagesAvailable = true;
+	try {
+		imagesSnapshot = await accountDataOperation(
+			`ler users/${user.uid}/data/images`,
+			() => getDoc(imagesDoc),
+		);
+	} catch (error) {
+		if (error.code !== "permission-denied") throw error;
+		imagesAvailable = false;
+	}
+	const legacy = legacySnapshot.exists() ? legacySnapshot.data() : {};
 	if (!settingsSnapshot.exists()) {
-		writes.push(
-			setDoc(settingsDoc, {
+		await accountDataOperation(
+			`criar users/${user.uid}/data/settings`,
+			() => setDoc(settingsDoc, {
 				endHour: legacy.endHour ?? DEFAULTS.endHour,
 				endMinutes: legacy.endMinutes ?? DEFAULTS.endMinutes,
 				accentPrimary: isHexColor(legacy.accentPrimary)
@@ -1034,30 +1557,59 @@ async function ensureUserData(user) {
 		);
 	}
 	if (!countersSnapshot.exists()) {
-		writes.push(
-			setDoc(countersDoc, {
+		await accountDataOperation(
+			`criar users/${user.uid}/data/counters`,
+			() => setDoc(countersDoc, {
 				items: normalizeCounters(legacy.customCounters),
 				updatedAt: serverTimestamp(),
 			}),
 		);
 	}
-	await Promise.all(writes);
+	await accountDataOperation(`normalizar users/${user.uid}`, () =>
+		setDoc(profileReference, {
+			displayName: user.displayName || "",
+			email: user.email || "",
+			photoURL: user.photoURL || "",
+			updatedAt: serverTimestamp(),
+		}),
+	);
+	if (imagesAvailable && !imagesSnapshot.exists()) {
+		try {
+			await accountDataOperation(
+				`criar users/${user.uid}/data/images`,
+				() => setDoc(imagesDoc, {
+					items: [],
+					updatedAt: serverTimestamp(),
+				}),
+			);
+		} catch (error) {
+			if (error.code !== "permission-denied") throw error;
+			imagesAvailable = false;
+		}
+	}
+	return imagesAvailable;
 }
 
 async function subscribeToUserData(user) {
 	unsubscribeUserData();
 	setSaveState("Conectando...", true);
 	setCounterState("Conectando...", "connecting");
+	let imagesAvailable;
 	try {
-		await ensureUserData(user);
+		imagesAvailable = await ensureUserData(user);
 	} catch (error) {
 		console.error("Falha ao preparar dados da conta.", error);
 		setSaveState("Erro de conexão");
 		setCounterState("Erro de conexão", "error");
-		showToast("Não foi possível preparar os dados da conta.");
+		showToast(
+			error.accountOperation
+				? `Permissão negada ao ${error.accountOperation}.`
+				: "Não foi possível preparar os dados da conta.",
+		);
 		return;
 	}
 	if (currentUser?.uid !== user.uid) return;
+	setImageLibraryAvailability(imagesAvailable);
 
 	unsubscribeSettings = onSnapshot(
 		settingsReference(user.uid),
@@ -1083,6 +1635,23 @@ async function subscribeToUserData(user) {
 			showToast("Não foi possível atualizar os contadores em tempo real.");
 		},
 	);
+	if (!imagesAvailable) {
+		applyImages([], user.uid);
+		return;
+	}
+	unsubscribeImages = onSnapshot(
+		imagesReference(user.uid),
+		(snapshot) => {
+			applyImages(snapshot.exists() ? snapshot.data().items : [], user.uid);
+		},
+		(error) => {
+			console.error("Falha ao acompanhar biblioteca de imagens.", error);
+			if (error.code === "permission-denied") {
+				setImageLibraryAvailability(false);
+			}
+			showToast("Não foi possível atualizar a biblioteca de imagens.");
+		},
+	);
 }
 
 async function deleteCounter(counter) {
@@ -1090,6 +1659,29 @@ async function deleteCounter(counter) {
 	const previousCounters = userSettings.customCounters;
 	const nextCounters = userSettings.customCounters.filter(
 		(item) => item.id !== counter.id,
+	);
+	userSettings.customCounters = nextCounters;
+	renderCustomCounters(nextCounters);
+	if (!(await saveCounters(nextCounters))) {
+		userSettings.customCounters = previousCounters;
+		renderCustomCounters(previousCounters);
+	}
+}
+
+function withoutCounterImage(counter) {
+	const {
+		imageId: _imageId,
+		imageOpacity: _imageOpacity,
+		overlayOpacity: _overlayOpacity,
+		...counterWithoutImage
+	} = counter;
+	return counterWithoutImage;
+}
+
+async function removeImageFromCounter(counter) {
+	const previousCounters = userSettings.customCounters;
+	const nextCounters = previousCounters.map((item) =>
+		item.id === counter.id ? withoutCounterImage(item) : item,
 	);
 	userSettings.customCounters = nextCounters;
 	renderCustomCounters(nextCounters);
@@ -1127,6 +1719,7 @@ function closeCounterDialog() {
 	editingCounterId = null;
 	elements.counterForm.reset();
 	elements.counterColor.disabled = true;
+	setSelectedCounterImage();
 	elements.counterMessage.textContent = "";
 }
 
@@ -1181,6 +1774,10 @@ function openCounterDialog(counter = null) {
 	elements.counterColorEnabled.checked = Boolean(counter?.color);
 	elements.counterColor.disabled = !counter?.color;
 	elements.counterColor.value = counter?.color || userSettings.accentPrimary;
+	elements.counterImageOpacity.value = String(counter?.imageOpacity ?? 100);
+	elements.counterOverlayOpacity.value = String(counter?.overlayOpacity ?? 55);
+	syncCounterOpacityOutputs();
+	setSelectedCounterImage(counter?.imageId || null);
 	elements.counterDialog.showModal();
 	elements.counterForm.elements.name.focus();
 }
@@ -1201,6 +1798,21 @@ elements.authButton.addEventListener("click", async () => {
 elements.sidebarBackdrop.addEventListener("click", closeSidebar);
 elements.sidebarClose.addEventListener("click", closeSidebar);
 elements.openCounterModal.addEventListener("click", () => openCounterDialog());
+elements.openImageLibrary.addEventListener("click", () => openImageLibrary());
+elements.chooseCounterImage.addEventListener("click", () =>
+	openImageLibrary(true),
+);
+elements.removeCounterImage.addEventListener("click", () => {
+	setSelectedCounterImage();
+	renderImageLibrary();
+});
+elements.imageLibraryClose.addEventListener("click", closeImageLibrary);
+elements.imageLibraryDialog.addEventListener("click", (event) => {
+	if (event.target === elements.imageLibraryDialog) closeImageLibrary();
+});
+elements.imageUploadInput.addEventListener("change", () => {
+	uploadLibraryImage(elements.imageUploadInput.files?.[0]);
+});
 elements.counterDialogClose.addEventListener("click", closeCounterDialog);
 elements.counterDialogCancel.addEventListener("click", closeCounterDialog);
 elements.counterDialog.addEventListener("click", (event) => {
@@ -1210,6 +1822,7 @@ elements.counterDialog.addEventListener("close", () => {
 	editingCounterId = null;
 	elements.counterForm.reset();
 	elements.counterColor.disabled = true;
+	setSelectedCounterImage();
 	elements.counterMessage.textContent = "";
 });
 elements.customVisibilityButton.addEventListener("click", async () => {
@@ -1232,7 +1845,7 @@ elements.signOutButton.addEventListener("click", async () => {
 elements.deleteAccountButton.addEventListener("click", async () => {
 	if (!currentUser) return;
 	const confirmed = window.confirm(
-		"Excluir permanentemente sua conta, configurações e contadores? Esta ação não pode ser desfeita.",
+		"Excluir permanentemente sua conta, configurações, contadores e imagens? Esta ação não pode ser desfeita.",
 	);
 	if (!confirmed) return;
 
@@ -1240,10 +1853,21 @@ elements.deleteAccountButton.addEventListener("click", async () => {
 	elements.deleteAccountButton.disabled = true;
 	try {
 		await reauthenticateWithPopup(userToDelete, googleProvider);
+		activeUploadTask?.cancel();
+		await Promise.all(
+			Array.from({ length: MAX_IMAGES }, async (_, slot) => {
+				try {
+					await deleteObject(imageStorageReference(userToDelete.uid, slot));
+				} catch (error) {
+					if (error.code !== "storage/object-not-found") throw error;
+				}
+			}),
+		);
 		const userRef = doc(db, "users", userToDelete.uid);
 		await Promise.all([
 			deleteDoc(doc(db, "users", userToDelete.uid, "data", "settings")),
 			deleteDoc(doc(db, "users", userToDelete.uid, "data", "counters")),
+			deleteDoc(doc(db, "users", userToDelete.uid, "data", "images")),
 		]);
 		await deleteDoc(userRef);
 		await deleteUser(userToDelete);
@@ -1251,13 +1875,23 @@ elements.deleteAccountButton.addEventListener("click", async () => {
 		showToast("Conta e dados excluídos permanentemente.");
 	} catch (error) {
 		console.error("Falha ao excluir a conta.", error);
-		showToast(friendlyAuthError(error));
+		showToast(
+			error.code?.startsWith("auth/")
+				? friendlyAuthError(error)
+				: "Não foi possível excluir todos os dados da conta.",
+		);
 	} finally {
 		elements.deleteAccountButton.disabled = false;
 	}
 });
 document.addEventListener("keydown", (event) => {
-	if (event.key === "Escape" && !elements.counterDialog.open) closeSidebar();
+	if (
+		event.key === "Escape" &&
+		!elements.counterDialog.open &&
+		!elements.imageLibraryDialog.open
+	) {
+		closeSidebar();
+	}
 });
 
 elements.hour.addEventListener("change", () => {
@@ -1321,10 +1955,19 @@ elements.counterColorEnabled.addEventListener("change", () => {
 	if (!elements.counterColorEnabled.checked) {
 		elements.counterColor.value = userSettings.accentPrimary;
 	}
+	updateCounterPreview();
 });
+elements.counterColor.addEventListener("input", updateCounterPreview);
+elements.counterForm.elements.name.addEventListener("input", updateCounterPreview);
 elements.counterType.addEventListener("change", () => {
 	setCounterType(elements.counterType.value);
 });
+for (const input of [
+	elements.counterImageOpacity,
+	elements.counterOverlayOpacity,
+]) {
+	input.addEventListener("input", syncCounterOpacityOutputs);
+}
 
 elements.counterForm.addEventListener("submit", async (event) => {
 	event.preventDefault();
@@ -1385,6 +2028,10 @@ elements.counterForm.addEventListener("submit", async (event) => {
 		elements.counterMessage.textContent = "Este contador não está mais disponível.";
 		return;
 	}
+	const requestedImageId = String(data.get("imageId") || "");
+	const imageId = userImages.some((image) => image.id === requestedImageId)
+		? requestedImageId
+		: null;
 	const counter = {
 		id: existingCounter?.id || createCounterId(),
 		name,
@@ -1392,6 +2039,15 @@ elements.counterForm.addEventListener("submit", async (event) => {
 		color: data.get("colorEnabled") ? String(data.get("color")) : null,
 		createdAt: existingCounter?.createdAt || new Date().toISOString(),
 	};
+	if (imageId) {
+		counter.imageId = imageId;
+		counter.imageOpacity = Math.round(
+			boundedNumber(data.get("imageOpacity"), 0, 100, 100),
+		);
+		counter.overlayOpacity = Math.round(
+			boundedNumber(data.get("overlayOpacity"), 0, 100, 55),
+		);
+	}
 	const nextCounters = existingCounter
 		? userSettings.customCounters.map((item) =>
 				item.id === existingCounter.id ? counter : item,
@@ -1419,7 +2075,14 @@ onAuthStateChanged(auth, (user) => {
 		return;
 	}
 	unsubscribeUserData();
+	activeUploadTask?.cancel();
+	activeUploadTask = null;
+	closeImageLibrary();
 	closeSidebar();
+	userImages = [];
+	imageUrls = new Map();
+	setImageLibraryAvailability(true);
+	renderImageLibrary();
 	applySettings({ ...DEFAULTS, ...guestTimeSettings() });
 	applyCounters([]);
 });

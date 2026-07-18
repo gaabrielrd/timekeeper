@@ -62,8 +62,16 @@ animado aparecer.
 ### Sidebar e modal
 
 A sidebar ocupa o lado direito, bloqueia interação externa via backdrop/`inert` e
-contém rotina, contadores e aparência, nesta ordem. O modal nativo `<dialog>` reúne
-criação e edição e troca os campos conforme o tipo.
+contém rotina, contadores, aparência e ações da conta no mesmo fluxo rolável. Sair
+precede excluir conta, que encerra o conteúdo. Um `<dialog>` reúne criação e
+edição com uma prévia compacta que reage a nome, cor, imagem e opacidades; outro
+apresenta upload, quota e biblioteca de imagens em uma grade compacta. A seleção de
+imagem no editor usa miniatura e ações por ícone para preservar espaço vertical.
+
+Imagens pessoais usam `cover` para ocupar todo o card. A camada de imagem e a
+sobreposição na cor da superfície têm opacidades independentes; conteúdo temporal e
+barra de progresso permanecem acima de ambas. O botão de remoção aparece no hover ou
+foco e fica sempre disponível em telas de toque.
 
 ## Fundos animados
 
@@ -134,6 +142,5 @@ Cuidados futuros:
 3. Zero, três, quatro e cinco contadores pessoais.
 4. Desktop, tablet e iPhone/Safari.
 5. Sidebar aberta sem overflow X.
-6. Modal fixo e recorrente com teclado.
+6. Modais de contador e biblioteca com teclado, upload e remoção.
 7. Reduced motion ativo.
-

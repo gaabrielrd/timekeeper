@@ -91,7 +91,20 @@ service cloud.firestore {
           || (counter.createdAt is string && counter.createdAt.size() <= 40))
         && (!('color' in counter)
           || counter.color == null
-          || isHexColor(counter.color));
+          || isHexColor(counter.color))
+        && (!('imageId' in counter)
+          || counter.imageId == null
+          || (counter.imageId is string
+            && counter.imageId.size() > 0
+            && counter.imageId.size() <= 100))
+        && (!('imageOpacity' in counter)
+          || (counter.imageOpacity is number
+            && counter.imageOpacity >= 0
+            && counter.imageOpacity <= 100))
+        && (!('overlayOpacity' in counter)
+          || (counter.overlayOpacity is number
+            && counter.overlayOpacity >= 0
+            && counter.overlayOpacity <= 100));
     }
 
     function isValidFixedCounter(counter) {
@@ -102,7 +115,10 @@ service cloud.firestore {
           'startAtMs',
           'endAtMs',
           'color',
-          'createdAt'
+          'createdAt',
+          'imageId',
+          'imageOpacity',
+          'overlayOpacity'
         ])
         && (!('type' in counter) || counter.type == 'fixed')
         && counter.startAtMs is int
@@ -139,7 +155,10 @@ service cloud.firestore {
           'endTime',
           'daysOfWeek',
           'color',
-          'createdAt'
+          'createdAt',
+          'imageId',
+          'imageOpacity',
+          'overlayOpacity'
         ])
         && counter.type == 'recurring'
         && counter.startTime is string
@@ -193,6 +212,64 @@ service cloud.firestore {
         && hasValidUpdatedAt(data);
     }
 
+    function isValidImageItem(image) {
+      return image is map
+        && image.keys().hasOnly([
+          'id',
+          'slot',
+          'name',
+          'size',
+          'contentType',
+          'createdAt'
+        ])
+        && image.id is string
+        && image.id.size() > 0
+        && image.id.size() <= 100
+        && image.slot is int
+        && image.slot >= 0
+        && image.slot <= 9
+        && image.name is string
+        && image.name.size() > 0
+        && image.name.size() <= 120
+        && image.size is int
+        && image.size > 0
+        && image.size <= 5 * 1024 * 1024
+        && image.contentType in [
+          'image/jpeg',
+          'image/png',
+          'image/webp',
+          'image/gif',
+          'image/avif'
+        ]
+        && image.createdAt is string
+        && image.createdAt.size() <= 40;
+    }
+
+    function isValidImageAt(items, index) {
+      return items.size() <= index ? true : isValidImageItem(items[index]);
+    }
+
+    function hasValidImageItems(items) {
+      return items is list
+        && items.size() <= 10
+        && isValidImageAt(items, 0)
+        && isValidImageAt(items, 1)
+        && isValidImageAt(items, 2)
+        && isValidImageAt(items, 3)
+        && isValidImageAt(items, 4)
+        && isValidImageAt(items, 5)
+        && isValidImageAt(items, 6)
+        && isValidImageAt(items, 7)
+        && isValidImageAt(items, 8)
+        && isValidImageAt(items, 9);
+    }
+
+    function isValidImagesDocument(data) {
+      return data.keys().hasOnly(['items', 'updatedAt'])
+        && hasValidImageItems(data.items)
+        && hasValidUpdatedAt(data);
+    }
+
     match /users/{userId} {
       allow read, delete: if isGoogleOwner(userId);
       allow create, update: if isGoogleOwner(userId)
@@ -200,14 +277,18 @@ service cloud.firestore {
 
       match /data/{documentId} {
         function isAllowedDocument() {
-          return documentId == 'settings' || documentId == 'counters';
+          return documentId == 'settings'
+            || documentId == 'counters'
+            || documentId == 'images';
         }
 
         function isValidDocument() {
           return (documentId == 'settings'
               && isValidSettingsDocument(request.resource.data))
             || (documentId == 'counters'
-              && isValidCountersDocument(request.resource.data));
+              && isValidCountersDocument(request.resource.data))
+            || (documentId == 'images'
+              && isValidImagesDocument(request.resource.data));
         }
 
         allow read, delete: if isGoogleOwner(userId) && isAllowedDocument();

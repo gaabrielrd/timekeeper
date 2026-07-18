@@ -28,7 +28,8 @@ Entra somente com uma conta Google. Além do uso básico, pode:
 - ordenar, editar, excluir, mostrar ou ocultar seus contadores;
 - configurar expediente na sidebar;
 - alterar duas cores de destaque;
-- ativar e configurar fundos animados.
+- ativar e configurar fundos animados;
+- enviar e reutilizar imagens de fundo nos contadores pessoais.
 
 Configurações e contadores são sincronizados em tempo real pelo Firestore.
 
@@ -79,6 +80,11 @@ Ambos podem ter uma cor própria. Sem cor, usam o destaque principal da interfac
 - A seção abre/fecha como acordeão e a preferência é sincronizada.
 - Operações de exclusão e ordenação atualizam a UI primeiro e fazem rollback se o
   Firestore rejeitar a escrita.
+- Cada card pode usar uma imagem da biblioteca, com opacidade da imagem e da
+  sobreposição ajustáveis separadamente.
+- A imagem pode ser removida no editor ou diretamente pelo botão do card.
+- A biblioteca aceita até dez arquivos de 5 MiB; excluir um remove seu uso em todos
+  os contadores sem excluir os próprios contadores.
 
 ## Aparência
 

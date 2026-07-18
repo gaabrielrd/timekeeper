@@ -13,7 +13,9 @@ real com Firebase.
 - Até cinco contadores pessoais por conta.
 - Contadores de período fixo ou eventos recorrentes por dias da semana.
 - Criação e edição em modal, exclusão e ordenação por botões.
-- Sincronização ao vivo de configurações e contadores com Firestore.
+- Biblioteca privada com até dez imagens reutilizáveis nos contadores pessoais.
+- Opacidade independente da imagem e da sobreposição do card.
+- Sincronização ao vivo de configurações, contadores e biblioteca com Firestore.
 - Duas cores de destaque e sete fundos animados personalizáveis.
 - Layout responsivo, tela cheia e respeito a `prefers-reduced-motion`.
 - Widgets de previsão do tempo para Indaial, Maringá e São Paulo.
@@ -30,6 +32,7 @@ Navegador
 ├── contadores padrão e cookies locais
 ├── Firebase Authentication (Google)
 ├── Cloud Firestore (dados em tempo real)
+├── Cloud Storage (imagens privadas dos contadores)
 └── serviços externos (Adobe Fonts, WeatherWidget e Google Analytics)
 ```
 
@@ -46,14 +49,14 @@ Na raiz do projeto:
 
 ```bash
 npm ci
-firebase emulators:start --only hosting,firestore,auth --project demo-timekeeper
+firebase emulators:start --only hosting,firestore,auth,storage --project demo-timekeeper
 ```
 
 Para uma inspeção rápida somente da interface estática, qualquer servidor HTTP
 local também funciona. Abrir `public/index.html` diretamente como `file://` não é
 recomendado, pois módulos ES e integrações remotas dependem de uma origem HTTP.
 
-Abra `http://127.0.0.1:5000/?emulators=1`. O parâmetro ativa Auth e Firestore locais
+Abra `http://127.0.0.1:5000/?emulators=1`. O parâmetro ativa Auth, Firestore e Storage locais
 somente em `localhost`/`127.0.0.1`; sem ele, o cliente continua usando o Firebase
 configurado. Veja [Desenvolvimento](docs/development.md).
 
@@ -66,19 +69,20 @@ configurado. Veja [Desenvolvimento](docs/development.md).
 │   ├── privacy.html           # Política e controles de privacidade
 │   ├── 404.html               # Página 404 padrão do Firebase
 │   └── src/
-│       ├── firebase.js        # Auth, Firestore, contadores pessoais e fundos
+│       ├── firebase.js        # Auth, Firestore, Storage, contadores e fundos
 │       ├── analytics.js       # Consentimento e carregamento opcional de métricas
 │       ├── time.js            # Cálculos temporais compartilhados e testáveis
 │       ├── data.js            # Datas anuais de pagamentos e feriados
 │       ├── style.css          # Design system, layout, responsividade e animações
 │       └── *.min.js / assets  # Bibliotecas e recursos locais
 ├── docs/                      # Documentação detalhada
-├── tests/                     # Testes unitários, contratos e Firestore Rules
+├── tests/                     # Testes unitários, contratos e Firebase Rules
 ├── .github/workflows/ci.yml   # CI para pushes e pull requests
 ├── package.json               # Ferramentas de teste; não participa do runtime
 ├── firebase.json              # Hosting, regras e índices
-├── firebase.rules-test.json   # Firestore Emulator isolado para testes de Rules
+├── firebase.rules-test.json   # Emuladores isolados para testes de Rules
 ├── firestore.rules            # Autorização e limite de contadores
+├── storage.rules              # Imagens privadas, tipos, slots e limites
 ├── firestore.indexes.json     # Índices do Firestore
 └── .firebaserc                # Projeto Firebase padrão
 ```
@@ -87,15 +91,15 @@ configurado. Veja [Desenvolvimento](docs/development.md).
 
 O projeto configurado em `.firebaserc` é `timekeeper-d9a0a`. Para usar outro
 projeto, crie-o no Firebase, ative Google como provedor de Authentication, crie o
-Firestore e altere:
+Firestore, provisione o Storage na região desejada e altere:
 
 1. o alias em `.firebaserc`;
 2. o objeto passado a `initializeApp` em `public/src/firebase.js`;
 3. os domínios autorizados no Firebase Authentication.
 
 A chave de API presente no frontend identifica o projeto e não é tratada como
-segredo. A proteção dos dados depende das regras do Firestore e do provedor de
-autenticação. Consulte [Segurança](docs/security.md).
+segredo. A proteção dos dados depende das regras do Firestore e do Storage, além do
+provedor de autenticação. Consulte [Segurança](docs/security.md).
 
 ## Validação e publicação
 
@@ -106,7 +110,7 @@ npm ci
 npm run check
 npm run test:e2e
 npm run test:rules
-firebase deploy --only hosting,firestore:rules
+firebase deploy --only hosting,firestore:rules,storage
 ```
 
 Faça também o checklist manual descrito em [Testes](docs/testing.md), incluindo

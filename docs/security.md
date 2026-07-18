@@ -4,7 +4,7 @@
 
 Todo código no navegador e todos os campos enviados pelo cliente são não confiáveis.
 O usuário pode alterar JavaScript, requests e payloads. A fronteira de autorização
-é `firestore.rules` em conjunto com Firebase Authentication.
+é formada por `firestore.rules`, `storage.rules` e Firebase Authentication.
 
 ## Autenticação
 
@@ -26,11 +26,18 @@ Para `/users/{userId}`:
 
 Para `/users/{userId}/data/{documentId}`:
 
-- apenas `settings` e `counters` são permitidos;
+- apenas `settings`, `counters` e `images` são permitidos;
 - somente o dono Google pode ler/escrever/excluir;
 - settings validam allowlist, tipos, cores, estilos e ranges;
 - counters validam allowlist, limite cinco e schemas fixo/recorrente;
 - nomes, IDs, cores, horários e dias recebem validação de formato/range.
+
+Para `/users/{userId}/counter-images/{slot}` no Cloud Storage:
+
+- somente o dono autenticado com Google pode ler, enviar ou excluir;
+- apenas slots `0` a `9` são aceitos;
+- cada objeto aceita tipos de imagem conhecidos e no máximo 5 MiB;
+- dez slots tornam impossível exceder 50 MiB por usuário pelas APIs do Storage.
 
 Não existem leituras públicas ou queries de coleção autorizadas.
 
@@ -53,8 +60,8 @@ usuários. O cliente valida ordem de datas e normaliza dias antes da escrita.
 3. Criar alertas de orçamento/uso no projeto Firebase.
 4. Validar periodicamente Auth e exclusão de conta em Safari/iPhone real.
 
-As rules possuem nove testes no Firestore Emulator e rodam na CI. Os fluxos Google
-OAuth emulado, CRUD, reordenação, persistência e exclusão de conta também rodam em
+As Rules de Firestore e Storage são testadas nos emuladores e rodam na CI. Os fluxos
+Google OAuth emulado, CRUD, upload, persistência e exclusão de conta também rodam em
 E2E Chromium desktop/mobile.
 
 ## Dependências de desenvolvimento
@@ -93,10 +100,10 @@ fazem sanitização.
   navegador; contadores e horários pessoais não são enviados pelo código do app.
 - WeatherWidget.io recebe requests do navegador e localização selecionada no link.
 - Adobe Typekit e Firebase CDN recebem requests de assets.
-- Firebase armazena email, nome e URL da foto no perfil do usuário.
+- Firebase armazena email, nome, URL da foto e imagens enviadas pelo usuário.
 
 `public/privacy.html` documenta essas finalidades. Os cookies de expediente são
-funcionais; Analytics é opcional e separado. A conta e os três documentos conhecidos
+funcionais; Analytics é opcional e separado. A conta, os três documentos operacionais e as imagens
 podem ser apagados pelo usuário após reautenticação Google no menu da conta.
 
 ## Resposta a incidente
