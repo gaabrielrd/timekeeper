@@ -46,9 +46,11 @@ O cliente conecta aos emuladores somente quando duas condições são verdadeira
 1. hostname é `localhost` ou `127.0.0.1`;
 2. a URL contém `?emulators=1`.
 
-As portas versionadas são Hosting 5000, Auth 9099, Firestore 8080 e UI 4000. Sem o
-parâmetro, mesmo em localhost, o SDK usa o projeto configurado; confira a URL antes
-de criar dados de teste.
+As portas versionadas do app são Hosting 5000, Auth 9099, Firestore 8080 e UI 4000.
+A suíte isolada de Rules usa Firestore 8081 por meio de
+`firebase.rules-test.json`, evitando colisão com o emulador dos E2E. Sem o parâmetro,
+mesmo em localhost, o SDK usa o projeto configurado; confira a URL antes de criar
+dados de teste.
 
 ## Fluxo recomendado de alteração
 

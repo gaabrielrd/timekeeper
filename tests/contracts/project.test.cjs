@@ -76,6 +76,7 @@ test("exclusão de conta remove dados após reautenticação Google", () => {
 
 test("Hosting evita cache misto e emuladores usam portas documentadas", () => {
 	const config = JSON.parse(read("firebase.json"));
+	const rulesTestConfig = JSON.parse(read("firebase.rules-test.json"));
 	const noCacheSources = config.hosting.headers
 		.filter((entry) =>
 			entry.headers.some(
@@ -89,6 +90,8 @@ test("Hosting evita cache misto e emuladores usam portas documentadas", () => {
 	assert.equal(config.emulators.auth.port, 9099);
 	assert.equal(config.emulators.firestore.port, 8080);
 	assert.equal(config.emulators.hosting.port, 5000);
+	assert.equal(rulesTestConfig.emulators.firestore.port, 8081);
+	assert.equal(rulesTestConfig.emulators.ui.enabled, false);
 });
 
 test("cliente ativa emuladores apenas por opt-in local e inclui fallback Safari", () => {

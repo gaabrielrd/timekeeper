@@ -77,6 +77,7 @@ configurado. Veja [Desenvolvimento](docs/development.md).
 ├── .github/workflows/ci.yml   # CI para pushes e pull requests
 ├── package.json               # Ferramentas de teste; não participa do runtime
 ├── firebase.json              # Hosting, regras e índices
+├── firebase.rules-test.json   # Firestore Emulator isolado para testes de Rules
 ├── firestore.rules            # Autorização e limite de contadores
 ├── firestore.indexes.json     # Índices do Firestore
 └── .firebaserc                # Projeto Firebase padrão

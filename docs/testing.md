@@ -19,7 +19,9 @@ git diff --check
 
 `npm test` executa unit/contratos + rules em sequência. `npm run test:e2e` é
 separado porque instala/usa Chromium e sobe Auth + Firestore Emulator. Java 21+ é
-obrigatório para os emuladores Firebase.
+obrigatório para os emuladores Firebase. Os E2E usam Firestore 8080; as Rules usam
+a configuração dedicada `firebase.rules-test.json` na porta 8081, de modo que uma
+etapa não dependa do encerramento do processo da outra.
 
 ## Cobertura automatizada
 
