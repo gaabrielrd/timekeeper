@@ -129,6 +129,7 @@ test("editor de contador possui prévia ao vivo e ações compactas de imagem", 
 	const client = read("public/src/firebase.js");
 	assert.match(html, /id="counter-preview-card"/);
 	assert.match(html, /id="counter-preview-image"/);
+	assert.match(html, /<fieldset class="counter-visual-fields">\s*<legend>Visual<\/legend>/);
 	assert.match(html, /aria-label="Escolher imagem da biblioteca"/);
 	assert.match(html, /aria-label="Remover imagem do card"/);
 	assert.match(client, /function updateCounterPreview\(\)/);

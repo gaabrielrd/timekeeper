@@ -213,8 +213,8 @@ body[data-background-style="glass"] .ambient-background {
 }
 body[data-background-style="glass"] .ambient-background::after {
 	opacity: 0.45;
-	animation: glass-sweep calc(var(--ambient-duration) * 0.78) ease-in-out infinite
-		alternate;
+	animation: glass-sweep calc(var(--ambient-duration) * 0.78) ease-in-out
+		infinite alternate;
 }
 body[data-background-style="glass"] .ambient-blob {
 	aspect-ratio: 1.8 / 1;
@@ -256,7 +256,8 @@ body[data-background-style="constellation"] .ambient-blob {
 	filter: drop-shadow(
 		0 0 28px color-mix(in srgb, var(--ambient-a) 24%, transparent)
 	);
-	transform: translate3d(17vw, 4vh, 0) rotateX(62deg) rotateZ(-12deg) scale(1.35);
+	transform: translate3d(17vw, 4vh, 0) rotateX(62deg) rotateZ(-12deg)
+		scale(1.35);
 	transform-style: preserve-3d;
 }
 body[data-background-style="rings"] .chrono-rings {
@@ -331,8 +332,8 @@ body[data-background-style="rings"] .chrono-rings {
 	box-shadow:
 		0 0 45px color-mix(in srgb, var(--ambient-a) 34%, transparent),
 		inset 0 0 28px color-mix(in srgb, var(--ambient-b) 24%, transparent);
-	animation: chrono-pulse calc(var(--ambient-duration) * 0.16) ease-in-out infinite
-		alternate;
+	animation: chrono-pulse calc(var(--ambient-duration) * 0.16) ease-in-out
+		infinite alternate;
 }
 body[data-background-style="aurora"] .ambient-background {
 	filter: saturate(122%) contrast(104%);
@@ -400,8 +401,8 @@ body[data-background-style="topography"] .topographic-map {
 	vector-effect: non-scaling-stroke;
 	animation:
 		topographic-flow calc(var(--ambient-duration) * 0.42) linear infinite,
-		topographic-contour calc(var(--ambient-duration) * 0.58) ease-in-out infinite
-			alternate;
+		topographic-contour calc(var(--ambient-duration) * 0.58) ease-in-out
+			infinite alternate;
 }
 .topographic-map path:nth-child(even) {
 	stroke: color-mix(in srgb, var(--ambient-b) 70%, transparent);
@@ -415,36 +416,48 @@ body[data-background-style="topography"] .topographic-map {
 .topographic-map path:nth-child(2) {
 	--topo-x: -3.5%;
 	--topo-y: 7%;
-	animation-delay: -4s, -11s;
+	animation-delay:
+		-4s,
+		-11s;
 }
 .topographic-map path:nth-child(3) {
 	--topo-x: 4%;
 	--topo-y: -8%;
-	animation-delay: -12s, -3s;
+	animation-delay:
+		-12s,
+		-3s;
 }
 .topographic-map path:nth-child(4) {
 	--topo-x: -2%;
 	--topo-y: 9%;
-	animation-duration: calc(var(--ambient-duration) * 0.36),
-		calc(var(--ambient-duration) * 0.46);
-	animation-delay: -7s, -17s;
+	animation-duration:
+		calc(var(--ambient-duration) * 0.36), calc(var(--ambient-duration) * 0.46);
+	animation-delay:
+		-7s,
+		-17s;
 }
 .topographic-map path:nth-child(5) {
 	--topo-x: 5%;
 	--topo-y: -6%;
-	animation-delay: -16s, -6s;
+	animation-delay:
+		-16s,
+		-6s;
 }
 .topographic-map path:nth-child(6) {
 	--topo-x: -4%;
 	--topo-y: 11%;
-	animation-duration: calc(var(--ambient-duration) * 0.5),
-		calc(var(--ambient-duration) * 0.66);
-	animation-delay: -9s, -21s;
+	animation-duration:
+		calc(var(--ambient-duration) * 0.5), calc(var(--ambient-duration) * 0.66);
+	animation-delay:
+		-9s,
+		-21s;
 }
 .topographic-map path:nth-child(7) {
 	--topo-x: 3%;
 	--topo-y: -10%;
-	animation-delay: -18s, -13s;
+	animation-delay:
+		-18s,
+		-13s;
 }
 .constellation-canvas {
 	display: block;
@@ -889,7 +902,10 @@ main {
 	cursor: pointer;
 	opacity: 0;
 	transform: translateY(-3px);
-	transition: opacity 0.2s ease, transform 0.2s ease, color 0.2s ease;
+	transition:
+		opacity 0.2s ease,
+		transform 0.2s ease,
+		color 0.2s ease;
 }
 .user-panel:hover .counter-card-image-remove,
 .counter-card-image-remove:focus-visible {
@@ -1200,10 +1216,10 @@ main {
 	border-radius: 10px;
 	outline: 0;
 	background:
-		linear-gradient(45deg, transparent 50%, var(--muted) 50%) right 15px top 50% /
-		5px 5px no-repeat,
-		linear-gradient(135deg, var(--muted) 50%, transparent 50%) right 10px top 50% /
-		5px 5px no-repeat,
+		linear-gradient(45deg, transparent 50%, var(--muted) 50%) right 15px top
+			50% / 5px 5px no-repeat,
+		linear-gradient(135deg, var(--muted) 50%, transparent 50%) right 10px top
+			50% / 5px 5px no-repeat,
 		var(--bg);
 	color: var(--text);
 }
@@ -1506,6 +1522,7 @@ input[type="color"]::-webkit-color-swatch {
 	font-size: 12px;
 }
 .weekday-options {
+	margin-top: 8px;
 	display: grid;
 	grid-template-columns: repeat(7, minmax(0, 1fr));
 	gap: 6px;
@@ -1555,7 +1572,7 @@ input[type="color"]::-webkit-color-swatch {
 	opacity: 0.25;
 	cursor: default;
 }
-.counter-image-fields {
+.counter-visual-fields {
 	min-width: 0;
 	margin: 0;
 	padding: 12px;
@@ -1565,17 +1582,19 @@ input[type="color"]::-webkit-color-swatch {
 	border-radius: 12px;
 	background: color-mix(in srgb, var(--bg) 78%, transparent);
 }
-.counter-image-fields legend {
+.counter-visual-fields legend {
 	padding: 0 6px;
 	color: var(--muted);
 	font-size: 12px;
 }
 .counter-image-selection {
 	min-width: 0;
+	padding-top: 11px;
 	display: grid;
 	grid-template-columns: 48px minmax(0, 1fr) auto;
 	align-items: center;
 	gap: 10px;
+	border-top: 1px solid var(--line);
 }
 .counter-image-preview {
 	width: 48px;
@@ -1750,7 +1769,9 @@ input[type="color"]::-webkit-color-swatch {
 	background: color-mix(in srgb, var(--accent-secondary) 22%, var(--bg));
 	color: var(--accent);
 	cursor: pointer;
-	transition: border-color 0.2s ease, background 0.2s ease;
+	transition:
+		border-color 0.2s ease,
+		background 0.2s ease;
 }
 .image-upload-dropzone:hover {
 	border-color: var(--accent);

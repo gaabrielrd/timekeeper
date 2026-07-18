@@ -153,6 +153,15 @@ test("usuário envia, reutiliza e remove uma imagem dos contadores", async (
 	const card = page.locator("#custom-panels .user-panel");
 	await expect(card.locator(".counter-card-image")).toHaveCSS("opacity", "0.72");
 	await expect(card.locator(".counter-card-overlay")).toHaveCSS("opacity", "0.44");
+	await page.locator("#sidebar-close").click();
+	await expect(page.locator("#account-sidebar")).toHaveAttribute(
+		"aria-hidden",
+		"true",
+	);
+	await expect(page.locator("#sidebar-backdrop")).toHaveCSS(
+		"pointer-events",
+		"none",
+	);
 
 	await card.getByRole("button", { name: "Remover imagem do contador Imagem E2E" }).click();
 	await expect(card.locator(".counter-card-media")).toHaveCount(0);

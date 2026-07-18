@@ -66,7 +66,8 @@ contém rotina, contadores, aparência e ações da conta no mesmo fluxo roláve
 precede excluir conta, que encerra o conteúdo. Um `<dialog>` reúne criação e
 edição com uma prévia compacta que reage a nome, cor, imagem e opacidades; outro
 apresenta upload, quota e biblioteca de imagens em uma grade compacta. A seleção de
-imagem no editor usa miniatura e ações por ícone para preservar espaço vertical.
+cor e imagem compartilha o painel `Visual`; a imagem usa miniatura e ações por ícone
+para preservar espaço vertical.
 
 Imagens pessoais usam `cover` para ocupar todo o card. A camada de imagem e a
 sobreposição na cor da superfície têm opacidades independentes; conteúdo temporal e
