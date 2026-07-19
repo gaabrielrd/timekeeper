@@ -248,8 +248,8 @@ test("aceita settings válidas e rejeita range ou campo desconhecido", async () 
 			dashboardSectionOrder: [
 				"standard",
 				"custom",
-				"timeline",
 				"weather",
+				"timeline",
 			],
 			hiddenDashboardSections: ["weather"],
 			weatherWidgets: [
@@ -398,6 +398,46 @@ test("rejeita schema, horários, dias e cores inválidos", async () => {
 	];
 	for (const counter of invalidCounters) {
 		await assertFails(setDoc(reference, { items: [counter] }));
+	}
+});
+test("aceita checklists válidos de até 3 itens", async () => {
+	await assertSucceeds(
+		setDoc(doc(googleDb(), "users/alice/data/counters"), {
+			items: [
+				{
+					...fixedCounter(),
+					checklist: [
+						{ id: "task-1", text: "Revisão", done: false },
+						{ id: "task-2", text: "Exercícios", done: true },
+					],
+				},
+			],
+			updatedAt: serverTimestamp(),
+		}),
+	);
+});
+
+test("rejeita checklists inválidos ou com mais de 3 itens", async () => {
+	const reference = doc(googleDb(), "users/alice/data/counters");
+	const invalidChecklists = [
+		[
+			{ id: "t1", text: "1", done: false },
+			{ id: "t2", text: "2", done: false },
+			{ id: "t3", text: "3", done: false },
+			{ id: "t4", text: "4", done: false },
+		],
+		[{ id: "t1", text: "Texto extremamente longo com mais de trinta caracteres", done: false }],
+		[{ id: "t1", text: "Faltando done" }],
+		[{ id: "t1", text: "done string", done: "false" }],
+		[{ id: "t1", text: "Task", done: false, extra: true }],
+	];
+	for (const checklist of invalidChecklists) {
+		await assertFails(
+			setDoc(reference, {
+				items: [{ ...fixedCounter(), checklist }],
+				updatedAt: serverTimestamp(),
+			}),
+		);
 	}
 });
 

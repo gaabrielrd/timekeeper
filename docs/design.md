@@ -38,6 +38,19 @@ O produto deve permanecer legível quando a fonte externa falhar.
 
 ## Layout
 
+### Modo de Foco
+
+A camada imersiva ocupa o viewport sem desmontar `ambient-background`. Em telas
+largas, título e tempo formam uma composição editorial horizontal; até 800 px ou em
+orientação vertical, o conteúdo passa para uma coluna centralizada. A superfície
+escurecida e o `text-shadow` mantêm contraste nos sete fundos, e a cor do contador
+é preservada nos detalhes e na barra.
+
+A entrada e a saída usam apenas opacidade e visibilidade. O botão de fechar recebe
+foco ao abrir, `Esc` encerra o modo e o foco retorna ao botão de origem quando ele
+ainda existe. A regra global de `prefers-reduced-motion` reduz as transições e as
+animações do fundo sem esconder conteúdo.
+
 ### Header
 
 Barra de controle fixa com título, horário anônimo ou toggle de contadores, conta e

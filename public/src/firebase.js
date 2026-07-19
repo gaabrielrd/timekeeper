@@ -46,6 +46,12 @@ import {
 	ReCaptchaEnterpriseProvider,
 	initializeAppCheck,
 } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app-check.js";
+import {
+	getAI,
+	getGenerativeModel,
+	GoogleAIBackend,
+	ResponseModality,
+} from "https://www.gstatic.com/firebasejs/12.16.0/firebase-ai.js";
 
 const useLocalEmulators =
 	["localhost", "127.0.0.1"].includes(window.location.hostname) &&
@@ -71,18 +77,35 @@ const pushConfigured =
 	typeof pushConfig.recaptchaEnterpriseSiteKey === "string" &&
 	pushConfig.recaptchaEnterpriseSiteKey.length > 10;
 let pushFunctions = null;
-let pushAppCheckInitialized = false;
+let appCheckInitialized = false;
+
+function ensureAppCheck() {
+	if (appCheckInitialized) return;
+
+	const isLocal = ["localhost", "127.0.0.1"].includes(window.location.hostname);
+	if (isLocal) {
+		self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+	}
+
+	const siteKey = pushConfig.recaptchaEnterpriseSiteKey;
+	if (siteKey || isLocal) {
+		try {
+			initializeAppCheck(app, {
+				provider: new ReCaptchaEnterpriseProvider(
+					siteKey || "6Lfoo1otAAAAAGP_SSJWNcnGABOfmHBWL6djlmT8",
+				),
+				isTokenAutoRefreshEnabled: true,
+			});
+			appCheckInitialized = true;
+		} catch (error) {
+			console.warn("App Check failed to initialize, continuing anyway:", error);
+		}
+	}
+}
+
 function ensurePushBackend() {
 	if (!pushConfigured) return null;
-	if (!pushAppCheckInitialized) {
-		initializeAppCheck(app, {
-			provider: new ReCaptchaEnterpriseProvider(
-				pushConfig.recaptchaEnterpriseSiteKey,
-			),
-			isTokenAutoRefreshEnabled: true,
-		});
-		pushAppCheckInitialized = true;
-	}
+	ensureAppCheck();
 	if (!pushFunctions) {
 		pushFunctions = getFunctions(
 			app,
@@ -91,6 +114,33 @@ function ensurePushBackend() {
 	}
 	return pushFunctions;
 }
+
+// Initialize Firebase AI Logic (Gemini API)
+let aiInstance = null;
+const modelInstances = new Map();
+
+function getAIModel(modelName = "gemini-2.5-flash-lite") {
+	ensureAppCheck();
+	if (!aiInstance) {
+		aiInstance = getAI(app, { backend: new GoogleAIBackend() });
+	}
+	if (!modelInstances.has(modelName)) {
+		modelInstances.set(modelName, getGenerativeModel(aiInstance, { model: modelName }));
+	}
+	return modelInstances.get(modelName);
+}
+
+async function generateText(prompt, modelName = "gemini-2.5-flash-lite") {
+	const model = getAIModel(modelName);
+	const result = await model.generateContent(prompt);
+	const response = await result.response;
+	return response.text();
+}
+
+window.TimekeeperAI = {
+	getAIModel,
+	generateText,
+};
 
 const DEFAULTS = {
 	endHour: 17,
@@ -105,7 +155,7 @@ const DEFAULTS = {
 	backgroundIntensity: 55,
 	showCustomCounters: true,
 	dashboardLayout: "balanced",
-	dashboardSectionOrder: ["standard", "custom", "timeline", "weather"],
+	dashboardSectionOrder: ["standard", "custom", "weather", "timeline"],
 	hiddenDashboardSections: [],
 	weatherWidgets: window.TimekeeperWeather.cloneDefaults(),
 	...window.TimekeeperNotifications.normalizePreferences(),
@@ -117,8 +167,8 @@ const DASHBOARD_SECTION_IDS =
 	window.TimekeeperOccurrences?.DASHBOARD_SECTION_IDS || [
 		"standard",
 		"custom",
-		"timeline",
 		"weather",
+		"timeline",
 	];
 
 function uniqueDashboardSections(value) {
@@ -291,6 +341,8 @@ const elements = {
 	counterSidebarState: document.querySelector("#counter-sidebar-state"),
 	counterMessage: document.querySelector("#counter-message"),
 	counterSubmit: document.querySelector("#counter-submit"),
+	counterChecklistInputs: document.querySelector("#counter-checklist-inputs"),
+	addChecklistItem: document.querySelector("#add-checklist-item"),
 	counterColorEnabled: document.querySelector("#counter-color-enabled"),
 	counterColor: document.querySelector("#counter-color"),
 	counterType: document.querySelector("#counter-type"),
@@ -327,6 +379,16 @@ const elements = {
 	imageLibraryMessage: document.querySelector("#image-library-message"),
 	imageLibraryGrid: document.querySelector("#image-library-grid"),
 	imageLibraryEmpty: document.querySelector("#image-library-empty"),
+	libraryTabUpload: document.querySelector("#library-tab-upload"),
+	libraryTabAi: document.querySelector("#library-tab-ai"),
+	libraryPanelUpload: document.querySelector("#library-panel-upload"),
+	libraryPanelAi: document.querySelector("#library-panel-ai"),
+	aiPromptInput: document.querySelector("#ai-prompt-input"),
+	aiThemeSelect: document.querySelector("#ai-theme-select"),
+	aiRatioSelect: document.querySelector("#ai-ratio-select"),
+	aiGenerateBtn: document.querySelector("#ai-generate-btn"),
+	aiLoading: document.querySelector("#ai-loading"),
+	aiLoadingText: document.querySelector("#ai-loading-text"),
 	openAdminModal: document.querySelector("#open-admin-modal"),
 	adminDialog: document.querySelector("#admin-dialog"),
 	adminDialogClose: document.querySelector("#admin-dialog-close"),
@@ -688,6 +750,32 @@ function updateCounterPreview() {
 	elements.counterPreviewOverlay.style.opacity = imageUrl
 		? String(overlayOpacity / 100)
 		: "0";
+
+	let previewChecklist = document.querySelector("#counter-preview-checklist");
+	if (!previewChecklist) {
+		previewChecklist = document.createElement("div");
+		previewChecklist.id = "counter-preview-checklist";
+		previewChecklist.className = "counter-card-checklist";
+		elements.counterPreviewCard.append(previewChecklist);
+	}
+	previewChecklist.replaceChildren();
+	if (currentChecklist.length > 0) {
+		currentChecklist.forEach((item) => {
+			const label = document.createElement("label");
+			label.className = "checklist-item-row";
+
+			const checkbox = document.createElement("input");
+			checkbox.type = "checkbox";
+			checkbox.checked = item.done;
+			checkbox.disabled = true;
+
+			const textSpan = document.createElement("span");
+			textSpan.textContent = item.text || "Subtarefa";
+
+			label.append(checkbox, textSpan);
+			previewChecklist.append(label);
+		});
+	}
 }
 
 function setSelectedCounterImage(imageId = null) {
@@ -831,6 +919,15 @@ async function saveImages(images) {
 	}
 }
 
+function switchLibraryTab(tabName) {
+	const isUpload = tabName === "upload";
+	elements.libraryTabUpload.setAttribute("aria-selected", String(isUpload));
+	elements.libraryTabAi.setAttribute("aria-selected", String(!isUpload));
+	elements.libraryPanelUpload.hidden = !isUpload;
+	elements.libraryPanelAi.hidden = isUpload;
+	elements.imageLibraryMessage.textContent = "";
+}
+
 function openImageLibrary(selectForCounter = false) {
 	if (!currentUser) return;
 	if (!imageLibraryAvailable) {
@@ -839,6 +936,12 @@ function openImageLibrary(selectForCounter = false) {
 	}
 	librarySelectsCounter = selectForCounter;
 	elements.imageLibraryMessage.textContent = "";
+	switchLibraryTab("upload");
+	if (elements.aiPromptInput) elements.aiPromptInput.value = "";
+	if (elements.aiThemeSelect) elements.aiThemeSelect.value = "";
+	if (elements.aiRatioSelect) elements.aiRatioSelect.value = "4:3";
+	if (elements.aiLoading) elements.aiLoading.hidden = true;
+	if (elements.aiGenerateBtn) elements.aiGenerateBtn.disabled = false;
 	renderImageLibrary();
 	if (!selectForCounter) closeSidebar();
 	elements.imageLibraryDialog.showModal();
@@ -935,6 +1038,179 @@ async function uploadLibraryImage(file) {
 		activeUploadTask = null;
 		elements.imageUploadInput.value = "";
 		setUploadState(null);
+	}
+}
+
+async function generateImage({ prompt, theme, ratio }) {
+	const aiStudioKey = window.TimekeeperRuntimeConfig?.aiStudioApiKey;
+	if (aiStudioKey) {
+		try {
+			const { GoogleGenAI } = await import("https://esm.run/@google/genai");
+			const ai = new GoogleGenAI({ apiKey: aiStudioKey });
+
+			let fullPrompt = prompt;
+			if (theme) {
+				fullPrompt = `${prompt}, theme color palette is ${theme}`;
+			}
+			fullPrompt = `${fullPrompt}, beautiful abstract background, elegant modern minimal style, high resolution digital design, clean wallpaper composition, web UI background optimized, no text, no watermarks`;
+
+			const response = await ai.models.generateImages({
+				model: "imagen-3.0-generate-002",
+				prompt: fullPrompt,
+				config: {
+					numberOfImages: 1,
+					aspectRatio: ratio || "4:3",
+				},
+			});
+
+			if (response?.generatedImages?.length > 0) {
+				return {
+					mimeType: "image/png",
+					base64Data: response.generatedImages[0].image.imageBytes,
+				};
+			}
+			throw new Error("Nenhuma imagem gerada ou o prompt foi bloqueado por filtros de segurança.");
+		} catch (error) {
+			console.error("Falha ao gerar com Google AI Studio SDK:", error);
+			throw error;
+		}
+	}
+
+	ensureAppCheck();
+	if (!aiInstance) {
+		aiInstance = getAI(app, { backend: new GoogleAIBackend() });
+	}
+
+	const model = getGenerativeModel(aiInstance, {
+		model: "gemini-2.5-flash-image",
+		generationConfig: {
+			responseModalities: [ResponseModality.TEXT, ResponseModality.IMAGE],
+			imageConfig: {
+				aspectRatio: ratio || "4:3",
+			}
+		}
+	});
+
+	let fullPrompt = prompt;
+	if (theme) {
+		fullPrompt = `${prompt}, theme color palette is ${theme}`;
+	}
+	fullPrompt = `${fullPrompt}, beautiful abstract background, elegant modern minimal style, high resolution digital design, clean wallpaper composition, web UI background optimized, no text, no watermarks`;
+
+	const result = await model.generateContent(fullPrompt);
+	const response = await result.response;
+	const parts = response.inlineDataParts();
+	if (!parts || parts.length === 0) {
+		throw new Error("Nenhuma imagem gerada ou o prompt foi bloqueado por filtros de segurança.");
+	}
+
+	const part = parts[0];
+	if (!part.inlineData || !part.inlineData.data) {
+		throw new Error("Formato de imagem inválido.");
+	}
+
+	return {
+		mimeType: part.inlineData.mimeType,
+		base64Data: part.inlineData.data,
+	};
+}
+
+async function handleGenerateAiImage() {
+	if (!currentUser) return;
+	const prompt = elements.aiPromptInput.value.trim();
+	if (!prompt) {
+		elements.imageLibraryMessage.textContent = "Por favor, digite uma descrição para a imagem.";
+		return;
+	}
+
+	elements.imageLibraryMessage.textContent = "";
+	const theme = elements.aiThemeSelect.value;
+	const ratio = elements.aiRatioSelect.value;
+
+	const occupiedSlots = new Set(userImages.map((image) => image.slot));
+	const slot = Array.from({ length: MAX_IMAGES }, (_, index) => index).find(
+		(index) => !occupiedSlots.has(index),
+	);
+	if (slot === undefined) {
+		elements.imageLibraryMessage.textContent = "Sua biblioteca já possui 10 imagens. Remova uma para liberar espaço.";
+		return;
+	}
+
+	elements.aiLoading.hidden = false;
+	elements.aiGenerateBtn.disabled = true;
+	elements.imageLibraryMessage.textContent = "";
+	elements.aiLoadingText.textContent = "Gerando imagem com Inteligência Artificial...";
+
+	const ownerId = currentUser.uid;
+	let activeSlotImageRef = imageStorageReference(ownerId, slot);
+
+	try {
+		const { mimeType, base64Data } = await generateImage({ prompt, theme, ratio });
+		elements.aiLoadingText.textContent = "Processando e enviando para a biblioteca...";
+
+		const res = await fetch(`data:${mimeType};base64,${base64Data}`);
+		const blob = await res.blob();
+
+		const cleanName = prompt.slice(0, 20).toLowerCase().replace(/[^a-z0-9]/g, "_") || "bg";
+		const filename = `ai_${cleanName}_${Date.now()}.png`;
+		const file = new File([blob], filename, { type: mimeType });
+
+		const image = {
+			id: createCounterId(),
+			slot,
+			name: `IA: ${prompt.slice(0, 30)}...`,
+			size: file.size,
+			contentType: file.type,
+			createdAt: new Date().toISOString(),
+		};
+
+		activeUploadTask = uploadBytesResumable(
+			activeSlotImageRef,
+			file,
+			{ contentType: file.type, customMetadata: { imageId: image.id, generatedByAi: "true" } },
+		);
+
+		await new Promise((resolve, reject) => {
+			activeUploadTask.on(
+				"state_changed",
+				(snapshot) => {
+					const progress = Math.round(
+						(snapshot.bytesTransferred / snapshot.totalBytes) * 100,
+					);
+					elements.aiLoadingText.textContent = `Enviando imagem para biblioteca (${progress}%)`;
+				},
+				reject,
+				resolve,
+			);
+		});
+
+		if (currentUser?.uid !== ownerId) return;
+
+		const nextImages = [...userImages, image].sort(
+			(first, second) => first.slot - second.slot,
+		);
+		if (!(await saveImages(nextImages))) {
+			await deleteObject(activeSlotImageRef);
+			throw new Error("Não foi possível salvar os metadados da imagem.");
+		}
+
+		elements.imageLibraryMessage.textContent = "Imagem gerada e salva com sucesso!";
+		elements.aiPromptInput.value = "";
+		elements.aiThemeSelect.value = "";
+		renderImageLibrary();
+		if (librarySelectsCounter) {
+			setSelectedCounterImage(image.id);
+			renderImageLibrary();
+			elements.imageLibraryDialog.close();
+		}
+	} catch (error) {
+		console.error("Falha ao gerar/salvar imagem IA:", error);
+		elements.imageLibraryMessage.textContent =
+			error.message || "Erro desconhecido ao gerar a imagem. Verifique a conexão.";
+	} finally {
+		activeUploadTask = null;
+		elements.aiLoading.hidden = true;
+		elements.aiGenerateBtn.disabled = false;
 	}
 }
 
@@ -1622,15 +1898,41 @@ async function saveSettings(partialSettings) {
 async function saveCounters(counters) {
 	if (!currentUser) return false;
 	setCounterState("Salvando...", "saving");
+	const sanitized = counters.map((c) => {
+		const clone = { ...c };
+		if (Array.isArray(clone.checklist)) {
+			const items = clone.checklist
+				.map((item) => {
+					if (!item || typeof item !== "object") return null;
+					const text = String(item.text || "").trim().slice(0, 30);
+					if (!text) return null;
+					return {
+						id: String(item.id || createCounterId()).slice(0, 100),
+						text,
+						done: Boolean(item.done),
+					};
+				})
+				.filter(Boolean);
+			if (items.length > 0) {
+				clone.checklist = items;
+			} else {
+				delete clone.checklist;
+			}
+		} else {
+			delete clone.checklist;
+		}
+		return clone;
+	});
 	try {
 		await setDoc(
 			countersReference(currentUser.uid),
-			{ items: counters.slice(0, MAX_COUNTERS), updatedAt: serverTimestamp() },
+			{ items: sanitized.slice(0, MAX_COUNTERS), updatedAt: serverTimestamp() },
 		);
 		setCounterState("Ao vivo", "live");
 		return true;
 	} catch (error) {
 		console.error("Falha ao salvar contadores.", error);
+		console.error("Payload being sent:", JSON.stringify(sanitized, null, 2));
 		console.table(
 			counters.map((counter, index) => ({
 				index,
@@ -1673,6 +1975,8 @@ function updateCustomCounters() {
 function createCustomPanel(counter, index) {
 	const panel = document.createElement("article");
 	panel.className = "a-panel user-panel";
+	panel.dataset.id = counter.id;
+	panel.dataset.focusId = counter.id;
 	panel.style.setProperty(
 		"--counter-color",
 		counter.color || "var(--accent)",
@@ -1702,6 +2006,15 @@ function createCustomPanel(counter, index) {
 	title.className = "panel-title";
 	title.textContent = counter.name;
 	top.append(panelIndex, title);
+	const focusButton = document.createElement("button");
+	focusButton.type = "button";
+	focusButton.className = "focus-mode-trigger";
+	focusButton.dataset.focusTrigger = "";
+	focusButton.title = "Modo de foco";
+	focusButton.setAttribute("aria-label", `Focar contador ${counter.name}`);
+	focusButton.innerHTML =
+		'<i class="material-icons" aria-hidden="true">center_focus_strong</i>';
+	top.append(focusButton);
 	if (counter.imageId) {
 		const removeImage = document.createElement("button");
 		removeImage.type = "button";
@@ -1728,7 +2041,44 @@ function createCustomPanel(counter, index) {
 	post.textContent = `para ${counter.name}.`;
 	const progress = document.createElement("div");
 	progress.className = "progress-bar";
-	panel.append(top, pre, main, post, progress);
+
+	if (Array.isArray(counter.checklist) && counter.checklist.length > 0) {
+		const checklistContainer = document.createElement("div");
+		checklistContainer.className = "counter-card-checklist";
+		counter.checklist.forEach((item) => {
+			const label = document.createElement("label");
+			label.className = "checklist-item-row";
+
+			const checkbox = document.createElement("input");
+			checkbox.type = "checkbox";
+			checkbox.checked = item.done;
+			checkbox.addEventListener("change", async () => {
+				checkbox.disabled = true;
+				const isChecked = checkbox.checked;
+				const nextCounters = userSettings.customCounters.map((c) => {
+					if (c.id !== counter.id) return c;
+					const nextChecklist = (c.checklist || []).map((t) => {
+						if (t.id !== item.id) return t;
+						return { ...t, done: isChecked };
+					});
+					return { ...c, checklist: nextChecklist };
+				});
+				if (!(await saveCounters(nextCounters))) {
+					checkbox.checked = !isChecked;
+				}
+				checkbox.disabled = false;
+			});
+
+			const textSpan = document.createElement("span");
+			textSpan.textContent = item.text;
+
+			label.append(checkbox, textSpan);
+			checklistContainer.append(label);
+		});
+		panel.append(top, pre, main, post, checklistContainer, progress);
+	} else {
+		panel.append(top, pre, main, post, progress);
+	}
 
 	const color = counter.color || userSettings.accentPrimary;
 	const bar = new ProgressBar.Line(progress, {
@@ -1864,6 +2214,178 @@ function updateCustomVisibility(counters = userSettings.customCounters) {
 }
 
 function renderCustomCounters(counters) {
+	const currentPanels = Array.from(elements.customPanels.children);
+	const currentIds = currentPanels.map((panel) => panel.dataset.id);
+	const newIds = counters.map((c) => c.id);
+
+	const isStructureSame =
+		currentIds.length === newIds.length &&
+		currentIds.every((id, index) => id === newIds[index]);
+
+	if (isStructureSame) {
+		counters.forEach((counter, index) => {
+			const panel = currentPanels[index];
+
+			// 1. Sync title
+			const title = panel.querySelector(".panel-title");
+			if (title && title.textContent !== counter.name) {
+				title.textContent = counter.name;
+			}
+			const focusButton = panel.querySelector(".focus-mode-trigger");
+			focusButton?.setAttribute("aria-label", `Focar contador ${counter.name}`);
+
+			// 2. Sync color variables
+			const color = counter.color || userSettings.accentPrimary;
+			panel.style.setProperty("--counter-color", counter.color || "var(--accent)");
+			const pbState = customProgressBars.find((item) => item.counter.id === counter.id);
+			if (pbState) {
+				pbState.counter = counter;
+				if (pbState.bar) {
+					pbState.bar.path.setAttribute("stroke", color);
+				}
+			}
+
+			// 3. Sync media / background images
+			let media = panel.querySelector(".counter-card-media");
+			const imageUrl = counter.imageId ? imageUrls.get(counter.imageId) : "";
+			if (imageUrl) {
+				if (!media) {
+					media = document.createElement("div");
+					media.className = "counter-card-media";
+					media.setAttribute("aria-hidden", "true");
+					const image = document.createElement("div");
+					image.className = "counter-card-image";
+					const overlay = document.createElement("div");
+					overlay.className = "counter-card-overlay";
+					media.append(image, overlay);
+					panel.prepend(media);
+				}
+				const image = media.querySelector(".counter-card-image");
+				if (image) {
+					image.style.backgroundImage = `url(${JSON.stringify(imageUrl)})`;
+					image.style.opacity = String(counter.imageOpacity / 100);
+				}
+				const overlay = media.querySelector(".counter-card-overlay");
+				if (overlay) {
+					overlay.style.opacity = String(counter.overlayOpacity / 100);
+				}
+			} else {
+				if (media) media.remove();
+			}
+
+			// 4. Sync remove image button
+			const top = panel.querySelector(".panel-top");
+			if (top) {
+				let removeImage = top.querySelector(".counter-card-image-remove");
+				if (counter.imageId) {
+					if (!removeImage) {
+						removeImage = document.createElement("button");
+						removeImage.type = "button";
+						removeImage.className = "counter-card-image-remove";
+						removeImage.title = `Remover imagem de ${counter.name}`;
+						removeImage.setAttribute(
+							"aria-label",
+							`Remover imagem do contador ${counter.name}`,
+						);
+						removeImage.innerHTML = '<i class="material-icons" aria-hidden="true">close</i>';
+						removeImage.addEventListener("click", () => removeImageFromCounter(counter));
+						top.append(removeImage);
+					} else {
+						removeImage.title = `Remover imagem de ${counter.name}`;
+						removeImage.setAttribute(
+							"aria-label",
+							`Remover imagem do contador ${counter.name}`,
+						);
+					}
+				} else {
+					if (removeImage) removeImage.remove();
+				}
+			}
+
+			// 5. Sync checklist in place
+			let checklistContainer = panel.querySelector(".counter-card-checklist");
+			const items = Array.isArray(counter.checklist) ? counter.checklist : [];
+
+			if (items.length === 0) {
+				if (checklistContainer) {
+					checklistContainer.remove();
+				}
+			} else {
+				if (!checklistContainer) {
+					checklistContainer = document.createElement("div");
+					checklistContainer.className = "counter-card-checklist";
+					const progress = panel.querySelector(".progress-bar");
+					panel.insertBefore(checklistContainer, progress);
+				}
+
+				const checkboxRows = Array.from(checklistContainer.querySelectorAll(".checklist-item-row"));
+
+				if (checkboxRows.length === items.length) {
+					items.forEach((item, itemIdx) => {
+						const row = checkboxRows[itemIdx];
+						const checkbox = row.querySelector('input[type="checkbox"]');
+						const span = row.querySelector("span");
+
+						if (checkbox && checkbox.checked !== item.done) {
+							checkbox.checked = item.done;
+						}
+						if (span && span.textContent !== item.text) {
+							span.textContent = item.text;
+						}
+					});
+				} else {
+					checklistContainer.replaceChildren();
+					items.forEach((item) => {
+						const label = document.createElement("label");
+						label.className = "checklist-item-row";
+
+						const checkbox = document.createElement("input");
+						checkbox.type = "checkbox";
+						checkbox.checked = item.done;
+						checkbox.addEventListener("change", async () => {
+							checkbox.disabled = true;
+							const isChecked = checkbox.checked;
+							const nextCounters = userSettings.customCounters.map((c) => {
+								if (c.id !== counter.id) return c;
+								const nextChecklist = (c.checklist || []).map((t) => {
+									if (t.id !== item.id) return t;
+									return { ...t, done: isChecked };
+								});
+								return { ...c, checklist: nextChecklist };
+							});
+							if (!(await saveCounters(nextCounters))) {
+								checkbox.checked = !isChecked;
+							}
+							checkbox.disabled = false;
+						});
+
+						const textSpan = document.createElement("span");
+						textSpan.textContent = item.text;
+
+						label.append(checkbox, textSpan);
+						checklistContainer.append(label);
+					});
+				}
+			}
+		});
+
+		renderCounterList(counters);
+		elements.counterCount.textContent = `${counters.length} / ${MAX_COUNTERS}`;
+		const isFull = counters.length >= MAX_COUNTERS;
+		elements.openCounterModal.disabled = isFull || !countersReady;
+		elements.openCounterModalLabel.textContent = isFull
+			? "Limite atingido"
+			: "Novo contador";
+		updateCustomVisibility(counters);
+		if (!editingCounterId) {
+			elements.counterSubmit.disabled = isFull;
+			elements.counterSubmit.textContent = isFull
+				? "Limite atingido"
+				: "Criar contador";
+		}
+		return;
+	}
+
 	customProgressBars.forEach(({ bar }) => bar.destroy());
 	customProgressBars = [];
 	elements.customPanels.replaceChildren();
@@ -1883,8 +2405,8 @@ function renderCustomCounters(counters) {
 	if (!editingCounterId) {
 		elements.counterSubmit.disabled = isFull;
 		elements.counterSubmit.textContent = isFull
-		? "Limite atingido"
-		: "Criar contador";
+			? "Limite atingido"
+			: "Criar contador";
 	}
 }
 
@@ -3170,6 +3692,24 @@ function normalizeCounter(counter) {
 			boundedNumber(counter.overlayOpacity, 0, 100, 55),
 		);
 	}
+	if (Array.isArray(counter.checklist)) {
+		const items = counter.checklist
+			.slice(0, 3)
+			.map((item) => {
+				if (!item || typeof item !== "object") return null;
+				const text = String(item.text || "").trim().slice(0, 30);
+				if (!text) return null;
+				return {
+					id: String(item.id || createCounterId()).slice(0, 100),
+					text,
+					done: Boolean(item.done),
+				};
+			})
+			.filter(Boolean);
+		if (items.length > 0) {
+			normalized.checklist = items;
+		}
+	}
 	if (type === "recurring") {
 		const startTime = String(counter.startTime || "");
 		const endTime = String(counter.endTime || "");
@@ -3507,6 +4047,48 @@ function toLocalInputValue(value) {
 	return localDate.toISOString().slice(0, 16);
 }
 
+let currentChecklist = [];
+
+function renderChecklistInputs() {
+	if (!elements.counterChecklistInputs) return;
+	elements.counterChecklistInputs.replaceChildren();
+
+	currentChecklist.forEach((item, index) => {
+		const row = document.createElement("div");
+		row.className = "checklist-input-row";
+
+		const input = document.createElement("input");
+		input.type = "text";
+		input.className = "field-control checklist-text-input";
+		input.placeholder = "Ex.: Revisão";
+		input.maxLength = 30;
+		input.value = item.text;
+		input.required = true;
+		input.addEventListener("input", (e) => {
+			currentChecklist[index].text = e.target.value;
+			updateCounterPreview();
+		});
+
+		const removeBtn = document.createElement("button");
+		removeBtn.type = "button";
+		removeBtn.className = "icon-button remove-checklist-item-btn";
+		removeBtn.setAttribute("aria-label", "Remover subtarefa");
+		removeBtn.innerHTML = '<i class="material-icons">delete</i>';
+		removeBtn.addEventListener("click", () => {
+			currentChecklist.splice(index, 1);
+			renderChecklistInputs();
+			updateCounterPreview();
+		});
+
+		row.append(input, removeBtn);
+		elements.counterChecklistInputs.append(row);
+	});
+
+	if (elements.addChecklistItem) {
+		elements.addChecklistItem.disabled = currentChecklist.length >= 3;
+	}
+}
+
 function closeCounterDialog() {
 	if (elements.counterDialog.open) elements.counterDialog.close();
 	editingCounterId = null;
@@ -3571,6 +4153,8 @@ function openCounterDialog(counter = null) {
 	elements.counterOverlayOpacity.value = String(counter?.overlayOpacity ?? 55);
 	syncCounterOpacityOutputs();
 	setSelectedCounterImage(counter?.imageId || null);
+	currentChecklist = counter?.checklist ? JSON.parse(JSON.stringify(counter.checklist)) : [];
+	renderChecklistInputs();
 	elements.counterDialog.showModal();
 	elements.counterForm.elements.name.focus();
 }
@@ -3662,6 +4246,16 @@ elements.removeCounterImage.addEventListener("click", () => {
 	setSelectedCounterImage();
 	renderImageLibrary();
 });
+elements.addChecklistItem.addEventListener("click", () => {
+	if (currentChecklist.length >= 3) return;
+	currentChecklist.push({ id: createCounterId(), text: "", done: false });
+	renderChecklistInputs();
+	updateCounterPreview();
+	const inputs = elements.counterChecklistInputs.querySelectorAll(".checklist-text-input");
+	if (inputs.length > 0) {
+		inputs[inputs.length - 1].focus();
+	}
+});
 elements.imageLibraryClose.addEventListener("click", closeImageLibrary);
 elements.imageLibraryDialog.addEventListener("click", (event) => {
 	if (event.target === elements.imageLibraryDialog) closeImageLibrary();
@@ -3669,6 +4263,15 @@ elements.imageLibraryDialog.addEventListener("click", (event) => {
 elements.imageUploadInput.addEventListener("change", () => {
 	uploadLibraryImage(elements.imageUploadInput.files?.[0]);
 });
+elements.libraryTabUpload.addEventListener("click", () => switchLibraryTab("upload"));
+elements.libraryTabAi.addEventListener("click", () => switchLibraryTab("ai"));
+document.querySelectorAll(".ai-preset-btn").forEach((button) => {
+	button.addEventListener("click", () => {
+		elements.aiPromptInput.value = button.getAttribute("data-prompt") || "";
+		elements.imageLibraryMessage.textContent = "";
+	});
+});
+elements.aiGenerateBtn.addEventListener("click", () => handleGenerateAiImage());
 elements.counterDialogClose.addEventListener("click", closeCounterDialog);
 elements.counterDialogCancel.addEventListener("click", closeCounterDialog);
 elements.counterDialog.addEventListener("click", (event) => {
@@ -4003,6 +4606,13 @@ elements.counterForm.addEventListener("submit", async (event) => {
 		color: data.get("colorEnabled") ? String(data.get("color")) : null,
 		createdAt: existingCounter?.createdAt || new Date().toISOString(),
 	};
+	if (currentChecklist.length > 0) {
+		counter.checklist = currentChecklist.map((item) => ({
+			id: item.id || createCounterId(),
+			text: String(item.text).trim().slice(0, 30),
+			done: Boolean(item.done),
+		}));
+	}
 	if (imageId) {
 		counter.imageId = imageId;
 		counter.imageOpacity = Math.round(

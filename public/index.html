@@ -27,13 +27,25 @@
 		<script src="src/occurrences.js"></script>
 		<script src="src/weather.js"></script>
 		<script src="src/notifications.js"></script>
+		<script defer src="src/focus.js"></script>
 		<script src="src/progressbar.min.js"></script>
 		<script defer src="src/analytics.js"></script>
 		<script defer src="src/pwa.js"></script>
+		<script>
+			try {
+				if (sessionStorage.getItem("timekeeper:focus-counter")) {
+					document.documentElement.dataset.focusRestore = "pending";
+				}
+			} catch {}
+		</script>
 	</head>
 
 	<body>
-		<div id="ambient-background" class="ambient-background" aria-hidden="true">
+		<div
+			id="ambient-background"
+			class="ambient-background"
+			aria-hidden="true"
+		>
 			<span class="ambient-blob blob-one"></span>
 			<span class="ambient-blob blob-two"></span>
 			<span class="ambient-blob blob-three"></span>
@@ -75,8 +87,50 @@
 					/>
 				</g>
 			</svg>
-			<canvas id="constellation-canvas" class="constellation-canvas"></canvas>
+			<canvas
+				id="constellation-canvas"
+				class="constellation-canvas"
+			></canvas>
 		</div>
+		<section
+			id="focus-mode"
+			class="focus-mode"
+			role="dialog"
+			aria-modal="true"
+			aria-hidden="true"
+			aria-labelledby="focus-mode-title"
+			inert
+		>
+			<button
+				id="focus-mode-close"
+				class="focus-mode-close"
+				type="button"
+				aria-label="Sair do modo de foco"
+				title="Sair do modo de foco (Esc)"
+			>
+				<i class="material-icons" aria-hidden="true">close</i>
+			</button>
+			<div class="focus-mode-shell">
+				<p id="focus-mode-pre" class="focus-mode-pre">Modo de foco</p>
+				<h1 id="focus-mode-title" class="focus-mode-title">Contador</h1>
+				<p
+					id="focus-mode-main"
+					class="focus-mode-main"
+					role="timer"
+					aria-live="off"
+				>
+					carregando...
+				</p>
+				<p id="focus-mode-post" class="focus-mode-post"></p>
+				<div id="focus-mode-checklist" class="focus-mode-checklist" hidden></div>
+				<div
+					id="focus-mode-progress"
+					class="focus-mode-progress"
+					aria-hidden="true"
+				></div>
+				<p class="focus-mode-hint"><kbd>Esc</kbd> para sair</p>
+			</div>
+		</section>
 		<div class="dashboard-controls" aria-label="Controles da dashboard">
 			<div class="dashboard-title">
 				<i class="material-icons" aria-hidden="true">timelapse</i>
@@ -135,7 +189,11 @@
 					aria-haspopup="true"
 					aria-expanded="false"
 				>
-					<span id="account-avatar" class="account-avatar" aria-hidden="true">
+					<span
+						id="account-avatar"
+						class="account-avatar"
+						aria-hidden="true"
+					>
 						<i class="material-icons">person</i>
 					</span>
 					<span id="account-label">Entrar com Google</span>
@@ -151,7 +209,9 @@
 					title="Instalar Timekeeper"
 					hidden
 				>
-					<i class="material-icons" aria-hidden="true">install_desktop</i>
+					<i class="material-icons" aria-hidden="true"
+						>install_desktop</i
+					>
 					<span>Instalar</span>
 				</button>
 
@@ -174,33 +234,68 @@
 				aria-label="Contadores"
 			>
 				<div id="top-panels">
-					<article class="a-panel featured">
+					<article class="a-panel featured" data-focus-id="standard:workday">
 						<div class="panel-top">
 							<span class="panel-index">01</span>
 							<h2 class="panel-title">Expediente</h2>
+							<button
+								class="focus-mode-trigger"
+								type="button"
+								data-focus-trigger
+								aria-label="Focar contador Expediente"
+								title="Modo de foco"
+							>
+								<i class="material-icons" aria-hidden="true">center_focus_strong</i>
+							</button>
 						</div>
 						<p class="panel-pre">Ainda faltam</p>
-						<p class="panel-main" aria-live="polite">carregando...</p>
-						<p class="panel-post">para encerrar o dia de trabalho.</p>
+						<p class="panel-main" aria-live="polite">
+							carregando...
+						</p>
+						<p class="panel-post">
+							para encerrar o dia de trabalho.
+						</p>
 						<div class="progress-bar"></div>
 					</article>
-					<article class="a-panel">
+					<article class="a-panel" data-focus-id="standard:payment">
 						<div class="panel-top">
 							<span class="panel-index">02</span>
 							<h2 class="panel-title">Pagamento</h2>
+							<button
+								class="focus-mode-trigger"
+								type="button"
+								data-focus-trigger
+								aria-label="Focar contador Pagamento"
+								title="Modo de foco"
+							>
+								<i class="material-icons" aria-hidden="true">center_focus_strong</i>
+							</button>
 						</div>
 						<p class="panel-pre">Ainda faltam</p>
-						<p class="panel-main" aria-live="polite">carregando...</p>
+						<p class="panel-main" aria-live="polite">
+							carregando...
+						</p>
 						<p class="panel-post">para o próximo pagamento.</p>
 						<div class="progress-bar"></div>
 					</article>
-					<article class="a-panel">
+					<article class="a-panel" data-focus-id="standard:holiday">
 						<div class="panel-top">
 							<span class="panel-index">03</span>
 							<h2 class="panel-title">Feriado</h2>
+							<button
+								class="focus-mode-trigger"
+								type="button"
+								data-focus-trigger
+								aria-label="Focar contador Feriado"
+								title="Modo de foco"
+							>
+								<i class="material-icons" aria-hidden="true">center_focus_strong</i>
+							</button>
 						</div>
 						<p class="panel-pre">Ainda faltam</p>
-						<p class="panel-main" aria-live="polite">carregando...</p>
+						<p class="panel-main" aria-live="polite">
+							carregando...
+						</p>
 						<p class="panel-post">para o próximo feriado.</p>
 						<div class="progress-bar"></div>
 					</article>
@@ -232,6 +327,30 @@
 			</section>
 
 			<section
+				id="dashboard-weather-section"
+				class="weather-section"
+				data-dashboard-section="weather"
+				aria-label="Previsão do tempo"
+			>
+				<div
+					id="weather-forecasts"
+					class="forecasts"
+					aria-live="polite"
+				></div>
+				<p id="weather-empty" class="weather-empty" hidden>
+					Nenhuma cidade visível. Adicione ou ative uma cidade nas
+					configurações.
+				</p>
+				<p
+					id="weather-offline-message"
+					class="weather-offline-message"
+					hidden
+				>
+					A previsão do tempo precisa de conexão.
+				</p>
+			</section>
+
+			<section
 				id="dashboard-timeline-section"
 				class="timeline-section"
 				data-dashboard-section="timeline"
@@ -242,19 +361,30 @@
 						<p class="section-kicker">Próximos eventos</p>
 						<h2 id="timeline-title">Timeline</h2>
 					</div>
-					<div class="timeline-filters" aria-label="Filtros da timeline">
+					<div
+						class="timeline-filters"
+						aria-label="Filtros da timeline"
+					>
 						<label>
 							<span>Tipo</span>
 							<select id="timeline-source-filter">
 								<option value="all">Todos</option>
 								<option value="workday">Expediente</option>
-								<option value="calendar">Pagamentos e feriados</option>
-								<option value="counters">Meus contadores</option>
+								<option value="calendar">
+									Pagamentos e feriados
+								</option>
+								<option value="counters">
+									Meus contadores
+								</option>
 							</select>
 						</label>
 					</div>
 				</div>
-				<p id="timeline-range" class="timeline-range" aria-live="polite"></p>
+				<p
+					id="timeline-range"
+					class="timeline-range"
+					aria-live="polite"
+				></p>
 				<div
 					id="timeline-list"
 					class="timeline-visual"
@@ -267,22 +397,6 @@
 				></div>
 				<p id="timeline-empty" class="timeline-empty" hidden>
 					Nenhum próximo evento disponível para este filtro.
-				</p>
-			</section>
-
-			<section
-				id="dashboard-weather-section"
-				class="weather-section"
-				data-dashboard-section="weather"
-				aria-label="Previsão do tempo"
-			>
-				<div id="weather-forecasts" class="forecasts" aria-live="polite"></div>
-				<p id="weather-empty" class="weather-empty" hidden>
-					Nenhuma cidade visível. Adicione ou ative uma cidade nas
-					configurações.
-				</p>
-				<p id="weather-offline-message" class="weather-offline-message" hidden>
-					A previsão do tempo precisa de conexão.
 				</p>
 			</section>
 		</main>
@@ -320,13 +434,18 @@
 			</header>
 
 			<div class="sidebar-scroll">
-				<section class="settings-section" aria-labelledby="sidebar-title">
+				<section
+					class="settings-section"
+					aria-labelledby="sidebar-title"
+				>
 					<div class="settings-heading">
 						<div>
 							<p class="section-kicker">Rotina</p>
 							<h2 id="sidebar-title">Expediente</h2>
 						</div>
-						<span class="save-state" id="settings-state">Sincronizado</span>
+						<span class="save-state" id="settings-state"
+							>Sincronizado</span
+						>
 					</div>
 					<label class="field-label" for="config-hora"
 						>Encerrar expediente</label
@@ -363,7 +482,9 @@
 					<div class="settings-heading">
 						<div>
 							<p class="section-kicker">Até cinco</p>
-							<h2 id="counter-management-title">Meus contadores</h2>
+							<h2 id="counter-management-title">
+								Meus contadores
+							</h2>
 						</div>
 						<div class="counter-heading-meta">
 							<span
@@ -372,12 +493,22 @@
 								data-state="connecting"
 								>Conectando...</span
 							>
-							<span id="counter-count" class="counter-count">0 / 5</span>
+							<span id="counter-count" class="counter-count"
+								>0 / 5</span
+							>
 						</div>
 					</div>
 
-					<div id="counter-list" class="counter-list" aria-live="polite"></div>
-					<button id="open-counter-modal" class="primary-button" type="button">
+					<div
+						id="counter-list"
+						class="counter-list"
+						aria-live="polite"
+					></div>
+					<button
+						id="open-counter-modal"
+						class="primary-button"
+						type="button"
+					>
 						<i class="material-icons" aria-hidden="true">add</i>
 						<span id="open-counter-modal-label">Novo contador</span>
 					</button>
@@ -386,12 +517,17 @@
 						class="secondary-button library-button"
 						type="button"
 					>
-						<i class="material-icons" aria-hidden="true">photo_library</i>
+						<i class="material-icons" aria-hidden="true"
+							>photo_library</i
+						>
 						Biblioteca de imagens
 					</button>
 				</section>
 
-				<section class="settings-section" aria-labelledby="appearance-title">
+				<section
+					class="settings-section"
+					aria-labelledby="appearance-title"
+				>
 					<div class="settings-heading">
 						<div>
 							<p class="section-kicker">Interface</p>
@@ -402,11 +538,19 @@
 					<div class="color-fields">
 						<label class="color-field">
 							<span>Principal</span>
-							<input id="accent-primary" type="color" value="#a78bfa" />
+							<input
+								id="accent-primary"
+								type="color"
+								value="#a78bfa"
+							/>
 						</label>
 						<label class="color-field">
 							<span>Secundária</span>
-							<input id="accent-secondary" type="color" value="#362860" />
+							<input
+								id="accent-secondary"
+								type="color"
+								value="#362860"
+							/>
 						</label>
 					</div>
 
@@ -426,33 +570,51 @@
 						aria-label="Ordem e visibilidade das seções"
 					></div>
 					<p class="setting-help">
-						Use as setas para organizar as seções. Os contadores padrão
-						permanecem visíveis.
+						Use as setas para organizar as seções. Os contadores
+						padrão permanecem visíveis.
 					</p>
 
 					<div class="appearance-divider"></div>
 					<label class="toggle-field" for="background-enabled">
 						<span>
 							<strong>Fundo animado</strong>
-							<small>Movimento ambiente atrás dos contadores</small>
+							<small
+								>Movimento ambiente atrás dos contadores</small
+							>
 						</span>
-						<input id="background-enabled" type="checkbox" role="switch" />
+						<input
+							id="background-enabled"
+							type="checkbox"
+							role="switch"
+						/>
 					</label>
-					<div id="background-controls" class="background-controls is-disabled">
+					<div
+						id="background-controls"
+						class="background-controls is-disabled"
+					>
 						<label class="field-label">
 							Estilo
 							<select id="background-style" class="settings-select" disabled>
 								<option value="lava">Lava lamp</option>
 								<option value="float">Blobs flutuantes</option>
-								<option value="glass">Correntes de vidro</option>
-								<option value="rings">Anéis cronológicos</option>
+								<option value="glass">
+									Correntes de vidro
+								</option>
+								<option value="rings">
+									Anéis cronológicos
+								</option>
 								<option value="aurora">Aurora orbital</option>
-								<option value="topography">Mapa topográfico</option>
-								<option value="constellation">Constelação dinâmica</option>
+								<option value="topography">
+									Mapa topográfico
+								</option>
+								<option value="constellation">
+									Constelação dinâmica
+								</option>
 							</select>
 						</label>
 						<p id="background-description" class="setting-help">
-							Formas quentes que sobem, se fundem e mudam lentamente.
+							Formas quentes que sobem, se fundem e mudam
+							lentamente.
 						</p>
 						<div class="color-fields background-color-fields">
 							<label class="color-field">
@@ -477,7 +639,9 @@
 						<label class="range-field">
 							<span
 								>Velocidade
-								<output id="background-speed-output" for="background-speed"
+								<output
+									id="background-speed-output"
+									for="background-speed"
 									>Normal</output
 								></span
 							>
@@ -520,9 +684,13 @@
 					<div class="settings-heading">
 						<div>
 							<p class="section-kicker">Até cinco</p>
-							<h2 id="weather-settings-title">Previsão do tempo</h2>
+							<h2 id="weather-settings-title">
+								Previsão do tempo
+							</h2>
 						</div>
-						<span id="weather-widget-count" class="counter-count">3 / 5</span>
+						<span id="weather-widget-count" class="counter-count"
+							>3 / 5</span
+						>
 					</div>
 					<div
 						id="weather-widget-list"
@@ -535,18 +703,34 @@
 						type="button"
 						style="display: flex; align-items: center"
 					>
-						<i class="material-icons" aria-hidden="true">add_location</i>
+						<i class="material-icons" aria-hidden="true"
+							>add_location</i
+						>
 						Adicionar cidade
 					</button>
-					<form id="weather-widget-form" class="weather-widget-form" hidden>
+					<form
+						id="weather-widget-form"
+						class="weather-widget-form"
+						hidden
+					>
 						<input name="id" type="hidden" />
 						<label class="field-label">
 							Cidade
-							<input name="label1" type="text" maxlength="40" required />
+							<input
+								name="label1"
+								type="text"
+								maxlength="40"
+								required
+							/>
 						</label>
 						<label class="field-label">
 							Estado ou região
-							<input name="label2" type="text" maxlength="40" required />
+							<input
+								name="label2"
+								type="text"
+								maxlength="40"
+								required
+							/>
 						</label>
 						<label class="field-label">
 							Link do Forecast7
@@ -597,7 +781,9 @@
 					<div class="settings-heading">
 						<div>
 							<p class="section-kicker">Alertas inteligentes</p>
-							<h2 id="notification-settings-title">Notificações</h2>
+							<h2 id="notification-settings-title">
+								Notificações
+							</h2>
 						</div>
 						<span
 							id="notification-state"
@@ -611,7 +797,11 @@
 							<strong>Ativar neste dispositivo</strong>
 							<small>A permissão só será solicitada ao ativar.</small>
 						</span>
-						<input id="notifications-enabled" type="checkbox" role="switch" />
+						<input
+							id="notifications-enabled"
+							type="checkbox"
+							role="switch"
+						/>
 					</label>
 					<div
 						id="notification-controls"
@@ -619,7 +809,9 @@
 					>
 						<fieldset class="notification-options">
 							<legend>Antecedência</legend>
-							<div class="notification-choice-grid notification-lead-grid">
+							<div
+								class="notification-choice-grid notification-lead-grid"
+							>
 								<label
 									><input
 										type="checkbox"
@@ -696,7 +888,9 @@
 						>
 							<span>
 								<strong>Horário de silêncio</strong>
-								<small>Não emitir alertas nesse intervalo.</small>
+								<small
+									>Não emitir alertas nesse intervalo.</small
+								>
 							</span>
 							<input
 								id="notification-quiet-enabled"
@@ -704,7 +898,10 @@
 								role="switch"
 							/>
 						</label>
-						<div id="notification-quiet-times" class="notification-quiet-times">
+						<div
+							id="notification-quiet-times"
+							class="notification-quiet-times"
+						>
 							<label class="field-label"
 								>Início<input
 									id="notification-quiet-start"
@@ -740,7 +937,9 @@
 						type="button"
 						hidden
 					>
-						<i class="material-icons" aria-hidden="true">settings</i>
+						<i class="material-icons" aria-hidden="true"
+							>settings</i
+						>
 						Configuração geral
 					</button>
 					<button
@@ -756,7 +955,9 @@
 						class="text-button danger-button"
 						type="button"
 					>
-						<i class="material-icons" aria-hidden="true">delete_forever</i>
+						<i class="material-icons" aria-hidden="true"
+							>delete_forever</i
+						>
 						Excluir conta e dados
 					</button>
 				</footer>
@@ -785,8 +986,13 @@
 						<i class="material-icons">close</i>
 					</button>
 				</div>
-				<section class="counter-live-preview" aria-label="Prévia do contador">
-					<span class="counter-live-preview-label">Prévia do card</span>
+				<section
+					class="counter-live-preview"
+					aria-label="Prévia do contador"
+				>
+					<span class="counter-live-preview-label"
+						>Prévia do card</span
+					>
 					<div
 						id="counter-preview-card"
 						class="counter-preview-card"
@@ -804,11 +1010,17 @@
 						</div>
 						<div class="counter-preview-top">
 							<span class="counter-preview-index">04</span>
-							<strong id="counter-preview-title">Nome do contador</strong>
+							<strong id="counter-preview-title"
+								>Nome do contador</strong
+							>
 						</div>
 						<span class="counter-preview-pre">Ainda faltam</span>
-						<strong class="counter-preview-time">12d 08h 42m</strong>
-						<span id="counter-preview-post" class="counter-preview-post"
+						<strong class="counter-preview-time"
+							>12d 08h 42m</strong
+						>
+						<span
+							id="counter-preview-post"
+							class="counter-preview-post"
 							>para Nome do contador.</span
 						>
 						<span class="counter-preview-progress"></span>
@@ -928,10 +1140,16 @@
 				<div id="fixed-schedule-fields" class="schedule-fields">
 					<div class="date-grid">
 						<label class="field-label"
-							>Início<input name="startAt" type="datetime-local" required
+							>Início<input
+								name="startAt"
+								type="datetime-local"
+								required
 						/></label>
 						<label class="field-label"
-							>Fim<input name="endAt" type="datetime-local" required
+							>Fim<input
+								name="endAt"
+								type="datetime-local"
+								required
 						/></label>
 					</div>
 				</div>
@@ -1000,18 +1218,37 @@
 							/><span>Sex</span></label
 						>
 						<label
-							><input name="daysOfWeek" type="checkbox" value="6" /><span
-								>Sáb</span
-							></label
+							><input
+								name="daysOfWeek"
+								type="checkbox"
+								value="6"
+							/><span>Sáb</span></label
 						>
 						<label
-							><input name="daysOfWeek" type="checkbox" value="0" /><span
-								>Dom</span
-							></label
+							><input
+								name="daysOfWeek"
+								type="checkbox"
+								value="0"
+							/><span>Dom</span></label
 						>
 					</div>
 				</fieldset>
-				<p id="counter-message" class="form-message" aria-live="polite"></p>
+				<fieldset id="counter-checklist-fields" class="counter-checklist-fields">
+					<legend>Subtarefas (até 3)</legend>
+					<div id="counter-checklist-inputs" class="counter-checklist-inputs"></div>
+					<button
+						id="add-checklist-item"
+						class="secondary-button add-checklist-btn"
+						type="button"
+					>
+						<i class="material-icons" aria-hidden="true">add</i> Adicionar subtarefa
+					</button>
+				</fieldset>
+				<p
+					id="counter-message"
+					class="form-message"
+					aria-live="polite"
+				></p>
 				<div class="modal-actions">
 					<button
 						id="counter-dialog-cancel"
@@ -1020,7 +1257,11 @@
 					>
 						Cancelar
 					</button>
-					<button id="counter-submit" class="primary-button" type="submit">
+					<button
+						id="counter-submit"
+						class="primary-button"
+						type="submit"
+					>
 						Criar contador
 					</button>
 				</div>
@@ -1053,27 +1294,164 @@
 				<div class="library-usage-track" aria-hidden="true">
 					<span id="image-library-usage-bar"></span>
 				</div>
-				<label
-					id="image-upload-dropzone"
-					class="image-upload-dropzone"
-					for="image-upload-input"
-				>
-					<input
-						id="image-upload-input"
-						type="file"
-						accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
-					/>
-					<i class="material-icons" aria-hidden="true">image</i>
-					<span
-						><strong>Enviar imagem</strong
-						><small>JPG, PNG, WebP, GIF ou AVIF · até 5 MB</small></span
+				<div class="library-tabs">
+					<button
+						id="library-tab-upload"
+						type="button"
+						aria-selected="true"
+						aria-controls="library-panel-upload"
 					>
-				</label>
-				<div id="image-upload-progress" class="image-upload-progress" hidden>
-					<span id="image-upload-label">Enviando...</span>
-					<progress id="image-upload-progress-bar" max="100" value="0">
-						0%
-					</progress>
+						Enviar arquivo
+					</button>
+					<button
+						id="library-tab-ai"
+						type="button"
+						aria-selected="false"
+						aria-controls="library-panel-ai"
+					>
+						Gerar com IA
+					</button>
+				</div>
+				<div
+					id="library-panel-upload"
+					class="library-panel"
+					role="tabpanel"
+				>
+					<label
+						id="image-upload-dropzone"
+						class="image-upload-dropzone"
+						for="image-upload-input"
+					>
+						<input
+							id="image-upload-input"
+							type="file"
+							accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
+						/>
+						<i class="material-icons" aria-hidden="true">image</i>
+						<span
+							><strong>Enviar imagem</strong
+							><small
+								>JPG, PNG, WebP, GIF ou AVIF · até 5 MB</small
+							></span
+						>
+					</label>
+					<div
+						id="image-upload-progress"
+						class="image-upload-progress"
+						hidden
+					>
+						<span id="image-upload-label">Enviando...</span>
+						<progress
+							id="image-upload-progress-bar"
+							max="100"
+							value="0"
+						>
+							0%
+						</progress>
+					</div>
+				</div>
+				<div
+					id="library-panel-ai"
+					class="library-panel"
+					role="tabpanel"
+					hidden
+				>
+					<div class="ai-generator-form">
+						<div class="ai-field">
+							<span class="ai-label">Ideias rápidas</span>
+							<div class="ai-presets">
+								<button
+									type="button"
+									class="ai-preset-btn"
+									data-prompt="A detailed cosmic nebula with swirling deep purple and violet cosmic dust, glowing stars, and faint nebular gas, dark space atmosphere, cinematic lighting"
+								>
+									🌌 Nebulosa
+								</button>
+								<button
+									type="button"
+									class="ai-preset-btn"
+									data-prompt="A minimalist wave of purple and green aurora borealis flowing smoothly over a dark, silhouetted geometric landscape, clean digital art"
+								>
+									🌅 Aurora
+								</button>
+								<button
+									type="button"
+									class="ai-preset-btn"
+									data-prompt="An abstract cyberpunk digital landscape with glowing cyan and neon magenta grid lines receding into a dark horizon, retro-futuristic style"
+								>
+									🌐 Cyberpunk
+								</button>
+								<button
+									type="button"
+									class="ai-preset-btn"
+									data-prompt="Abstract flowing time waves resembling elegant golden sand grains drifting across a pure black void, luxury fluid dynamics"
+								>
+									⏳ Ondas do Tempo
+								</button>
+							</div>
+						</div>
+						<div class="ai-field">
+							<label for="ai-prompt-input" class="ai-label"
+								>O que você quer ver?</label
+							>
+							<textarea
+								id="ai-prompt-input"
+								placeholder="Descreva o fundo ideal (ex: planeta brilhante em órbita profunda, tons de azul e roxo)..."
+								maxlength="500"
+							></textarea>
+						</div>
+						<div class="ai-row">
+							<div class="ai-field ai-half">
+								<label for="ai-theme-select" class="ai-label"
+									>Tema de cor</label
+								>
+								<select id="ai-theme-select">
+									<option value="">(Nenhum tema)</option>
+									<option value="deep violet and purple">
+										Roxo / Violeta
+									</option>
+									<option value="dark cyan and neon blue">
+										Azul / Ciano
+									</option>
+									<option
+										value="deep space black and glowing gold"
+									>
+										Preto / Dourado
+									</option>
+									<option
+										value="monochrome dark charcoal and silver"
+									>
+										Prata / Monocromático
+									</option>
+								</select>
+							</div>
+							<div class="ai-field ai-half">
+								<label for="ai-ratio-select" class="ai-label"
+									>Formato (Aspect Ratio)</label
+								>
+								<select id="ai-ratio-select">
+									<option value="4:3" selected>
+										4:3 Card (Padrão)
+									</option>
+									<option value="1:1">1:1 Quadrado</option>
+									<option value="16:9">
+										16:9 Horizontal
+									</option>
+								</select>
+							</div>
+						</div>
+						<button
+							id="ai-generate-btn"
+							class="primary-button ai-generate-btn"
+							type="button"
+						>
+							Gerar fundo com IA
+						</button>
+						<div id="ai-loading" class="ai-loading" hidden>
+							<div class="ai-spinner"></div>
+							<span id="ai-loading-text">Gerando imagem...</span>
+						</div>
+					</div>
 				</div>
 				<p
 					id="image-library-message"
@@ -1156,14 +1534,23 @@
 					aria-labelledby="admin-tab-workday"
 					data-admin-panel="workday"
 				>
-					<form id="admin-workday-form" class="admin-form admin-workday-form">
+					<form
+						id="admin-workday-form"
+						class="admin-form admin-workday-form"
+					>
 						<div class="admin-workday-controls">
 							<div class="date-grid">
 								<label class="field-label"
-									>Início<input name="startTime" type="time" required
+									>Início<input
+										name="startTime"
+										type="time"
+										required
 								/></label>
 								<label class="field-label"
-									>Fim<input name="endTime" type="time" required
+									>Fim<input
+										name="endTime"
+										type="time"
+										required
 								/></label>
 							</div>
 							<button class="primary-button" type="submit">
@@ -1174,39 +1561,53 @@
 							<legend>Dias de expediente</legend>
 							<div class="weekday-options">
 								<label
-									><input name="daysOfWeek" type="checkbox" value="1" /><span
-										>Seg</span
-									></label
+									><input
+										name="daysOfWeek"
+										type="checkbox"
+										value="1"
+									/><span>Seg</span></label
 								>
 								<label
-									><input name="daysOfWeek" type="checkbox" value="2" /><span
-										>Ter</span
-									></label
+									><input
+										name="daysOfWeek"
+										type="checkbox"
+										value="2"
+									/><span>Ter</span></label
 								>
 								<label
-									><input name="daysOfWeek" type="checkbox" value="3" /><span
-										>Qua</span
-									></label
+									><input
+										name="daysOfWeek"
+										type="checkbox"
+										value="3"
+									/><span>Qua</span></label
 								>
 								<label
-									><input name="daysOfWeek" type="checkbox" value="4" /><span
-										>Qui</span
-									></label
+									><input
+										name="daysOfWeek"
+										type="checkbox"
+										value="4"
+									/><span>Qui</span></label
 								>
 								<label
-									><input name="daysOfWeek" type="checkbox" value="5" /><span
-										>Sex</span
-									></label
+									><input
+										name="daysOfWeek"
+										type="checkbox"
+										value="5"
+									/><span>Sex</span></label
 								>
 								<label
-									><input name="daysOfWeek" type="checkbox" value="6" /><span
-										>Sáb</span
-									></label
+									><input
+										name="daysOfWeek"
+										type="checkbox"
+										value="6"
+									/><span>Sáb</span></label
 								>
 								<label
-									><input name="daysOfWeek" type="checkbox" value="0" /><span
-										>Dom</span
-									></label
+									><input
+										name="daysOfWeek"
+										type="checkbox"
+										value="0"
+									/><span>Dom</span></label
 								>
 							</div>
 						</fieldset>
@@ -1223,9 +1624,14 @@
 					<form id="admin-payment-form" class="admin-date-form">
 						<input name="editingId" type="hidden" />
 						<label class="field-label admin-date-field"
-							>Data de pagamento<input name="date" type="date" required
+							>Data de pagamento<input
+								name="date"
+								type="date"
+								required
 						/></label>
-						<button class="primary-button" type="submit">Salvar</button>
+						<button class="primary-button" type="submit">
+							Salvar
+						</button>
 						<button
 							class="secondary-button admin-date-cancel"
 							type="button"
@@ -1251,9 +1657,14 @@
 					<form id="admin-holiday-form" class="admin-date-form">
 						<input name="editingId" type="hidden" />
 						<label class="field-label admin-date-field"
-							>Data de feriado<input name="date" type="date" required
+							>Data de feriado<input
+								name="date"
+								type="date"
+								required
 						/></label>
-						<button class="primary-button" type="submit">Salvar</button>
+						<button class="primary-button" type="submit">
+							Salvar
+						</button>
 						<button
 							class="secondary-button admin-date-cancel"
 							type="button"
@@ -1268,7 +1679,11 @@
 						aria-live="polite"
 					></div>
 				</section>
-				<p id="admin-message" class="form-message" aria-live="polite"></p>
+				<p
+					id="admin-message"
+					class="form-message"
+					aria-live="polite"
+				></p>
 			</div>
 		</dialog>
 		<div
@@ -1277,7 +1692,12 @@
 			role="status"
 			aria-live="polite"
 		></div>
-		<div id="pwa-update-banner" class="pwa-update-banner" role="status" hidden>
+		<div
+			id="pwa-update-banner"
+			class="pwa-update-banner"
+			role="status"
+			hidden
+		>
 			<span>Uma nova versão do Timekeeper está disponível.</span>
 			<button id="pwa-update-button" class="primary-button" type="button">
 				Atualizar agora
@@ -1293,16 +1713,24 @@
 				<p class="section-kicker">Privacidade</p>
 				<h2 id="privacy-title">Você decide sobre métricas</h2>
 				<p>
-					Podemos usar o Google Analytics para entender o uso do Timekeeper.
-					Nenhum contador ou horário pessoal é enviado.
+					Podemos usar o Google Analytics para entender o uso do
+					Timekeeper. Nenhum contador ou horário pessoal é enviado.
 					<a href="privacy.html">Saiba mais</a>.
 				</p>
 			</div>
 			<div class="privacy-actions">
-				<button id="privacy-decline" class="secondary-button" type="button">
+				<button
+					id="privacy-decline"
+					class="secondary-button"
+					type="button"
+				>
 					Não permitir
 				</button>
-				<button id="privacy-accept" class="primary-button" type="button">
+				<button
+					id="privacy-accept"
+					class="primary-button"
+					type="button"
+				>
 					Permitir métricas
 				</button>
 			</div>
@@ -1345,30 +1773,34 @@
 						type: "recurring",
 						startTime: workdayConfig.startTime,
 						endTime:
-							String(document.querySelector("#config-hora").value).padStart(
-								2,
-								"0",
-							) +
+							String(
+								document.querySelector("#config-hora").value,
+							).padStart(2, "0") +
 							":" +
-							String(document.querySelector("#config-minutos").value).padStart(
-								2,
-								"0",
-							),
+							String(
+								document.querySelector("#config-minutos").value,
+							).padStart(2, "0"),
 						daysOfWeek: workdayConfig.daysOfWeek,
 					},
 					now,
 				);
 				var panels = document.querySelectorAll("#top-panels .a-panel");
 				panels[0].querySelector(".panel-pre").textContent =
-					workdayState.phase === "active" ? "Ainda faltam" : "Começa em";
-				panels[0].querySelector(".panel-main").innerHTML = formatInterval(
-					intervalBreakdown(workdayState.target - now),
-				);
+					workdayState.phase === "active"
+						? "Ainda faltam"
+						: "Começa em";
+				panels[0].querySelector(".panel-main").innerHTML =
+					formatInterval(
+						intervalBreakdown(workdayState.target - now),
+					);
 				panels[0].querySelector(".panel-post").textContent =
 					workdayState.phase === "active"
 						? "para encerrar o dia de trabalho."
 						: "para iniciar o próximo expediente.";
-				var targets = [findNext(pagamentos, now), findNext(feriados, now)];
+				var targets = [
+					findNext(pagamentos, now),
+					findNext(feriados, now),
+				];
 				var calendarLabels = ["próximo pagamento", "próximo feriado"];
 				panels.forEach((panel, index) => {
 					if (index === 0) return;
@@ -1378,7 +1810,9 @@
 					var post = panel.querySelector(".panel-post");
 					if (target) {
 						pre.textContent = "Ainda faltam";
-						main.innerHTML = formatInterval(intervalBreakdown(target - now));
+						main.innerHTML = formatInterval(
+							intervalBreakdown(target - now),
+						);
 						post.textContent = `para o ${calendarLabels[index - 1]}.`;
 						return;
 					}
@@ -1392,9 +1826,16 @@
 			}
 
 			function setCookie(name, value, days) {
-				var expires = new Date(Date.now() + days * 86400000).toUTCString();
+				var expires = new Date(
+					Date.now() + days * 86400000,
+				).toUTCString();
 				document.cookie =
-					name + "=" + value + ";expires=" + expires + ";path=/;SameSite=Lax";
+					name +
+					"=" +
+					value +
+					";expires=" +
+					expires +
+					";path=/;SameSite=Lax";
 			}
 			function getCookie(name) {
 				var match = document.cookie

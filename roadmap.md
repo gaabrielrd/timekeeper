@@ -28,6 +28,11 @@ sem interromper a experiência de visitantes ou a sincronização atual pelo Fir
 | 4 | Timeline | Fases 0 e 2 | Eventos padrão e pessoais em uma visão cronológica |
 | 5A | Notificações locais | Fases 1 e 4 | Alertas enquanto o navegador/PWA puder executar |
 | 5B | Push confiável | Fase 5A + backend | Alertas com a aplicação fechada |
+| 6 | Mini-Checklists | Fases 0 e 2 | Subtarefas em cards e progresso parcial |
+| 7 | Modo de Foco | Fases 0 e 2 | Tela cheia imersiva focada em um único contador com fundo animado |
+| 8 | Arquivo & Conquistas | Fases 0 e 2 | Histórico de contadores finalizados e persistência em `/data/archive` |
+| 9 | Calendário Mensal | Fases 0, 2 e 4 | Grade visual de calendário para ocorrências da Timeline |
+| 10 | Clima Dinâmico | Fases 0, 2 e 3 | Efeitos climáticos (chuva, sol, noite) nos cards de previsão |
 
 ## Status da execução
 
@@ -38,6 +43,11 @@ sem interromper a experiência de visitantes ou a sincronização atual pelo Fir
 - [x] Fase 4 — timeline
 - [x] Fase 5A — notificações locais
 - [x] Fase 5B — push confiável (ativação remota depende de configuração e deploy)
+- [ ] Fase 6 — mini-checklists nos contadores
+- [x] Fase 7 — modo de foco (zen screen)
+- [ ] Fase 8 — histórico e arquivo de contadores (conquistas)
+- [ ] Fase 9 — visualização em grade de calendário
+- [ ] Fase 10 — clima dinâmico nos cards
 
 As marcações acima representam implementação, documentação e gates automatizados
 concluídos. A validação manual em navegadores e dispositivos reais permanece no
@@ -134,7 +144,7 @@ dependem dos mesmos dados.
 ```js
 {
   dashboardLayout: "balanced",
-  dashboardSectionOrder: ["standard", "custom", "timeline", "weather"],
+  dashboardSectionOrder: ["standard", "custom", "weather", "timeline"],
   hiddenDashboardSections: []
 }
 ```
@@ -310,6 +320,82 @@ operação e ativação estão em
 - Reprocessamento é idempotente e não cria notificações duplicadas.
 - Métricas mostram agendado, enviado, inválido e falha sem registrar conteúdo
   sensível desnecessário.
+
+## Fase 6 — Mini-Checklists nos contadores
+
+### Objetivo
+Permitir que usuários autenticados definam subtarefas nos contadores pessoais, exibindo progresso tanto temporal quanto de metas concluídas diretamente no card.
+
+### Escopo MVP
+- Permitir criar e ordenar até 3 subtarefas por contador pessoal no modal de edição.
+- Exibir checkboxes de status nos cards e barras de progresso parcial de conclusão.
+- Persistir a lista de tarefas como um array estruturado no próprio item do contador.
+- Permitir marcar/desmarcar subtarefas diretamente na UI do card (otimista, com sincronização em tempo real).
+
+### Critérios de aceite
+- O limite máximo de 3 subtarefas por contador é validado no cliente e nas Firestore Rules.
+- A barra de progresso do card se adapta elegantemente para mostrar o percentual do tempo e o progresso das tarefas concluídas.
+- As subtarefas mantêm seu estado de sincronização e ordenação entre abas.
+
+## Fase 7 — Modo de Foco (Zen Screen)
+
+### Objetivo
+Oferecer uma visualização em tela cheia de um contador selecionado, integrando-o ao fundo animado para criar uma experiência temporal imersiva livre de distrações.
+
+### Escopo MVP
+- Adicionar um botão de "Modo de Foco" (ícone ou link discreto) no cabeçalho do card de qualquer contador.
+- Esconder toda a dashboard e centralizar o contador selecionado com tipografia editorial em tamanho extra grande.
+- Integrar a movimentação e partículas do fundo animado ativo, aplicando contraste apropriado às cores do texto.
+- Persistir a preferência da seção em foco em cookies locais ou transientemente em sessão para restaurar em caso de reload.
+- Sair do modo de foco pressionando a tecla `ESC` ou clicando em um botão discreto de fechar.
+
+### Critérios de aceite
+- O layout do Modo de Foco adapta-se perfeitamente para viewports mobile (vertical) e desktop (horizontal/telas secundárias).
+- Transições de entrada e saída do Modo de Foco ocorrem sem flashes ou pops de animação, respeitando a configuração de reduced motion.
+
+## Fase 8 — Histórico e Arquivo de Contadores (Conquistas)
+
+### Objetivo
+Implementar o arquivamento de contadores fixos completados para manter o painel de contadores ativos limpo, sem perder o registro histórico das metas concluídas.
+
+### Escopo MVP
+- Mover contadores fixos que chegaram a 100% de progresso para a coleção de arquivo (`/users/{uid}/data/archive`).
+- Adicionar um painel / histórico de "Conquistas" na biblioteca ou configurações onde o usuário possa rever as últimas 100 metas concluídas.
+- Exibir a data e hora em que a meta foi alcançada.
+- Permitir excluir permanentemente itens do arquivo.
+
+### Critérios de aceite
+- As Firestore Rules limitam o arquivo a no máximo 100 itens por usuário para preservar o limite de armazenamento.
+- A migração de um contador ativo para o arquivo libera instantaneamente o budget para a criação de um novo contador ativo (mantendo o limite de 5 ativos).
+
+## Fase 9 — Visualização em Grade de Calendário
+
+### Objetivo
+Expandir as visualizações temporais da seção *Timeline* permitindo alternar de uma representação linear para uma grade clássica de calendário mensal/semanal.
+
+### Escopo MVP
+- Adicionar um seletor visual na Timeline para alternar entre "Lista Linear" e "Calendário Mensal".
+- Renderizar uma grade de calendário do mês corrente com o dia de hoje destacado.
+- Indicar os marcos temporais (expediente, pagamentos, feriados, contadores ativos) com pequenas tags de texto ou pontos de cores correspondentes no dia correto.
+- Permitir abrir os detalhes de um evento ao clicar no respectivo dia.
+
+### Critérios de aceite
+- A grade de calendário permanece responsiva de 320 px a desktop, reduzindo para visualização semanal ou lista compacta em celulares.
+- O cálculo e a renderização das datas do calendário utilizam o fuso horário local do dispositivo do usuário.
+
+## Fase 10 — Clima Dinâmico nos Cards
+
+### Objetivo
+Aumentar a excelência visual dos widgets de clima, estilizando dinamicamente os backgrounds dos cards com micropartículas e atmosferas baseadas nas condições de tempo reais fornecidas pela API.
+
+### Escopo MVP
+- Mapear a condição do clima retornada pelo Forecast7 (ex: limpo, chuvoso, nublado, tempestade).
+- Gerar efeitos em CSS/canvas leves aplicados exclusivamente dentro do card da respectiva cidade (ex: gotas de chuva suaves caindo, névoa oscilante, estrelas brilhando à noite).
+- Otimizar o desempenho visual para que as animações de clima consumam pouca CPU/GPU e fiquem em pausa quando o card não estiver visível no viewport.
+
+### Critérios de aceite
+- Respeita o `prefers-reduced-motion` desativando as micropartículas de forma estrita.
+- Os cards mantêm o contraste de texto e a visibilidade dos controles de edição/exclusão sob qualquer efeito climático.
 
 ## Testes transversais
 

@@ -1,4 +1,7 @@
 window.TimekeeperRuntimeConfig = Object.freeze({
+	// Chave gratuita do Google AI Studio para geração de imagens sem custo localmente (opcional)
+	// Crie a sua chave de API gratuitamente em: https://aistudio.google.com/
+	aiStudioApiKey: "",
 	push: Object.freeze({
 		functionsRegion: "southamerica-east1",
 		vapidKey:

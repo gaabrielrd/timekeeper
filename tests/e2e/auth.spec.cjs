@@ -224,6 +224,28 @@ test("usuário personaliza o layout e sincroniza entre abas", async (
 	await secondPage.close();
 });
 
+test("contador pessoal abre e restaura o modo de foco", async ({ page }, testInfo) => {
+	await loginWithGoogleEmulator(page, testInfo.project.name);
+	await page.locator("#auth-button").click();
+	await page.locator("#open-counter-modal").click();
+	await page.locator('[name="name"]').fill("Foco E2E");
+	await page.locator("#counter-submit").click();
+	await page.locator("#sidebar-close").click();
+
+	const focusTrigger = page.getByRole("button", { name: "Focar contador Foco E2E" });
+	if (testInfo.project.name === "chromium") {
+		await page.locator("#custom-panels .user-panel").hover();
+	}
+	await focusTrigger.click();
+	await expect(page.locator("#focus-mode-title")).toHaveText("Foco E2E");
+	await expect(page.locator("#focus-mode-main")).not.toHaveText("carregando...");
+	await page.reload();
+	await expect(page.locator("body")).toHaveClass(/focus-mode-active/);
+	await expect(page.locator("#focus-mode-title")).toHaveText("Foco E2E");
+	await page.getByRole("button", { name: "Sair do modo de foco" }).click();
+	await expect(page.locator("body")).not.toHaveClass(/focus-mode-active/);
+});
+
 test("notificações só pedem permissão após ativação explícita", async (
 	{ page },
 	testInfo,

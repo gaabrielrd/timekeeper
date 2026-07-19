@@ -3,8 +3,8 @@
 ## Estado atual
 
 O projeto usa Node Test Runner, Playwright e Firebase Emulator Suite. A suíte atual
-contém 53 testes unitários/contratuais do cliente, 7 testes do domínio das Functions,
-32 E2E em Chromium (16 cenários em desktop e mobile) e 16 testes de
+contém 54 testes unitários/contratuais do cliente, 7 testes do domínio das Functions,
+38 E2E em Chromium (19 cenários em desktop e mobile) e 16 testes de
 Firestore/Storage Rules. GitHub Actions executa todos em pushes, pull requests e
 disparos manuais.
 
@@ -64,6 +64,8 @@ outro diretório silenciosamente.
 - contrato de permissão explícita, deduplicação e clique do service worker.
 - contrato FID/App Check, scheduler, fila determinística, TTL e configuração das
   Functions.
+- marcação, armazenamento de sessão, saída por teclado e cache offline do Modo de
+  Foco.
 
 ### Firestore Rules
 
@@ -103,6 +105,8 @@ outro diretório silenciosamente.
 - Timeline SVG geral e pessoal, orientação responsiva, filtros, marcadores únicos,
   segmentos recorrentes e abertura do editor.
 - notificações concedidas, negadas e indisponíveis sem prompt automático.
+- Modo de Foco padrão e pessoal, reload da sessão, `Esc`, botão de fechar, reduced
+  motion e ausência de overflow em desktop/mobile.
 
 Os E2E usam `demo-timekeeper` e só ativam emuladores com `?emulators=1` em
 localhost. Nenhum teste automatizado escreve no projeto Firebase de produção.
@@ -195,6 +199,17 @@ Viewports sugeridos: 320, 390, 768, 1024 e 1440 px.
 - O sexto contador é impedido na UI e pelas rules.
 - O botão do header só aparece com ao menos um contador.
 - Ocultar/mostrar abre a seção com animação de acordeão.
+
+### Modo de Foco
+
+- Os três cards padrão e todos os cards pessoais exibem uma ação com nome acessível.
+- Título, intervalo, progresso e checklist acompanham o card de origem.
+- Reload na mesma aba restaura o contador sem mostrar a dashboard primeiro.
+- `Esc` e o botão de fechar saem do modo e removem o estado da sessão.
+- Excluir o contador em foco ou restaurar um ID obsoleto retorna à dashboard.
+- A composição não cria overflow em 320, 390, 768 px ou desktop.
+- O fundo ativo não é remontado, o contraste permanece legível e reduced motion
+  praticamente elimina a transição.
 
 ### Biblioteca de imagens
 

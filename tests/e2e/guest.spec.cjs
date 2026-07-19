@@ -26,6 +26,60 @@ test("visitante acompanha contadores e persiste o expediente", async ({ page }) 
 	await expect(page.locator("#guest-config-minutos")).toHaveValue("25");
 });
 
+test("modo de foco restaura o contador e fecha por Escape sem overflow", async (
+	{ page },
+	testInfo,
+) => {
+	await page.emulateMedia({ reducedMotion: "reduce" });
+	await page.evaluate(() => {
+		document.body.dataset.backgroundEnabled = "true";
+	});
+	const focusTrigger = page.getByRole("button", {
+		name: "Focar contador Expediente",
+	});
+	if (testInfo.project.name === "chromium") {
+		await expect(focusTrigger).toBeHidden();
+		await page.locator('[data-focus-id="standard:workday"]').hover();
+	}
+	await expect(focusTrigger).toBeVisible();
+	await focusTrigger.click();
+	await expect(page.locator("body")).toHaveClass(/focus-mode-active/);
+	await expect(page.locator("#focus-mode")).toHaveAttribute("aria-hidden", "false");
+	await expect(page.locator("#focus-mode-title")).toHaveText("Expediente");
+	await expect(page.locator("#focus-mode-main")).not.toHaveText("carregando...");
+	const ambientOpacity = await page
+		.locator("#ambient-background")
+		.evaluate((element) => Number.parseFloat(getComputedStyle(element).opacity));
+	expect(ambientOpacity).toBeGreaterThan(0);
+	await expect
+		.poll(() =>
+			page.evaluate(() => sessionStorage.getItem("timekeeper:focus-counter")),
+		)
+		.toBe("standard:workday");
+	const reducedTransition = await page
+		.locator("#focus-mode")
+		.evaluate((element) => getComputedStyle(element).transitionDuration);
+	expect(Number.parseFloat(reducedTransition)).toBeLessThanOrEqual(0.001);
+
+	await page.reload();
+	await expect(page.locator("body")).toHaveClass(/focus-mode-active/);
+	await expect(page.locator("#focus-mode-title")).toHaveText("Expediente");
+	const dimensions = await page.evaluate(() => ({
+		clientWidth: document.documentElement.clientWidth,
+		scrollWidth: document.documentElement.scrollWidth,
+	}));
+	expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth);
+
+	await page.keyboard.press("Escape");
+	await expect(page.locator("body")).not.toHaveClass(/focus-mode-active/);
+	await expect(page.locator("#focus-mode")).toHaveAttribute("aria-hidden", "true");
+	await expect
+		.poll(() =>
+			page.evaluate(() => sessionStorage.getItem("timekeeper:focus-counter")),
+		)
+		.toBeNull();
+});
+
 test("layout não cria overflow horizontal", async ({ page }, testInfo) => {
 	const dimensions = await page.evaluate(() => ({
 		clientWidth: document.documentElement.clientWidth,

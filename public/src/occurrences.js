@@ -12,8 +12,8 @@
 		const DASHBOARD_SECTION_IDS = Object.freeze([
 			"standard",
 			"custom",
-			"timeline",
 			"weather",
+			"timeline",
 		]);
 
 		function validDate(value) {

@@ -129,8 +129,8 @@ test("seções da dashboard possuem IDs estáveis", () => {
 	assert.deepEqual(DASHBOARD_SECTION_IDS, [
 		"standard",
 		"custom",
-		"timeline",
 		"weather",
+		"timeline",
 	]);
 });
 

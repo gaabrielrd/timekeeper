@@ -346,6 +346,27 @@ test("editor de contador possui prévia ao vivo e ações compactas de imagem", 
 	assert.match(client, /elements\.counterColor\.addEventListener\("input", updateCounterPreview\)/);
 });
 
+test("modo de foco cobre todos os cards, restaura a sessão e integra o shell PWA", () => {
+	const html = read("public/index.html");
+	const client = read("public/src/firebase.js");
+	const focus = read("public/src/focus.js");
+	const styles = read("public/src/style.css");
+	const serviceWorker = read("public/sw.js");
+	assert.equal((html.match(/data-focus-id="standard:/g) || []).length, 3);
+	assert.match(html, /id="focus-mode"[\s\S]*role="dialog"[\s\S]*aria-modal="true"/);
+	assert.match(html, /id="focus-mode-close"[\s\S]*Sair do modo de foco/);
+	assert.match(html, /src="src\/focus\.js"/);
+	assert.match(client, /panel\.dataset\.focusId = counter\.id/);
+	assert.match(client, /focusButton\.dataset\.focusTrigger/);
+	assert.match(focus, /timekeeper:focus-counter/);
+	assert.match(focus, /root\.sessionStorage/);
+	assert.match(focus, /event\.key === "Escape"/);
+	assert.match(focus, /new MutationObserver\(tryRestore\)/);
+	assert.match(styles, /body\.focus-mode-active \.focus-mode/);
+	assert.match(styles, /@media \(max-width: 800px\), \(orientation: portrait\)/);
+	assert.match(serviceWorker, /"\/src\/focus\.js"/);
+});
+
 test("JavaScript inline do HTML compila", () => {
 	const html = read("public/index.html");
 	const scripts = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)]

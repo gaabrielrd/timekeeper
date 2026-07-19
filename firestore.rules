@@ -198,6 +198,26 @@ service cloud.firestore {
         && hasValidUpdatedAt(data);
     }
 
+    function isValidChecklistItem(item) {
+      return item is map
+        && item.keys().hasOnly(['id', 'text', 'done'])
+        && item.id.matches('^.{1,100}$')
+        && item.text.matches('^.{1,30}$')
+        && item.done is bool;
+    }
+
+    function isValidChecklistAt(checklist, index) {
+      return checklist.size() <= index ? true : isValidChecklistItem(checklist[index]);
+    }
+
+    function isValidChecklist(checklist) {
+      return checklist is list
+        && checklist.size() <= 3
+        && isValidChecklistAt(checklist, 0)
+        && isValidChecklistAt(checklist, 1)
+        && isValidChecklistAt(checklist, 2);
+    }
+
     function hasValidCounterBase(counter) {
       return counter is map
         && counter.id.matches('^.{1,100}$')
@@ -215,7 +235,10 @@ service cloud.firestore {
             && counter.imageOpacity <= 100
             && counter.overlayOpacity is number
             && counter.overlayOpacity >= 0
-            && counter.overlayOpacity <= 100));
+            && counter.overlayOpacity <= 100))
+        && (!('checklist' in counter)
+          || counter.checklist == null
+          || isValidChecklist(counter.checklist));
     }
 
     function isValidFixedCounter(counter) {
@@ -229,7 +252,8 @@ service cloud.firestore {
           'createdAt',
           'imageId',
           'imageOpacity',
-          'overlayOpacity'
+          'overlayOpacity',
+          'checklist'
         ])
         && counter.startAtMs is int
         && counter.endAtMs is int
@@ -256,7 +280,8 @@ service cloud.firestore {
           'createdAt',
           'imageId',
           'imageOpacity',
-          'overlayOpacity'
+          'overlayOpacity',
+          'checklist'
         ])
         && counter.startTime.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')
         && counter.endTime.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')

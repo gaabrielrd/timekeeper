@@ -79,6 +79,15 @@ e stale-while-revalidate somente para assets da própria origem. Firestore, Stor
 fontes e clima externos não são interceptados nem tratados como fonte offline. O
 worker recebe mensagens FCM em background e o clique foca ou abre a Timeline.
 
+### Modo de foco — `public/src/focus.js`
+
+Controla a tela imersiva sem duplicar a lógica temporal. O módulo espelha o DOM do
+card selecionado a cada segundo, enquanto os runtimes existentes continuam sendo a
+fonte dos cálculos e das barras. A preferência usa `sessionStorage`; durante um
+reload, um `MutationObserver` aguarda o snapshot que recria um contador pessoal e
+abandona com timeout se o ID não existir mais. O fundo ambiente permanece montado,
+evitando reinício das animações na entrada e na saída.
+
 ### Aplicação autenticada — `public/src/firebase.js`
 
 Responsável por:
@@ -95,6 +104,7 @@ Responsável por:
 - renderizar cards e lista de gerenciamento;
 - aplicar cores e fundos;
 - renderizar Timeline e central de notificações local/push;
+- criar os cards pessoais com ações e IDs estáveis consumidos pelo modo de foco;
 - executar canvas da constelação e sincronizar anéis cronológicos.
 
 ### Dados de calendário — `public/src/data.js`

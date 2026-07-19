@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "timekeeper-shell";
-const CACHE_VERSION = "v3";
+const CACHE_VERSION = "v4";
 const CACHE_NAME = `${CACHE_PREFIX}-${CACHE_VERSION}`;
 const APP_SHELL = [
 	"/",
@@ -20,6 +20,7 @@ const APP_SHELL = [
 	"/src/occurrences.js",
 	"/src/weather.js",
 	"/src/notifications.js",
+	"/src/focus.js",
 	"/src/progressbar.min.js",
 	"/src/anime.min.js",
 	"/src/analytics.js",

@@ -95,6 +95,7 @@ remoções intencionais.
 | `notificationLeadMinutes` | number[] | `[15]` | valores únicos entre 0, 5, 15, 60 e 1440 |
 | `notificationSources` | map | todas `true` | chaves `workday`, `payment`, `holiday`, `counters` |
 | `notificationQuietHours` | map | 22:00–07:00, desligado | boolean e horários locais `HH:mm` |
+| `weatherEffectsEnabled` | boolean | `false` | boolean estrito ao aplicar |
 | `updatedAt` | timestamp | servidor | `serverTimestamp()` |
 
 O campo legado `customCounters` pode existir no documento raiz, mas não deve ser
@@ -141,6 +142,7 @@ sete dias. `/pushMetrics/{YYYY-MM-DD}` contém apenas contagens agregadas de
 | `imageId` | string ou `null` | referência a `data/images.items[].id` |
 | `imageOpacity` | number | 0–100; cliente persiste inteiro, rules aceitam number |
 | `overlayOpacity` | number | 0–100; cliente persiste inteiro, rules aceitam number |
+| `checklist` | object[] ou `null` | Array de até 3 subtarefas: `id` (string), `text` (string), `done` (boolean) |
 
 ### Período fixo
 
@@ -197,6 +199,21 @@ Cada imagem pode ser referenciada por vários contadores sem duplicar bytes. Exc
 uma imagem limpa todas as referências a seu `imageId`. Dez slots de no máximo 5 MiB
 impõem 50 MiB por usuário nas Storage Rules, independentemente dos metadados.
 
+## Arquivo de Contadores — `/users/{uid}/data/archive`
+
+```js
+{
+  items: [/* até 100 objetos do tipo fixed, em ordem decrescente de finalização */],
+  updatedAt: serverTimestamp()
+}
+```
+
+Cada item no arquivo estende o formato de um contador do tipo `fixed` adicionando a data de arquivamento:
+
+| Campo | Tipo | Regra |
+| --- | --- | --- |
+| `archivedAt` | string ISO | data e hora em que o contador foi arquivado |
+
 ## Dados locais do visitante
 
 | Cookie | Conteúdo | Duração |
@@ -204,8 +221,12 @@ impõem 50 MiB por usuário nas Storage Rules, independentemente dos metadados.
 | `hourTime` | hora selecionada | 365 dias |
 | `minutesTime` | minuto selecionado | 365 dias |
 
-São gravados com `path=/` e `SameSite=Lax`. Não possuem `Secure` nem `HttpOnly`,
-pois são configurações não sensíveis acessadas pelo JavaScript.
+O Modo de Foco não adiciona campo persistido ao Firestore. A chave de
+`sessionStorage` `timekeeper:focus-counter` guarda por aba o ID estável de um
+contador padrão ou pessoal e é removida ao sair da visualização.
+
+Os dois cookies são gravados com `path=/` e `SameSite=Lax`. Não possuem `Secure`
+nem `HttpOnly`, pois são configurações não sensíveis acessadas pelo JavaScript.
 
 ## Sincronização e concorrência
 
@@ -221,10 +242,11 @@ com a versão aceita pelo servidor.
 - `generalConfig` permite leitura pública; criação/edição/remoção exige perfil
   administrativo e o expediente não pode ser removido.
 - O cliente não pode conceder nem alterar sua própria flag `isAdmin`.
-- Subdocumentos permitidos: somente `settings`, `counters` e `images`.
+- Subdocumentos permitidos: somente `settings`, `counters`, `images` e `archive`.
 - Settings aceitam somente chaves conhecidas, tipos e ranges válidos.
 - `counters.items` precisa ser lista e ter até cinco elementos válidos.
-- Cada contador valida ID, nome, cor, imagem, opacidades e o schema fixo/recorrente.
+- Cada contador valida ID, nome, cor, imagem, opacidades, o schema fixo/recorrente e opcionalmente até 3 subtarefas no checklist.
+- `archive.items` precisa ser lista e ter até 100 contadores arquivados com o campo `archivedAt` válido.
 - Images aceitam até dez metadados válidos; Storage limita dono, tipo, slot e bytes.
 - Horários recorrentes e dias da semana são validados por formato/range; períodos
   fixos exigem inteiros não negativos e fim posterior ao início.

@@ -16,6 +16,7 @@ Pode:
 - acompanhar expediente, pagamento e feriado;
 - definir a hora/minuto de encerramento do expediente;
 - usar tela cheia e consultar o clima.
+- abrir qualquer contador padrão no Modo de Foco.
 
 O horário fica salvo nos cookies `hourTime` e `minutesTime` por 365 dias. Não pode
 criar contadores nem personalizar aparência.
@@ -149,6 +150,20 @@ explícita. Uma visita online prepara o shell local para reabrir a interface off
 Firebase e previsão do tempo continuam dependentes de conexão e mostram estados
 de indisponibilidade. Atualizações aguardam confirmação antes de recarregar.
 
+## Modo de Foco
+
+Qualquer card de contador possui uma ação discreta para abrir uma visualização que
+ocupa todo o viewport. Ela mantém o fundo animado ativo, amplia título, intervalo e
+progresso e, nos contadores pessoais, também mostra o estado do mini-checklist. O
+layout distribui título e tempo lado a lado em telas largas e passa para uma coluna
+em mobile ou orientação vertical.
+
+O ID do contador em foco fica somente em `sessionStorage`, na chave
+`timekeeper:focus-counter`. Um reload na mesma aba restaura a visualização; fechar
+a aba encerra a preferência. Se um contador pessoal não estiver mais disponível, o
+estado transitório expira sem bloquear a dashboard. O usuário sai pelo botão de
+fechar ou pela tecla `Esc`.
+
 ## Estados importantes da interface
 
 - `Conectando...`: subscription ainda não entregou dados.
@@ -156,6 +171,20 @@ de indisponibilidade. Atualizações aguardam confirmação antes de recarregar.
 - `Ao vivo` / `Sincronizado`: Firestore é a fonte atual.
 - `Erro de conexão`: leitura ou escrita falhou; um toast explica o problema.
 - `Limite atingido`: já existem cinco contadores e a criação fica desabilitada.
+
+## Evoluções da V2
+
+### Histórico e Arquivo de Contadores (Conquistas)
+Os contadores fixos que atingem 100% de progresso são automaticamente movidos para uma coleção de arquivo (`/users/{uid}/data/archive`). O usuário pode visualizar até 100 metas concluídas no painel de "Conquistas", liberando o budget de 5 contadores ativos para novas metas. O histórico exibe o nome do contador, o checklist concluído e a data/hora do arquivamento.
+
+### Grade de Calendário
+A Timeline ganha um novo modo de visualização em formato de grade mensal ou semanal clássico. Os dias do mês indicam a presença de expediente, datas de pagamento, feriados e contadores ativos por meio de marcações coloridas discretas. O clique em um dia específico abre o detalhamento dos eventos. A exibição adapta-se de forma responsiva a dispositivos móveis.
+
+### Clima Dinâmico nos Cards
+Os cards de previsão de clima exibem micropartículas atmosféricas baseadas na condição meteorológica atual (chuva, sol, noite limpa, nublado). A animação é desativada sob movimento reduzido (`prefers-reduced-motion`) e entra em suspensão quando os cards não estão visíveis no viewport para poupar desempenho de CPU/GPU.
+
+### Mini-Checklists nos Contadores
+Cada contador pessoal suporta a adição de até 3 subtarefas (checkpoints) em formato de lista interativa. A conclusão de cada subtarefa atualiza o progresso parcial no card de forma complementar ao progresso temporal. A interface atualiza o estado de forma otimista e sincroniza as edições em tempo real.
 
 ## Requisitos não funcionais atuais
 

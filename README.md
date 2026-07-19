@@ -24,6 +24,7 @@ real com Firebase.
 - Presets, ordem e visibilidade sincronizados para as seções da dashboard.
 - Até cinco widgets de clima configuráveis, reordenáveis e sincronizados.
 - Timeline SVG responsiva de expediente, próximos marcos de calendário e contadores pessoais.
+- Modo de foco imersivo para qualquer contador, restaurado durante a sessão.
 - Notificações locais e push FCM com antecedência, fontes e silêncio configuráveis.
 
 ## Visão rápida
@@ -87,6 +88,7 @@ configurado. Veja [Desenvolvimento](docs/development.md).
 │       ├── occurrences.js     # Ocorrências derivadas para timeline e alertas
 │       ├── weather.js         # Widgets Forecast7 configuráveis
 │       ├── notifications.js   # Candidatos e preferências de alertas locais
+│       ├── focus.js           # Tela imersiva e restauração transitória do contador
 │       ├── runtime-config.js  # Chaves públicas VAPID/App Check e região
 │       ├── data.js            # Seed/fallback dos calendários públicos
 │       ├── style.css          # Design system, layout, responsividade e animações
