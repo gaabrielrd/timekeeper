@@ -42,11 +42,48 @@ wrapper compatível com navegador/CommonJS: expõe `TimekeeperTime` no browser e
 ser importado diretamente pelos testes Node. O módulo Firebase consome a mesma API
 por `window`, eliminando duplicação da regra temporal.
 
+### Ocorrências compartilhadas — `public/src/occurrences.js`
+
+Normaliza expediente, calendários e contadores pessoais em ocorrências ordenadas,
+com IDs estáveis e limites temporais em milissegundos. Para a Timeline, também
+projeta uma escala automática cujo limite é o mais distante entre o próximo marco
+de pagamento, feriado e contador pessoal, expandindo os intervalos recorrentes que
+cabem nessa escala. O módulo é puro, funciona no navegador e em CommonJS e continua
+sendo a fonte compartilhada pela Timeline e pelas notificações locais.
+
+### Integração meteorológica — `public/src/weather.js`
+
+Centraliza validação do fornecedor Forecast7, normalização das cidades, estados de
+carregamento/erro e carregamento idempotente do script WeatherWidget. Mudanças de
+cor ou lista removem iframes antigos sem duplicar o script externo.
+
+### Notificações e push — cliente e Functions
+
+`public/src/notifications.js` normaliza preferências e mantém o fallback local.
+`firebase.js` solicita permissão apenas após o toggle explícito, inicializa App Check,
+registra a instalação FCM no mesmo service worker e envia o FID por callable. Com o
+push ativo, a varredura local é suspensa para evitar duplicidade. Sem configuração
+FCM/App Check ou após falha de cadastro, Web Locks e `localStorage` continuam
+deduplicando os alertas emitidos enquanto a página está em execução.
+
+`functions/src/push-domain.js` deriva ocorrências no fuso IANA do dispositivo. As
+callables de `functions/index.js` cadastram/revogam FIDs privados; a função agendada
+assume jobs determinísticos em transação, envia pelo Admin SDK e agrega métricas.
+
+### PWA — `public/src/pwa.js` e `public/sw.js`
+
+O cliente registra o service worker apenas em origem segura ou localhost, oferece
+instalação quando o navegador dispara `beforeinstallprompt` e exige ação explícita
+para ativar uma versão em espera. O service worker usa network-first em navegações
+e stale-while-revalidate somente para assets da própria origem. Firestore, Storage,
+fontes e clima externos não são interceptados nem tratados como fonte offline. O
+worker recebe mensagens FCM em background e o clique foca ou abre a Timeline.
+
 ### Aplicação autenticada — `public/src/firebase.js`
 
 Responsável por:
 
-- inicializar Firebase Auth, Firestore e Storage;
+- inicializar Firebase Auth, Firestore, Storage, Functions, Messaging e App Check;
 - autenticar com `GoogleAuthProvider`;
 - preparar/migrar documentos do usuário;
 - assinar a configuração geral pública e popular seu seed quando um administrador
@@ -57,6 +94,7 @@ Responsável por:
 - enviar, reutilizar e excluir imagens privadas da biblioteca;
 - renderizar cards e lista de gerenciamento;
 - aplicar cores e fundos;
+- renderizar Timeline e central de notificações local/push;
 - executar canvas da constelação e sincronizar anéis cronológicos.
 
 ### Dados de calendário — `public/src/data.js`
@@ -73,6 +111,10 @@ visual é dirigido por atributos no `body`, por exemplo:
 ```html
 <body data-background-enabled="true" data-background-style="constellation">
 ```
+
+As seções operacionais usam `data-dashboard-section` com os IDs estáveis
+`standard`, `custom`, `timeline` e `weather`. Preferências passam por normalização
+central no cliente antes de afetar ordem ou visibilidade.
 
 ## Bootstrap da aplicação
 
@@ -185,10 +227,12 @@ no cliente.
 3. Versionar ou gerar nomes com hash para CSS/JS e usar cache `immutable`.
 4. Criar staging Firebase separado de produção.
 5. Considerar `signInWithRedirect` como fallback para Safari/WebViews.
+6. Particionar o scheduler por shard antes de ultrapassar 200 dispositivos ativos.
 
 ## Automação de qualidade
 
-- Node Test Runner cobre cálculos puros e contratos entre HTML/JS/config/docs.
+- Node Test Runner cobre cálculos puros do cliente, domínio das Functions e
+  contratos entre HTML/JS/config/docs.
 - Playwright cobre visitante, privacidade, Google Auth Emulator, CRUD, imagens,
   persistência e exclusão de conta em desktop/mobile Chromium.
 - Firebase Emulator + `@firebase/rules-unit-testing` cobre Firestore e Storage Rules.

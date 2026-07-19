@@ -10,7 +10,8 @@ async function loginWithGoogleEmulator(page, projectName) {
 	await popup.waitForLoadState("domcontentloaded");
 	await popup.getByText("Add new account", { exact: true }).click();
 
-	const suffix = `${projectName}-${Date.now()}`.replace(/[^a-z0-9-]/gi, "-");
+	const suffix = `${projectName}-${Date.now()}-${Math.random().toString(36).slice(2)}`
+		.replace(/[^a-z0-9-]/gi, "-");
 	const email = `${suffix}@example.com`;
 	await popup.locator("#email-input").fill(email);
 	await popup.locator("#display-name-input").fill("Pessoa E2E");
@@ -19,6 +20,8 @@ async function loginWithGoogleEmulator(page, projectName) {
 	await closePromise;
 
 	await expect(page.locator("#account-label")).toHaveText("Pessoa");
+	await expect(page.locator("#settings-state")).toHaveText("Sincronizado");
+	await expect(page.locator("#counter-sidebar-state")).toHaveText("Ao vivo");
 	return email;
 }
 
@@ -44,6 +47,37 @@ async function grantAdminByEmail(email) {
 	if (!profileResponse.ok) {
 		throw new Error(`Falha ao conceder admin no emulador: ${profileResponse.status}`);
 	}
+}
+
+async function mockNotificationPermission(page, result) {
+	await page.addInitScript((permissionResult) => {
+		let permission = localStorage.getItem("e2e:notification-permission") ||
+			(permissionResult === "unsupported" ? "default" : "default");
+		if (permissionResult === "unsupported") {
+			Object.defineProperty(window, "Notification", {
+				configurable: true,
+				value: undefined,
+			});
+			return;
+		}
+		class MockNotification {}
+		Object.defineProperty(MockNotification, "permission", {
+			get: () => permission,
+		});
+		MockNotification.requestPermission = async () => {
+			const requests = Number(
+				localStorage.getItem("e2e:notification-requests") || 0,
+			);
+			localStorage.setItem("e2e:notification-requests", String(requests + 1));
+			permission = permissionResult;
+			localStorage.setItem("e2e:notification-permission", permission);
+			return permission;
+		};
+		Object.defineProperty(window, "Notification", {
+			configurable: true,
+			value: MockNotification,
+		});
+	}, result);
 }
 
 test("usuário cria, edita, reordena e oculta contadores", async (
@@ -77,7 +111,10 @@ test("usuário cria, edita, reordena e oculta contadores", async (
 	);
 	await expect(page.locator("#custom-visibility-button")).toBeVisible();
 
-	await page.getByRole("button", { name: "Editar Entrega E2E" }).click();
+	await page
+		.locator("#counter-list")
+		.getByRole("button", { name: "Editar Entrega E2E" })
+		.click();
 	await page.locator('[name="name"]').fill("Rotina E2E");
 	await page.locator("#counter-type").selectOption("recurring");
 	await page.locator('#counter-form [name="startTime"]').fill("09:00");
@@ -117,6 +154,202 @@ test("usuário cria, edita, reordena e oculta contadores", async (
 	await expect(page.locator("#custom-panels .panel-title").first()).toHaveText(
 		"Segundo E2E",
 	);
+	await page.locator("#timeline-source-filter").selectOption("counters");
+	const timelineCounter = page
+		.locator(
+			testInfo.project.name === "mobile-chromium"
+				? "#timeline-legend"
+				: "#timeline-list",
+		)
+		.getByRole("button", { name: "Editar Segundo E2E" });
+	await expect(timelineCounter).toBeVisible();
+	await timelineCounter.click();
+	await expect(page.locator("#counter-dialog")).toBeVisible();
+	await expect(page.locator('#counter-form [name="name"]')).toHaveValue(
+		"Segundo E2E",
+	);
+});
+
+test("usuário personaliza o layout e sincroniza entre abas", async (
+	{ page, context },
+	testInfo,
+) => {
+	await loginWithGoogleEmulator(page, testInfo.project.name);
+	await page.locator("#auth-button").click();
+	await page.locator("#dashboard-layout").selectOption("compact");
+	await expect(page.locator("body")).toHaveAttribute(
+		"data-dashboard-layout",
+		"compact",
+	);
+
+	const weatherControl = page.locator(
+		'[data-dashboard-section-control="weather"]',
+	);
+	await weatherControl.getByRole("checkbox").uncheck();
+	await expect(page.locator("#dashboard-weather-section")).toHaveClass(
+		/is-dashboard-hidden/,
+	);
+	await weatherControl
+		.getByRole("button", { name: "Mover seção para cima" })
+		.click();
+
+	const secondPage = await context.newPage();
+	await secondPage.goto("/?emulators=1");
+	await expect(secondPage.locator("#account-label")).toHaveText("Pessoa");
+	await expect(secondPage.locator("body")).toHaveAttribute(
+		"data-dashboard-layout",
+		"compact",
+	);
+	await expect(secondPage.locator("#dashboard-weather-section")).toHaveClass(
+		/is-dashboard-hidden/,
+	);
+	const orders = await secondPage.evaluate(() => ({
+		timeline: Number(
+			getComputedStyle(document.querySelector("#dashboard-timeline-section")).order,
+		),
+		weather: Number(
+			getComputedStyle(document.querySelector("#dashboard-weather-section")).order,
+		),
+	}));
+	expect(orders.weather).toBeLessThan(orders.timeline);
+
+	await page.reload();
+	await expect(page.locator("body")).toHaveAttribute(
+		"data-dashboard-layout",
+		"compact",
+	);
+	await expect(page.locator("#dashboard-weather-section")).toHaveClass(
+		/is-dashboard-hidden/,
+	);
+	await secondPage.close();
+});
+
+test("notificações só pedem permissão após ativação explícita", async (
+	{ page },
+	testInfo,
+) => {
+	await mockNotificationPermission(page, "granted");
+	await loginWithGoogleEmulator(page, testInfo.project.name);
+	await page.locator("#auth-button").click();
+	await expect(page.locator("#notification-state")).toHaveText("Não autorizado");
+	await expect
+		.poll(() =>
+			page.evaluate(() =>
+				Number(localStorage.getItem("e2e:notification-requests") || 0),
+			),
+		)
+		.toBe(0);
+	await expect(page.locator("#notifications-enabled")).toBeEnabled();
+	await page.locator("#notifications-enabled").check();
+	await expect(page.locator("#notification-state")).toHaveText("Ativo");
+	await expect(page.locator("#notification-delivery-state")).toContainText(
+		"Entrega limitada",
+	);
+	await expect
+		.poll(() =>
+			page.evaluate(() =>
+				Number(localStorage.getItem("e2e:notification-requests") || 0),
+			),
+		)
+		.toBe(1);
+	await page.getByText("5 min", { exact: true }).click();
+	await expect(page.locator('#notification-controls [value="5"]')).toBeChecked();
+	await page.locator("#notification-quiet-enabled").check();
+	await page.locator("#notification-quiet-start").fill("21:30");
+	await page.locator("#notification-quiet-start").blur();
+	await page.reload();
+	await expect(page.locator("#notification-state")).toHaveText("Ativo");
+	await expect(page.locator('#notification-controls [value="5"]')).toBeChecked();
+	await expect(page.locator("#notification-quiet-enabled")).toBeChecked();
+	await expect(page.locator("#notification-quiet-start")).toHaveValue("21:30");
+});
+
+test("permissão negada não cria novos prompts automáticos", async (
+	{ page },
+	testInfo,
+) => {
+	await mockNotificationPermission(page, "denied");
+	await loginWithGoogleEmulator(page, testInfo.project.name);
+	await page.locator("#auth-button").click();
+	await expect(page.locator("#notifications-enabled")).toBeEnabled();
+	await page.locator('label[for="notifications-enabled"]').click();
+	await expect(page.locator("#notification-state")).toHaveText("Bloqueado");
+	await expect(page.locator("#notification-message")).toContainText(
+		"não solicitará novamente",
+	);
+	await page.reload();
+	await expect(page.locator("#notification-state")).toHaveText("Bloqueado");
+	await expect
+		.poll(() =>
+			page.evaluate(() =>
+				Number(localStorage.getItem("e2e:notification-requests") || 0),
+			),
+		)
+		.toBe(1);
+});
+
+test("UI informa quando notificações não são suportadas", async (
+	{ page },
+	testInfo,
+) => {
+	await mockNotificationPermission(page, "unsupported");
+	await loginWithGoogleEmulator(page, testInfo.project.name);
+	await page.locator("#auth-button").click();
+	await expect(page.locator("#notification-state")).toHaveText("Não suportado");
+	await expect(page.locator("#notifications-enabled")).toBeDisabled();
+});
+
+test("usuário gerencia cidades e sincroniza os widgets", async (
+	{ page, context },
+	testInfo,
+) => {
+	await loginWithGoogleEmulator(page, testInfo.project.name);
+	await page.locator("#auth-button").click();
+	await expect(page.locator("#weather-widget-count")).toHaveText("3 / 5");
+	await page.locator("#add-weather-widget").click();
+	await page.locator('#weather-widget-form [name="label1"]').fill("CURITIBA");
+	await page.locator('#weather-widget-form [name="label2"]').fill("PARANÁ");
+	await page
+		.locator('#weather-widget-form [name="forecastUrl"]')
+		.fill("https://example.com/weather/");
+	await page.locator('#weather-widget-form [type="submit"]').click();
+	await expect(page.locator("#weather-widget-message")).toContainText(
+		"Forecast7",
+	);
+
+	await page
+		.locator('#weather-widget-form [name="forecastUrl"]')
+		.fill("https://forecast7.com/pt/n25d43n49d27/curitiba/");
+	await page.locator('#weather-widget-form [type="submit"]').click();
+	await expect(page.locator("#weather-widget-count")).toHaveText("4 / 5");
+	await expect(page.locator('[data-weather-setting-id]')).toHaveCount(4);
+
+	await page.getByRole("button", { name: "Ocultar CURITIBA" }).click();
+	await expect(
+		page.locator('[data-weather-setting-id]').filter({ hasText: "CURITIBA" }),
+	).toContainText("Oculto");
+	await page.getByRole("button", { name: "Editar CURITIBA" }).click();
+	await page
+		.locator('#weather-widget-form [name="label1"]')
+		.fill("CURITIBA CENTRO");
+	await page.locator('#weather-widget-form [type="submit"]').click();
+	await expect(page.locator("#weather-widget-list")).toContainText(
+		"CURITIBA CENTRO",
+	);
+
+	const secondPage = await context.newPage();
+	await secondPage.goto("/?emulators=1");
+	await expect(secondPage.locator("#account-label")).toHaveText("Pessoa");
+	await secondPage.locator("#auth-button").click();
+	await expect(secondPage.locator("#weather-widget-list")).toContainText(
+		"CURITIBA CENTRO",
+	);
+	await expect(secondPage.locator("#weather-widget-count")).toHaveText("4 / 5");
+	await secondPage.close();
+
+	page.once("dialog", (dialog) => dialog.accept());
+	await page.getByRole("button", { name: "Remover CURITIBA CENTRO" }).click();
+	await expect(page.locator("#weather-widget-count")).toHaveText("3 / 5");
 });
 
 test("administrador gerencia a configuração geral", async ({ page }, testInfo) => {

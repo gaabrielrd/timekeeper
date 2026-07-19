@@ -1,0 +1,21 @@
+{
+  "name": "timekeeper-functions",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.js",
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "check": "node --check index.js && node --check src/push-domain.js && node --test test/*.test.cjs",
+    "test": "node --test test/*.test.cjs"
+  },
+  "dependencies": {
+    "firebase-admin": "14.2.0",
+    "firebase-functions": "7.3.0",
+    "luxon": "3.7.2"
+  },
+  "overrides": {
+    "uuid": "11.1.1"
+  }
+}

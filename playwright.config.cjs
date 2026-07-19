@@ -1,4 +1,6 @@
 const { defineConfig, devices } = require("@playwright/test");
+const hostingPort = Number(process.env.PORT || 4174);
+const hostingUrl = `http://127.0.0.1:${hostingPort}`;
 
 module.exports = defineConfig({
 	testDir: "./tests/e2e",
@@ -8,7 +10,7 @@ module.exports = defineConfig({
 	reporter: process.env.CI ? "github" : "list",
 	timeout: 30000,
 	use: {
-		baseURL: "http://127.0.0.1:4173",
+		baseURL: hostingUrl,
 		screenshot: "only-on-failure",
 		trace: "retain-on-failure",
 	},
@@ -22,19 +24,11 @@ module.exports = defineConfig({
 			use: { ...devices["iPhone 13"], browserName: "chromium" },
 		},
 	],
-	webServer: [
-		{
-			command: "node scripts/serve-public.cjs",
-			url: "http://127.0.0.1:4173",
-			reuseExistingServer: !process.env.CI,
-			timeout: 30000,
-		},
-		{
-			command:
-				"firebase emulators:start --project demo-timekeeper --only auth,firestore,storage",
-			url: "http://127.0.0.1:4000",
-			reuseExistingServer: !process.env.CI,
-			timeout: 60000,
-		},
-	],
+	webServer: {
+		command: "node scripts/serve-public.cjs",
+		env: { ...process.env, PORT: String(hostingPort) },
+		url: hostingUrl,
+		reuseExistingServer: false,
+		timeout: 30000,
+	},
 });

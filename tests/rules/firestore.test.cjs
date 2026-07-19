@@ -244,10 +244,97 @@ test("aceita settings válidas e rejeita range ou campo desconhecido", async () 
 			backgroundSpeed: 55,
 			backgroundIntensity: 55,
 			showCustomCounters: true,
+			dashboardLayout: "balanced",
+			dashboardSectionOrder: [
+				"standard",
+				"custom",
+				"timeline",
+				"weather",
+			],
+			hiddenDashboardSections: ["weather"],
+			weatherWidgets: [
+				{
+					id: "indaial",
+					label1: "INDAIAL",
+					label2: "SANTA CATARINA",
+					forecastUrl: "https://forecast7.com/pt/n26d90n49d24/indaial/",
+					enabled: true,
+				},
+			],
+			notificationsEnabled: true,
+			notificationLeadMinutes: [0, 15, 60],
+			notificationSources: {
+				workday: true,
+				payment: true,
+				holiday: false,
+				counters: true,
+			},
+			notificationQuietHours: {
+				enabled: true,
+				startTime: "22:00",
+				endTime: "07:00",
+			},
 			updatedAt: serverTimestamp(),
 		}),
 	);
 	await assertFails(setDoc(reference, { backgroundIntensity: 101 }));
+	await assertFails(setDoc(reference, { dashboardLayout: "unknown" }));
+	await assertFails(
+		setDoc(reference, { dashboardSectionOrder: ["standard", "standard"] }),
+	);
+	await assertFails(
+		setDoc(reference, { hiddenDashboardSections: ["standard"] }),
+	);
+	await assertFails(
+		setDoc(reference, {
+			weatherWidgets: [
+				{
+					id: "externo",
+					label1: "EXTERNO",
+					label2: "TESTE",
+					forecastUrl: "https://example.com/weather/",
+					enabled: true,
+				},
+			],
+		}),
+	);
+	await assertFails(
+		setDoc(reference, {
+			weatherWidgets: Array.from({ length: 6 }, (_, index) => ({
+				id: `city-${index}`,
+				label1: `CITY ${index}`,
+				label2: "TEST",
+				forecastUrl: "https://forecast7.com/pt/n26d90n49d24/indaial/",
+				enabled: true,
+			})),
+		}),
+	);
+	await assertFails(
+		setDoc(reference, { notificationLeadMinutes: [15, 15] }),
+	);
+	await assertFails(
+		setDoc(reference, { notificationLeadMinutes: [30] }),
+	);
+	await assertFails(
+		setDoc(reference, {
+			notificationSources: {
+				workday: true,
+				payment: true,
+				holiday: true,
+				counters: true,
+				external: true,
+			},
+		}),
+	);
+	await assertFails(
+		setDoc(reference, {
+			notificationQuietHours: {
+				enabled: true,
+				startTime: "25:00",
+				endTime: "07:00",
+			},
+		}),
+	);
 	await assertFails(setDoc(reference, { admin: true }));
 });
 
@@ -318,6 +405,30 @@ test("nega subdocumentos fora da allowlist", async () => {
 	await assertFails(
 		setDoc(doc(googleDb(), "users/alice/data/private"), { value: true }),
 	);
+});
+
+test("dispositivos, fila push e métricas são privados até para o proprietário", async () => {
+	await environment.withSecurityRulesDisabled(async (context) => {
+		const adminDb = context.firestore();
+		await setDoc(doc(adminDb, "users/alice/devices/device-1234567890"), {
+			fid: "fid-1234567890",
+			permission: "granted",
+		});
+		await setDoc(doc(adminDb, "notificationQueue/job-1"), {
+			uid: "alice",
+			status: "scheduled",
+		});
+		await setDoc(doc(adminDb, "pushMetrics/2026-07-18"), { sent: 1 });
+	});
+	const owner = googleDb("alice");
+	await assertFails(getDoc(doc(owner, "users/alice/devices/device-1234567890")));
+	await assertFails(
+		setDoc(doc(owner, "users/alice/devices/device-1234567890"), {
+			permission: "granted",
+		}),
+	);
+	await assertFails(getDoc(doc(owner, "notificationQueue/job-1")));
+	await assertFails(getDoc(doc(owner, "pushMetrics/2026-07-18")));
 });
 
 test("documentos válidos podem ser lidos pelo proprietário", async () => {

@@ -7,7 +7,8 @@ const port = Number(process.env.PORT || 4173);
 const contentTypes = {
 	".css": "text/css; charset=utf-8",
 	".html": "text/html; charset=utf-8",
-	".js": "text/javascript; charset=utf-8",
+".js": "text/javascript; charset=utf-8",
+	".webmanifest": "application/manifest+json; charset=utf-8",
 	".png": "image/png",
 	".woff": "font/woff",
 };
@@ -44,4 +45,3 @@ function shutdown() {
 
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
-

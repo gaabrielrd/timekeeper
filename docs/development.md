@@ -17,6 +17,7 @@ O projeto possui dependências npm apenas de desenvolvimento/testes e não tem b
 git clone https://github.com/gaabrielrd/timekeeper.git
 cd timekeeper
 npm ci
+npm ci --prefix functions
 firebase login
 firebase use
 ```
@@ -29,7 +30,7 @@ projeto atual. Login só é necessário para recursos remotos da CLI.
 Para testar os assets como o Firebase Hosting os serve, sem tocar em produção:
 
 ```bash
-firebase emulators:start --only hosting,auth,firestore,storage --project demo-timekeeper
+firebase emulators:start --only hosting,auth,firestore,storage,functions,pubsub --project demo-timekeeper
 ```
 
 Abra `http://127.0.0.1:5000/?emulators=1`.
@@ -46,11 +47,16 @@ O cliente conecta aos emuladores somente quando duas condições são verdadeira
 1. hostname é `localhost` ou `127.0.0.1`;
 2. a URL contém `?emulators=1`.
 
-As portas versionadas do app são Hosting 5000, Auth 9099, Firestore 8080, Storage
-9199 e UI 4000. A suíte isolada de Rules usa Firestore 8081 e Storage 9198 por meio de
-`firebase.rules-test.json`, evitando colisão com o emulador dos E2E. Sem o parâmetro,
-mesmo em localhost, o SDK usa o projeto configurado; confira a URL antes de criar
-dados de teste.
+As portas versionadas do app são Hosting 5000, Functions 5001, Pub/Sub 8085, Auth
+9099, Firestore 8080, Storage 9199 e UI 4000. A suíte E2E usa `firebase.e2e.json`, mantém a UI desligada e controla
+o ciclo de vida com `firebase emulators:exec`. A suíte isolada de Rules usa Firestore
+8081 e Storage 9198 por meio de `firebase.rules-test.json`, evitando colisão com o
+emulador dos E2E. Sem o parâmetro, mesmo em localhost, o SDK usa o projeto configurado;
+confira a URL antes de criar dados de teste.
+
+FCM e App Check não são emulados pelos E2E. Com `?emulators=1`, o cliente mantém o
+fallback local e não cadastra FIDs. Teste entrega push real somente em um projeto
+Firebase autorizado, com configuração pública preenchida e dispositivo dedicado.
 
 ## Fluxo recomendado de alteração
 
@@ -72,10 +78,15 @@ git diff --check
 ```
 
 `npm run check` verifica sintaxe, cálculos temporais, contratos entre arquivos,
-calendários e links da documentação. `npm run test:e2e` inicia servidor estático,
-Auth/Firestore Emulator e Chromium para fluxos visitante e autenticado em desktop e
-mobile. `npm run test:rules` inicia o emulador e testa autorização/schema. O
+calendários e links da documentação. `npm run test:e2e` mantém Auth, Firestore e
+Storage Emulator ativos via `emulators:exec`, inicia o servidor estático e executa
+Chromium para fluxos visitante e autenticado em desktop e mobile. `npm run test:rules`
+inicia os emuladores isolados e testa autorização/schema. O
 JavaScript inline é compilado como parte dos contratos.
+
+O servidor estático dos E2E usa 4174 e o Playwright não reutiliza servidores já
+ativos. Se a porta estiver ocupada, libere o processo conflitante ou defina outra
+com `PORT`; não reaproveite um servidor de diretório desconhecido.
 
 A mesma suíte roda em `.github/workflows/ci.yml` com Node 22 e Java 21.
 
@@ -92,6 +103,7 @@ A mesma suíte roda em `.github/workflows/ci.yml` com Node 22 e Java 21.
 | Novo fundo | HTML, CSS/JS, descrição e docs de design |
 | Limite de contadores | JS, HTML, rules e documentação |
 | Hosting/cache/rotas | `firebase.json` e docs de deploy |
+| Push/Functions | `functions/`, `public/src/firebase.js`, `public/sw.js`, Rules/TTL |
 
 ## Serviços externos durante desenvolvimento
 

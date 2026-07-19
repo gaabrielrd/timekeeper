@@ -113,6 +113,42 @@ O fundo animado começa desligado. Quando ativado, o usuário escolhe:
 Estilos atuais: lava lamp, blobs flutuantes, correntes de vidro, anéis
 cronológicos, aurora orbital, mapa topográfico e constelação dinâmica.
 
+Usuários autenticados também escolhem entre layouts `focus`, `balanced` e
+`compact`, reordenam as seções disponíveis e ocultam áreas opcionais. Os contadores
+padrão não podem ser ocultados. Essas preferências sincronizam entre abas.
+
+## Timeline
+
+A seção Timeline combina expediente, pagamentos, feriados e ocorrências fixas ou
+recorrentes em um SVG horizontal no desktop e vertical no mobile. A escala começa
+em agora e termina no mais distante entre o próximo pagamento, o próximo feriado e
+a próxima ocorrência da categoria de contadores pessoais; datas posteriores do
+mesmo calendário não são exibidas. Intervalos recorrentes aparecem como segmentos
+próprios, eventos pontuais como marcadores rotulados, e o filtro por origem não muda
+o alcance calculado. Itens pessoais abrem o editor do contador; eventos gerais
+permanecem somente leitura.
+
+## Notificações locais e push
+
+Usuários autenticados podem ativar alertas no dispositivo, escolher fontes,
+antecedências de 0 a 1.440 minutos e um intervalo de silêncio. A permissão do
+navegador só é solicitada no toggle de ativação. A UI diferencia não autorizado,
+bloqueado, não suportado, local e `Push ativo`. Quando VAPID e App Check estão
+configurados, o mesmo dispositivo recebe alertas pelo FCM com a aplicação fechada
+nas plataformas Web Push suportadas. Sem essa configuração, o fallback exige que a
+página/PWA ainda possa executar. Negar permissão não gera prompts automáticos.
+
+Até cinco dispositivos podem ser registrados por conta. Logout revoga a instalação
+atual; excluir a conta remove dispositivos e jobs. O horário de silêncio é calculado
+no fuso de cada dispositivo.
+
+## Instalação e modo offline
+
+Em navegadores compatíveis, o Timekeeper pode ser instalado como PWA após uma ação
+explícita. Uma visita online prepara o shell local para reabrir a interface offline;
+Firebase e previsão do tempo continuam dependentes de conexão e mostram estados
+de indisponibilidade. Atualizações aguardam confirmação antes de recarregar.
+
 ## Estados importantes da interface
 
 - `Conectando...`: subscription ainda não entregou dados.

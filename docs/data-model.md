@@ -87,10 +87,38 @@ remoções intencionais.
 | `backgroundSpeed` | number | `55` | clamp 20–100 |
 | `backgroundIntensity` | number | `55` | clamp 15–100 |
 | `showCustomCounters` | boolean | `true` | falso somente quando explícito |
+| `dashboardLayout` | `focus`, `balanced` ou `compact` | `balanced` | valor conhecido |
+| `dashboardSectionOrder` | string[] | `standard`, `custom`, `timeline`, `weather` | IDs conhecidos, únicos, até quatro |
+| `hiddenDashboardSections` | string[] | `[]` | IDs únicos; `standard` não pode ser ocultado |
+| `weatherWidgets` | object[] | três cidades atuais | até cinco; Forecast7, textos e chaves validados |
+| `notificationsEnabled` | boolean | `false` | verdadeiro somente após ativação explícita |
+| `notificationLeadMinutes` | number[] | `[15]` | valores únicos entre 0, 5, 15, 60 e 1440 |
+| `notificationSources` | map | todas `true` | chaves `workday`, `payment`, `holiday`, `counters` |
+| `notificationQuietHours` | map | 22:00–07:00, desligado | boolean e horários locais `HH:mm` |
 | `updatedAt` | timestamp | servidor | `serverTimestamp()` |
 
 O campo legado `customCounters` pode existir no documento raiz, mas não deve ser
 usado para novas escritas.
+
+A Timeline e os candidatos de notificação são derivados dos snapshots de
+`generalConfig`, `settings` e `counters`; não existe coleção persistida de
+ocorrências. A projeção visual usa apenas o próximo pagamento, o próximo feriado e
+a próxima ocorrência da categoria de contadores. O fallback local guarda IDs já
+emitidos em `localStorage`; o backend usa uma fila idempotente privada.
+
+## Dispositivos push — `/users/{uid}/devices/{deviceId}`
+
+Somente as Cloud Functions acessam esses documentos. O cliente usa callables com
+Auth Google e App Check; as Rules negam leitura e escrita direta até ao proprietário.
+Cada usuário pode manter até cinco dispositivos com `fid`, `fidHash`, `timeZone`,
+`platform`, `permission`, timestamps e `purgeAt`. Revogados expiram em 30 dias.
+
+## Fila e métricas privadas
+
+`/notificationQueue/{jobId}` registra ocorrência/borda/antecedência, lease, tentativas,
+status e timestamps, sem título ou corpo. O ID é determinístico e a fila expira em
+sete dias. `/pushMetrics/{YYYY-MM-DD}` contém apenas contagens agregadas de
+`scheduled`, `sent`, `invalid`, `failed` e `suppressed`, com TTL de 30 dias.
 
 ## Contadores — `/users/{uid}/data/counters`
 

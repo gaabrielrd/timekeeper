@@ -40,6 +40,61 @@ test("layout não cria overflow horizontal", async ({ page }, testInfo) => {
 	await expect(page.locator("#auth-button")).toBeVisible();
 });
 
+test("viewports de 320 e 768 px permanecem sem overflow", async ({ page }) => {
+	for (const width of [320, 768]) {
+		await page.setViewportSize({ width, height: 900 });
+		await expect
+			.poll(() =>
+				page.evaluate(() => ({
+					clientWidth: document.documentElement.clientWidth,
+					scrollWidth: document.documentElement.scrollWidth,
+				})),
+			)
+			.toMatchObject({ clientWidth: width, scrollWidth: width });
+		await expect(page.locator("#dashboard-timeline-section")).toBeVisible();
+	}
+});
+
+test("timeline SVG adapta orientação, recorrências e próximos marcos", async ({ page }) => {
+	await expect(page.locator("#dashboard-timeline-section")).toBeVisible();
+	const timeline = page.locator("#timeline-svg");
+	await expect(timeline).toBeVisible();
+	const viewport = page.viewportSize();
+	await expect(timeline).toHaveAttribute(
+		"data-orientation",
+		viewport.width <= 700 ? "vertical" : "horizontal",
+	);
+	await expect(page.locator("#timeline-range")).toContainText("escala automática");
+	await page.locator("#timeline-source-filter").selectOption("workday");
+	await expect
+		.poll(() => page.locator("#timeline-svg .timeline-svg-segment").count())
+		.toBeGreaterThan(1);
+	await page.locator("#timeline-source-filter").selectOption("calendar");
+	await expect(page.locator("#timeline-list")).toContainText(/Pagamento|Feriado/);
+	await expect(page.locator('#timeline-svg [data-source-type="payment"]')).toHaveCount(1);
+	await expect(page.locator('#timeline-svg [data-source-type="holiday"]')).toHaveCount(1);
+});
+
+test("PWA registra o shell e reabre offline", async ({ page, context }) => {
+	await expect
+		.poll(() =>
+			page.evaluate(async () => {
+				const registration = await navigator.serviceWorker.ready;
+				return registration.active?.scriptURL || "";
+			}),
+		)
+		.toContain("/sw.js");
+	await expect
+		.poll(() => page.evaluate(async () => (await caches.keys()).length))
+		.toBeGreaterThan(0);
+
+	await context.setOffline(true);
+	await page.reload();
+	await expect(page).toHaveTitle("Timekeeper");
+	await expect(page.locator("#weather-offline-message")).toBeVisible();
+	await context.setOffline(false);
+});
+
 test("Analytics não carrega antes da escolha e recusa persiste", async ({ page }) => {
 	await expect(page.locator("#privacy-banner")).toBeVisible();
 	await expect(page.locator("#google-analytics-script")).toHaveCount(0);

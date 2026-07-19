@@ -20,7 +20,11 @@ real com Firebase.
 - Sincronização ao vivo de configurações, contadores e biblioteca com Firestore.
 - Duas cores de destaque e sete fundos animados personalizáveis.
 - Layout responsivo, tela cheia e respeito a `prefers-reduced-motion`.
-- Widgets de previsão do tempo para Indaial, Maringá e São Paulo.
+- Aplicação instalável com shell offline e atualização controlada.
+- Presets, ordem e visibilidade sincronizados para as seções da dashboard.
+- Até cinco widgets de clima configuráveis, reordenáveis e sincronizados.
+- Timeline SVG responsiva de expediente, próximos marcos de calendário e contadores pessoais.
+- Notificações locais e push FCM com antecedência, fontes e silêncio configuráveis.
 
 ## Visão rápida
 
@@ -35,7 +39,12 @@ Navegador
 ├── Firebase Authentication (Google)
 ├── Cloud Firestore (dados em tempo real)
 ├── Cloud Storage (imagens privadas dos contadores)
+├── Firebase Cloud Messaging e App Check
 └── serviços externos (Adobe Fonts, WeatherWidget e Google Analytics)
+
+Cloud Functions (southamerica-east1)
+├── cadastro/revogação privada de dispositivos por FID
+└── scheduler de um minuto, fila idempotente e métricas agregadas
 ```
 
 ## Como executar localmente
@@ -51,6 +60,7 @@ Na raiz do projeto:
 
 ```bash
 npm ci
+npm ci --prefix functions
 firebase emulators:start --only hosting,firestore,auth,storage --project demo-timekeeper
 ```
 
@@ -74,11 +84,16 @@ configurado. Veja [Desenvolvimento](docs/development.md).
 │       ├── firebase.js        # Auth, Firestore, Storage, contadores e fundos
 │       ├── analytics.js       # Consentimento e carregamento opcional de métricas
 │       ├── time.js            # Cálculos temporais compartilhados e testáveis
+│       ├── occurrences.js     # Ocorrências derivadas para timeline e alertas
+│       ├── weather.js         # Widgets Forecast7 configuráveis
+│       ├── notifications.js   # Candidatos e preferências de alertas locais
+│       ├── runtime-config.js  # Chaves públicas VAPID/App Check e região
 │       ├── data.js            # Seed/fallback dos calendários públicos
 │       ├── style.css          # Design system, layout, responsividade e animações
 │       └── *.min.js / assets  # Bibliotecas e recursos locais
 ├── docs/                      # Documentação detalhada
 ├── tests/                     # Testes unitários, contratos e Firebase Rules
+├── functions/                 # Callables, scheduler FCM e domínio temporal por fuso
 ├── .github/workflows/ci.yml   # CI para pushes e pull requests
 ├── package.json               # Ferramentas de teste; não participa do runtime
 ├── firebase.json              # Hosting, regras e índices
@@ -112,7 +127,7 @@ npm ci
 npm run check
 npm run test:e2e
 npm run test:rules
-firebase deploy --only hosting,firestore:rules,storage
+firebase deploy --only hosting,functions,firestore:rules,firestore:indexes,storage
 ```
 
 Faça também o checklist manual descrito em [Testes](docs/testing.md), incluindo
@@ -132,6 +147,7 @@ O índice completo está em [docs/README.md](docs/README.md). Comece por:
 - [Testes](docs/testing.md)
 - [Manutenção](docs/maintenance.md)
 - [Troubleshooting](docs/troubleshooting.md)
+- [Roadmap de produto](roadmap.md)
 
 ## Estado atual e limitações conhecidas
 
@@ -145,6 +161,9 @@ O índice completo está em [docs/README.md](docs/README.md). Comece por:
   schemas fixo/recorrente, inclusive `endAtMs > startAtMs` no servidor.
 - A aplicação depende de serviços externos para fonte, clima, SDK Firebase e
   analytics; métricas só carregam após consentimento explícito.
+- O fallback local exige que a página/PWA esteja em execução. A entrega com o app
+  fechado usa FCM e só é ativada depois de preencher as chaves públicas em
+  `runtime-config.js`, configurar App Check e publicar as Functions.
 - A CI cobre sintaxe, lógica temporal, contratos/documentação, E2E Chromium em
   desktop/mobile e rules. Ainda faltam um Safari/iPhone real e staging separado.
 - A auditoria não encontra vulnerabilidades de produção; a versão atual da

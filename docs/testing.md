@@ -3,25 +3,32 @@
 ## Estado atual
 
 O projeto usa Node Test Runner, Playwright e Firebase Emulator Suite. A suíte atual
-contém 23 testes unitários/contratuais, 16 E2E em Chromium (oito cenários em desktop
-e mobile) e 15 testes de Firestore/Storage Rules. GitHub Actions executa todos em pushes,
-pull requests e disparos manuais.
+contém 53 testes unitários/contratuais do cliente, 7 testes do domínio das Functions,
+32 E2E em Chromium (16 cenários em desktop e mobile) e 16 testes de
+Firestore/Storage Rules. GitHub Actions executa todos em pushes, pull requests e
+disparos manuais.
 
 ## Checagens rápidas
 
 ```bash
 npm ci
+npm ci --prefix functions
 npm run check
 npm run test:e2e
 npm run test:rules
 git diff --check
 ```
 
-`npm test` executa unit/contratos + rules em sequência. `npm run test:e2e` é
-separado porque instala/usa Chromium e sobe Auth, Firestore e Storage Emulator. Java
-21+ é obrigatório para os emuladores Firebase. Os E2E usam Firestore 8080 e Storage
-9199; as Rules usam a configuração dedicada nas portas 8081 e 9198, de modo que uma
-etapa não dependa do encerramento do processo da outra.
+`npm test` executa cliente, Functions e rules em sequência. `npm run test:e2e` é
+separado porque instala/usa Chromium e executa Auth, Firestore e Storage Emulator por
+meio de `firebase emulators:exec` e `firebase.e2e.json`. Assim os serviços permanecem
+ativos durante toda a suíte e são encerrados mesmo se um teste falhar. Java 21+ é
+obrigatório para os emuladores Firebase. Os E2E usam Auth 9099, Firestore 8080 e
+Storage 9199; as Rules usam a configuração dedicada nas portas 8081 e 9198, de modo
+que uma etapa não dependa do encerramento do processo da outra.
+O servidor HTTP da matriz usa a porta 4174 e nunca reutiliza um processo existente:
+uma colisão interrompe a execução antes dos testes, em vez de servir arquivos de
+outro diretório silenciosamente.
 
 ## Cobertura automatizada
 
@@ -33,6 +40,13 @@ etapa não dependa do encerramento do processo da outra.
 - contador fixo válido/inválido;
 - recorrência ativa, próxima ocorrência, fim de semana e meia-noite;
 - normalização de dias inválidos/duplicados.
+- normalização conjunta de calendários, fixos e recorrências para ocorrências;
+- ordenação estável e recorrências que atravessam a meia-noite.
+- projeção automática da Timeline, próximos marcos por categoria, recorrências,
+  fallback, filtros, empate e preservação da data civil local;
+- normalização de alertas, início/fim, fontes, silêncio e janela de vencimento.
+- materialização server-side no fuso IANA, calendário civil, meia-noite e recuperação
+  de execuções agendadas atrasadas.
 
 ### Contratos do repositório
 
@@ -45,7 +59,11 @@ etapa não dependa do encerramento do processo da outra.
 - calendários ordenados com ao menos uma data futura;
 - seed de `generalConfig`, modal com três abas e contrato público/admin;
 - links Markdown locais válidos.
+- módulos únicos para clima, ocorrências e IDs das seções da dashboard.
 - limites de 5 MiB/50 MiB alinhados entre UI, cliente, configuração e Storage Rules.
+- contrato de permissão explícita, deduplicação e clique do service worker.
+- contrato FID/App Check, scheduler, fila determinística, TTL e configuração das
+  Functions.
 
 ### Firestore Rules
 
@@ -60,6 +78,9 @@ etapa não dependa do encerramento do processo da outra.
 - metadados de imagens limitados a dez itens válidos.
 - leitura pública de `generalConfig`, escrita exclusiva por administrador Google,
   bloqueio de autoelevação e proteção do documento de expediente.
+- layouts, Forecast7 e preferências aninhadas de notificação aceitos somente nos
+  formatos e limites conhecidos.
+- dispositivos, fila e métricas push negados inclusive ao proprietário.
 
 ### Storage Rules
 
@@ -79,6 +100,9 @@ etapa não dependa do encerramento do processo da outra.
 - edição para recorrente, reordenação, toggle, reload e subscriptions;
 - reautenticação e exclusão integral da conta e dos dados conhecidos.
 - upload, associação, opacidades e remoção de imagem do card.
+- Timeline SVG geral e pessoal, orientação responsiva, filtros, marcadores únicos,
+  segmentos recorrentes e abertura do editor.
+- notificações concedidas, negadas e indisponíveis sem prompt automático.
 
 Os E2E usam `demo-timekeeper` e só ativam emuladores com `?emulators=1` em
 localhost. Nenhum teste automatizado escreve no projeto Firebase de produção.
@@ -126,6 +150,26 @@ Viewports sugeridos: 320, 390, 768, 1024 e 1440 px.
 - Toggle de fundo inicia desligado para conta nova.
 - Estilo, cores, velocidade e intensidade sincronizam em outra aba.
 - Falha de escrita apresenta erro sem deixar estado enganoso.
+- Layout, ordem, cidades e preferências de notificação sincronizam em outra aba.
+
+### Timeline e notificações
+
+- A escala termina no próximo marco mais distante entre as categorias e os filtros
+  mostram somente as fontes esperadas, sem overflow.
+- Desktop usa eixo horizontal; 320 px e 390 px usam eixo vertical, chamadas legíveis
+  e uma única ocorrência para o próximo pagamento e o próximo feriado.
+- Eventos simultâneos, ativo e próximo recebem os estados visuais corretos.
+- Clicar em contador pessoal abre seu editor; evento geral é somente leitura.
+- Permissão só aparece depois de ativar e negar não repete o prompt.
+- Horário de silêncio atravessa meia-noite e alteração/exclusão invalida candidatos.
+- Duas abas não emitem o mesmo ID de ocorrência e os registros expiram.
+- Sem configuração push, a mensagem de entrega limitada permanece visível.
+- Com VAPID/App Check configurados, o estado muda para `Push ativo`; foreground,
+  background e aplicação fechada recebem uma única notificação.
+- Logout revoga o dispositivo, novo login permite recadastro e exclusão da conta
+  remove dispositivos/jobs antes do usuário.
+- Horário de silêncio gera métrica `suppressed`; FID inválido é revogado; repetição
+  do scheduler não duplica o `jobId`.
 
 ### Administração
 

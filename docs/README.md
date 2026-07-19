@@ -14,6 +14,7 @@ Este diretório é a fonte de verdade para entender, operar e evoluir o projeto.
 | [Testes](testing.md) | Estratégia atual e checklists manuais |
 | [Manutenção](maintenance.md) | Rotinas anuais e dívida técnica priorizada |
 | [Troubleshooting](troubleshooting.md) | Diagnóstico de problemas frequentes |
+| [Push confiável](push-architecture.md) | Arquitetura, operação e ativação da Fase 5B |
 
 Para uma apresentação rápida, volte ao [README principal](../README.md). Para
 instruções operacionais de alteração, consulte [AGENTS.md](../AGENTS.md).
@@ -23,4 +24,3 @@ instruções operacionais de alteração, consulte [AGENTS.md](../AGENTS.md).
 Documentação e código fazem parte da mesma mudança. Se um campo, limite, fluxo,
 comando ou comportamento visual mudar, atualize o guia correspondente antes de
 considerar o trabalho concluído.
-

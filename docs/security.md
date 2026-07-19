@@ -40,7 +40,8 @@ Para `/users/{userId}/data/{documentId}`:
 - cada documento usa um `match` literal próprio para não somar os três schemas no
   limite de expressões das Rules;
 - somente o dono Google pode ler/escrever/excluir;
-- settings validam allowlist, tipos, cores, estilos e ranges;
+- settings validam allowlist, tipos, cores, estilos, layouts, widgets de clima e
+  preferências aninhadas de notificação;
 - counters validam allowlist, limite cinco e schemas fixo/recorrente;
 - o tipo do contador seleciona o schema antes da validação e os dias usam uma
   allowlist de `0` a `6`, reduzindo o orçamento de expressões sem relaxar dados;
@@ -116,10 +117,24 @@ fazem sanitização.
 - WeatherWidget.io recebe requests do navegador e localização selecionada no link.
 - Adobe Typekit e Firebase CDN recebem requests de assets.
 - Firebase armazena email, nome, URL da foto e imagens enviadas pelo usuário.
+- Quando push é ativado, Firebase armazena FID, fuso, plataforma mínima, estado do
+  dispositivo e fila técnica; App Check avalia a legitimidade da aplicação.
 
 `public/privacy.html` documenta essas finalidades. Os cookies de expediente são
 funcionais; Analytics é opcional e separado. A conta, os três documentos operacionais e as imagens
 podem ser apagados pelo usuário após reautenticação Google no menu da conta.
+
+O service worker da PWA intercepta somente requisições GET da própria origem. Ele
+não armazena respostas de Firebase, Cloud Storage, WeatherWidget, Analytics ou
+fontes externas. O cache contém apenas o shell público da aplicação e é versionado
+para permitir limpeza de versões anteriores.
+
+O fallback local mantém IDs expirantes no `localStorage` por UID. Para push, FIDs,
+dispositivos, fila e métricas são inacessíveis pelo cliente e só passam pelo Admin
+SDK. Callables exigem Google Auth e App Check, limitam cinco dispositivos e reduzem
+refreshes repetidos. Jobs usam hash determinístico, não armazenam título/corpo e
+expiram por TTL. Logout revoga o dispositivo; exclusão de conta remove dispositivos
+e jobs antes de apagar o usuário. Logs registram somente totais operacionais.
 
 ## Resposta a incidente
 

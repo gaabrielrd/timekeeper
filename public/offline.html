@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="pt-BR">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="theme-color" content="#0c0b0f" />
+		<title>Timekeeper · Offline</title>
+		<style>
+			:root {
+				color-scheme: dark;
+				font-family: system-ui, sans-serif;
+			}
+			body {
+				min-height: 100vh;
+				margin: 0;
+				display: grid;
+				place-items: center;
+				background: #0c0b0f;
+				color: #f7f5fa;
+			}
+			main {
+				width: min(420px, calc(100% - 48px));
+			}
+			p {
+				color: #9993a3;
+				line-height: 1.6;
+			}
+			button {
+				min-height: 44px;
+				padding: 0 18px;
+				border: 0;
+				border-radius: 10px;
+				background: #a78bfa;
+				color: #0c0b0f;
+				font: inherit;
+				cursor: pointer;
+			}
+		</style>
+	</head>
+	<body>
+		<main>
+			<p>Timekeeper</p>
+			<h1>Sem conexão</h1>
+			<p>
+				O painel local está indisponível nesta primeira visita. Reconecte-se
+				para carregar os contadores e preparar o acesso offline.
+			</p>
+			<button type="button" onclick="location.reload()">Tentar novamente</button>
+		</main>
+	</body>
+</html>

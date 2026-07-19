@@ -29,6 +29,23 @@ import {
 	ref,
 	uploadBytesResumable,
 } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-storage.js";
+import {
+	getFunctions,
+	httpsCallable,
+} from "https://www.gstatic.com/firebasejs/12.16.0/firebase-functions.js";
+import {
+	getMessaging,
+	isSupported as messagingIsSupported,
+	onMessage,
+	onRegistered,
+	onUnregistered,
+	register as registerMessaging,
+	unregister as unregisterMessaging,
+} from "https://www.gstatic.com/firebasejs/12.16.0/firebase-messaging.js";
+import {
+	ReCaptchaEnterpriseProvider,
+	initializeAppCheck,
+} from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app-check.js";
 
 const useLocalEmulators =
 	["localhost", "127.0.0.1"].includes(window.location.hostname) &&
@@ -46,6 +63,34 @@ if (useLocalEmulators) {
 	firebaseConfig.projectId = "demo-timekeeper";
 }
 const app = initializeApp(firebaseConfig);
+const pushConfig = window.TimekeeperRuntimeConfig?.push || {};
+const pushConfigured =
+	!useLocalEmulators &&
+	typeof pushConfig.vapidKey === "string" &&
+	pushConfig.vapidKey.length > 20 &&
+	typeof pushConfig.recaptchaEnterpriseSiteKey === "string" &&
+	pushConfig.recaptchaEnterpriseSiteKey.length > 10;
+let pushFunctions = null;
+let pushAppCheckInitialized = false;
+function ensurePushBackend() {
+	if (!pushConfigured) return null;
+	if (!pushAppCheckInitialized) {
+		initializeAppCheck(app, {
+			provider: new ReCaptchaEnterpriseProvider(
+				pushConfig.recaptchaEnterpriseSiteKey,
+			),
+			isTokenAutoRefreshEnabled: true,
+		});
+		pushAppCheckInitialized = true;
+	}
+	if (!pushFunctions) {
+		pushFunctions = getFunctions(
+			app,
+			pushConfig.functionsRegion || "southamerica-east1",
+		);
+	}
+	return pushFunctions;
+}
 
 const DEFAULTS = {
 	endHour: 17,
@@ -59,8 +104,85 @@ const DEFAULTS = {
 	backgroundSpeed: 55,
 	backgroundIntensity: 55,
 	showCustomCounters: true,
+	dashboardLayout: "balanced",
+	dashboardSectionOrder: ["standard", "custom", "timeline", "weather"],
+	hiddenDashboardSections: [],
+	weatherWidgets: window.TimekeeperWeather.cloneDefaults(),
+	...window.TimekeeperNotifications.normalizePreferences(),
 	customCounters: [],
 };
+const DASHBOARD_LAYOUTS = new Set(["focus", "balanced", "compact"]);
+const DASHBOARD_CACHE_KEY = "timekeeper:dashboard-preferences";
+const DASHBOARD_SECTION_IDS =
+	window.TimekeeperOccurrences?.DASHBOARD_SECTION_IDS || [
+		"standard",
+		"custom",
+		"timeline",
+		"weather",
+	];
+
+function uniqueDashboardSections(value) {
+	return [...new Set(Array.isArray(value) ? value : [])].filter((section) =>
+		DASHBOARD_SECTION_IDS.includes(section),
+	);
+}
+
+function normalizeDashboardPreferences(data = {}) {
+	const requestedOrder = uniqueDashboardSections(data.dashboardSectionOrder);
+	return {
+		dashboardLayout: DASHBOARD_LAYOUTS.has(data.dashboardLayout)
+			? data.dashboardLayout
+			: "balanced",
+		dashboardSectionOrder: [
+			...requestedOrder,
+			...DASHBOARD_SECTION_IDS.filter(
+				(section) => !requestedOrder.includes(section),
+			),
+		],
+		hiddenDashboardSections: uniqueDashboardSections(
+			data.hiddenDashboardSections,
+		).filter((section) => section !== "standard"),
+	};
+}
+
+function applyDashboardPreferences(data = {}) {
+	const preferences = normalizeDashboardPreferences(data);
+	document.body.dataset.dashboardLayout = preferences.dashboardLayout;
+	document.querySelectorAll("[data-dashboard-section]").forEach((section) => {
+		const sectionId = section.dataset.dashboardSection;
+		section.style.order = String(
+			preferences.dashboardSectionOrder.indexOf(sectionId),
+		);
+		section.classList.toggle(
+			"is-dashboard-hidden",
+			preferences.hiddenDashboardSections.includes(sectionId),
+		);
+	});
+	return preferences;
+}
+
+function cachedDashboardPreferences() {
+	try {
+		return normalizeDashboardPreferences(
+			JSON.parse(localStorage.getItem(DASHBOARD_CACHE_KEY) || "{}"),
+		);
+	} catch {
+		return normalizeDashboardPreferences();
+	}
+}
+
+function cacheDashboardPreferences(preferences) {
+	try {
+		localStorage.setItem(
+			DASHBOARD_CACHE_KEY,
+			JSON.stringify(normalizeDashboardPreferences(preferences)),
+		);
+	} catch {
+		// O snapshot continua sendo a fonte de verdade sem armazenamento local.
+	}
+}
+
+applyDashboardPreferences(cachedDashboardPreferences());
 const MAX_COUNTERS = 5;
 const MAX_IMAGES = 10;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -119,6 +241,34 @@ const elements = {
 	backgroundIntensityOutput: document.querySelector(
 		"#background-intensity-output",
 	),
+	dashboardLayout: document.querySelector("#dashboard-layout"),
+	dashboardSectionControls: document.querySelector(
+		"#dashboard-section-controls",
+	),
+	weatherWidgetList: document.querySelector("#weather-widget-list"),
+	weatherWidgetCount: document.querySelector("#weather-widget-count"),
+	addWeatherWidget: document.querySelector("#add-weather-widget"),
+	weatherWidgetForm: document.querySelector("#weather-widget-form"),
+	cancelWeatherWidget: document.querySelector("#cancel-weather-widget"),
+	weatherWidgetMessage: document.querySelector("#weather-widget-message"),
+	notificationsEnabled: document.querySelector("#notifications-enabled"),
+	notificationState: document.querySelector("#notification-state"),
+	notificationControls: document.querySelector("#notification-controls"),
+	notificationDeliveryState: document.querySelector(
+		"#notification-delivery-state",
+	),
+	notificationMessage: document.querySelector("#notification-message"),
+	notificationQuietEnabled: document.querySelector(
+		"#notification-quiet-enabled",
+	),
+	notificationQuietTimes: document.querySelector("#notification-quiet-times"),
+	notificationQuietStart: document.querySelector("#notification-quiet-start"),
+	notificationQuietEnd: document.querySelector("#notification-quiet-end"),
+	timelineList: document.querySelector("#timeline-list"),
+	timelineEmpty: document.querySelector("#timeline-empty"),
+	timelineRange: document.querySelector("#timeline-range"),
+	timelineLegend: document.querySelector("#timeline-legend"),
+	timelineSourceFilter: document.querySelector("#timeline-source-filter"),
 	constellationCanvas: document.querySelector("#constellation-canvas"),
 	settingsState: document.querySelector("#settings-state"),
 	counterForm: document.querySelector("#counter-form"),
@@ -210,9 +360,18 @@ let activeUploadTask = null;
 let librarySelectsCounter = false;
 let imageLibraryAvailable = true;
 let currentUserIsAdmin = false;
+let countersReady = false;
 let generalConfigDocuments = [];
 let generalConfigHasRemoteData = false;
 let generalConfigSnapshotReady = false;
+let weatherRenderTimer = null;
+let notificationScanTimer = null;
+let notificationScanInProgress = false;
+let pushMessaging = null;
+let pushListenersReady = false;
+let pushRegistrationState = pushConfigured ? "idle" : "local";
+let pushRegistrationPromise = null;
+let pushDeviceId = null;
 
 function isHexColor(value) {
 	return /^#[0-9a-f]{6}$/i.test(value || "");
@@ -290,6 +449,7 @@ function setCounterState(label, state = "live") {
 		element.textContent = label;
 		element.dataset.state = state;
 	}
+	if (state !== "live") elements.openCounterModal.disabled = true;
 }
 
 function settingsReference(userId) {
@@ -366,6 +526,7 @@ function applyGeneralConfig(documents, hasRemoteData = false) {
 		.filter((item) => item.type === "holiday")
 		.map((item) => new Date(item.dateTime))
 		.sort((first, second) => first - second);
+	renderTimeline();
 
 	const [endHour, endMinutes] = workday.endTime.split(":").map(Number);
 	DEFAULTS.endHour = endHour;
@@ -818,6 +979,22 @@ async function deleteLibraryImage(image) {
 	}
 }
 
+function renderWeatherWidgets() {
+	window.TimekeeperWeather.render(document, userSettings.weatherWidgets, {
+		primary: isHexColor(userSettings.accentPrimary)
+			? userSettings.accentPrimary
+			: DEFAULTS.accentPrimary,
+		secondary: isHexColor(userSettings.accentSecondary)
+			? userSettings.accentSecondary
+			: DEFAULTS.accentSecondary,
+	});
+}
+
+function scheduleWeatherRender(delay = 180) {
+	window.clearTimeout(weatherRenderTimer);
+	weatherRenderTimer = window.setTimeout(renderWeatherWidgets, delay);
+}
+
 function applyAccents(primary, secondary) {
 	const safePrimary = isHexColor(primary) ? primary : DEFAULTS.accentPrimary;
 	const safeSecondary = isHexColor(secondary)
@@ -839,10 +1016,12 @@ function applyAccents(primary, secondary) {
 	customProgressBars.forEach(({ counter, bar }) => {
 		if (!counter.color) bar.path?.setAttribute("stroke", safePrimary);
 	});
-	document.querySelectorAll(".weatherwidget-io").forEach((widget) => {
-		widget.dataset.accent = safeSecondary;
-		widget.dataset.suncolor = safePrimary;
-	});
+	window.TimekeeperWeather?.applyColors(
+		document,
+		safePrimary,
+		safeSecondary,
+	);
+	scheduleWeatherRender();
 }
 
 const BACKGROUND_DESCRIPTIONS = {
@@ -945,6 +1124,7 @@ function updateChronoRings() {
 }
 
 const reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+const timelineOrientationQuery = window.matchMedia("(max-width: 700px)");
 const constellationState = {
 	context: elements.constellationCanvas.getContext("2d"),
 	dpr: 1,
@@ -1341,7 +1521,7 @@ async function saveAdminCalendarDate(event, type) {
 	form.querySelector('[type="submit"]').disabled = true;
 	try {
 		await batch.commit();
-		resetAdminDateForm(form);
+		if (form.elements.editingId.value === editingId) resetAdminDateForm(form);
 		elements.adminMessage.textContent = editingId
 			? "Data atualizada."
 			: "Data adicionada.";
@@ -1695,7 +1875,7 @@ function renderCustomCounters(counters) {
 	renderCounterList(counters);
 	elements.counterCount.textContent = `${counters.length} / ${MAX_COUNTERS}`;
 	const isFull = counters.length >= MAX_COUNTERS;
-	elements.openCounterModal.disabled = isFull;
+	elements.openCounterModal.disabled = isFull || !countersReady;
 	elements.openCounterModalLabel.textContent = isFull
 		? "Limite atingido"
 		: "Novo contador";
@@ -1708,6 +1888,1222 @@ function renderCustomCounters(counters) {
 	}
 }
 
+const DASHBOARD_SECTION_LABELS = {
+	standard: "Contadores padrão",
+	custom: "Meus contadores",
+	timeline: "Timeline",
+	weather: "Previsão do tempo",
+};
+
+function iconButton(icon, label, handler) {
+	const button = document.createElement("button");
+	button.className = "icon-button";
+	button.type = "button";
+	button.title = label;
+	button.setAttribute("aria-label", label);
+	const glyph = document.createElement("i");
+	glyph.className = "material-icons";
+	glyph.setAttribute("aria-hidden", "true");
+	glyph.textContent = icon;
+	button.append(glyph);
+	button.addEventListener("click", handler);
+	return button;
+}
+
+async function persistDashboardPreferences(preferences) {
+	const previous = normalizeDashboardPreferences(userSettings);
+	const normalized = applyDashboardPreferences(preferences);
+	Object.assign(userSettings, normalized);
+	cacheDashboardPreferences(normalized);
+	renderDashboardSectionControls(normalized);
+	if (!(await saveSettings(normalized))) {
+		Object.assign(userSettings, previous);
+		applyDashboardPreferences(previous);
+		cacheDashboardPreferences(previous);
+		renderDashboardSectionControls(previous);
+	}
+}
+
+function renderDashboardSectionControls(data = userSettings) {
+	if (!elements.dashboardLayout || !elements.dashboardSectionControls) return;
+	const preferences = normalizeDashboardPreferences(data);
+	elements.dashboardLayout.value = preferences.dashboardLayout;
+	elements.dashboardSectionControls.replaceChildren();
+	const availableOrder = preferences.dashboardSectionOrder.filter((sectionId) =>
+		document.querySelector(`[data-dashboard-section="${sectionId}"]`),
+	);
+	availableOrder.forEach((sectionId, index) => {
+		const row = document.createElement("div");
+		row.className = "dashboard-section-control";
+		row.dataset.dashboardSectionControl = sectionId;
+
+		const toggle = document.createElement("label");
+		toggle.className = "dashboard-section-toggle";
+		const input = document.createElement("input");
+		input.type = "checkbox";
+		input.checked = !preferences.hiddenDashboardSections.includes(sectionId);
+		input.disabled = sectionId === "standard";
+		input.setAttribute(
+			"aria-label",
+			`Exibir ${DASHBOARD_SECTION_LABELS[sectionId]}`,
+		);
+		input.addEventListener("change", () => {
+			const hidden = new Set(preferences.hiddenDashboardSections);
+			if (input.checked) hidden.delete(sectionId);
+			else hidden.add(sectionId);
+			persistDashboardPreferences({
+				...preferences,
+				hiddenDashboardSections: [...hidden],
+			});
+		});
+		const label = document.createElement("span");
+		label.textContent = DASHBOARD_SECTION_LABELS[sectionId];
+		toggle.append(input, label);
+
+		const actions = document.createElement("div");
+		actions.className = "dashboard-section-actions";
+		for (const [direction, icon, title] of [
+			[-1, "arrow_upward", "Mover seção para cima"],
+			[1, "arrow_downward", "Mover seção para baixo"],
+		]) {
+			const button = iconButton(icon, title, () => {
+				const siblingId = availableOrder[index + direction];
+				if (!siblingId) return;
+				const nextOrder = [...preferences.dashboardSectionOrder];
+				const currentIndex = nextOrder.indexOf(sectionId);
+				const siblingIndex = nextOrder.indexOf(siblingId);
+				[nextOrder[currentIndex], nextOrder[siblingIndex]] = [
+					nextOrder[siblingIndex],
+					nextOrder[currentIndex],
+				];
+				persistDashboardPreferences({
+					...preferences,
+					dashboardSectionOrder: nextOrder,
+				});
+			});
+			button.disabled = !availableOrder[index + direction];
+			actions.append(button);
+		}
+		row.append(toggle, actions);
+		elements.dashboardSectionControls.append(row);
+	});
+}
+
+function closeWeatherWidgetForm() {
+	elements.weatherWidgetForm.hidden = true;
+	elements.weatherWidgetForm.reset();
+	elements.weatherWidgetForm.elements.id.value = "";
+	elements.weatherWidgetForm.elements.enabled.checked = true;
+	elements.weatherWidgetMessage.textContent = "";
+}
+
+function openWeatherWidgetForm(widget = null) {
+	elements.weatherWidgetForm.hidden = false;
+	elements.weatherWidgetForm.elements.id.value = widget?.id || "";
+	elements.weatherWidgetForm.elements.label1.value = widget?.label1 || "";
+	elements.weatherWidgetForm.elements.label2.value = widget?.label2 || "";
+	elements.weatherWidgetForm.elements.forecastUrl.value =
+		widget?.forecastUrl || "";
+	elements.weatherWidgetForm.elements.enabled.checked = widget?.enabled !== false;
+	elements.weatherWidgetMessage.textContent = "";
+	elements.weatherWidgetForm.elements.label1.focus();
+}
+
+async function persistWeatherWidgets(nextWidgets) {
+	const previous = window.TimekeeperWeather.normalizeWidgets(
+		userSettings.weatherWidgets,
+	);
+	const normalized = window.TimekeeperWeather.normalizeWidgets(nextWidgets, false);
+	userSettings.weatherWidgets = normalized;
+	renderWeatherWidgetList();
+	renderWeatherWidgets();
+	if (!(await saveSettings({ weatherWidgets: normalized }))) {
+		userSettings.weatherWidgets = previous;
+		renderWeatherWidgetList();
+		renderWeatherWidgets();
+		return false;
+	}
+	return true;
+}
+
+function renderWeatherWidgetList() {
+	if (!elements.weatherWidgetList) return;
+	const widgets = window.TimekeeperWeather.normalizeWidgets(
+		userSettings.weatherWidgets,
+	);
+	userSettings.weatherWidgets = widgets;
+	elements.weatherWidgetList.replaceChildren();
+	elements.weatherWidgetCount.textContent = `${widgets.length} / ${window.TimekeeperWeather.MAX_WIDGETS}`;
+	elements.addWeatherWidget.disabled =
+		widgets.length >= window.TimekeeperWeather.MAX_WIDGETS;
+	widgets.forEach((widget, index) => {
+		const row = document.createElement("div");
+		row.className = "weather-widget-row";
+		row.classList.toggle("is-disabled", !widget.enabled);
+		row.dataset.weatherSettingId = widget.id;
+
+		const copy = document.createElement("div");
+		copy.className = "weather-widget-copy";
+		const title = document.createElement("strong");
+		title.textContent = widget.label1;
+		const region = document.createElement("span");
+		region.textContent = `${widget.label2} · ${widget.enabled ? "Visível" : "Oculto"}`;
+		copy.append(title, region);
+
+		const actions = document.createElement("div");
+		actions.className = "weather-widget-actions";
+		const visibility = iconButton(
+			widget.enabled ? "visibility" : "visibility_off",
+			`${widget.enabled ? "Ocultar" : "Exibir"} ${widget.label1}`,
+			() => {
+				const next = widgets.map((item) =>
+					item.id === widget.id ? { ...item, enabled: !item.enabled } : item,
+				);
+				persistWeatherWidgets(next);
+			},
+		);
+		const edit = iconButton("edit", `Editar ${widget.label1}`, () =>
+			openWeatherWidgetForm(widget),
+		);
+		actions.append(visibility, edit);
+		for (const [direction, icon, label] of [
+			[-1, "arrow_upward", "Mover para cima"],
+			[1, "arrow_downward", "Mover para baixo"],
+		]) {
+			const move = iconButton(icon, `${label}: ${widget.label1}`, () => {
+				const target = index + direction;
+				if (target < 0 || target >= widgets.length) return;
+				const next = [...widgets];
+				[next[index], next[target]] = [next[target], next[index]];
+				persistWeatherWidgets(next);
+			});
+			move.disabled = index + direction < 0 || index + direction >= widgets.length;
+			actions.append(move);
+		}
+		const remove = iconButton("delete", `Remover ${widget.label1}`, () => {
+			if (!window.confirm(`Remover a previsão de ${widget.label1}?`)) return;
+			persistWeatherWidgets(widgets.filter((item) => item.id !== widget.id));
+		});
+		remove.classList.add("delete-counter");
+		actions.append(remove);
+		row.append(copy, actions);
+		elements.weatherWidgetList.append(row);
+	});
+}
+
+const TIMELINE_SOURCE_FILTERS = {
+	all: [],
+	workday: ["workday"],
+	calendar: ["payment", "holiday"],
+	counters: ["fixed", "recurring"],
+};
+const TIMELINE_SOURCE_LABELS = {
+	workday: "Expediente",
+	payment: "Pagamento",
+	holiday: "Feriado",
+	fixed: "Contador fixo",
+	recurring: "Contador recorrente",
+};
+
+function timelineTimeLabel(occurrence) {
+	const formatter = new Intl.DateTimeFormat("pt-BR", {
+		day: "2-digit",
+		month: "short",
+		hour: "2-digit",
+		minute: "2-digit",
+	});
+	const start = formatter.format(new Date(occurrence.startAtMs));
+	if (occurrence.endAtMs == null) return start;
+	return `${start}–${formatter.format(new Date(occurrence.endAtMs))}`;
+}
+
+function updateTimelineTemporalStates() {
+	if (!elements.timelineList) return;
+	const now = Date.now();
+	const items = Array.from(
+		elements.timelineList.querySelectorAll("[data-timeline-occurrence]"),
+	);
+	let nextAtMs = Number.POSITIVE_INFINITY;
+	for (const item of items) {
+		const startAtMs = Number(item.dataset.startAt);
+		const endAtMs = Number(item.dataset.endAt) || startAtMs;
+		item.classList.toggle("is-active", startAtMs <= now && now < endAtMs);
+		item.classList.remove("is-next");
+		if (startAtMs > now) nextAtMs = Math.min(nextAtMs, startAtMs);
+	}
+	items.forEach((item) => {
+		item.classList.toggle("is-next", Number(item.dataset.startAt) === nextAtMs);
+	});
+}
+
+function buildUpcomingOccurrences(from = new Date(), horizonDays = 90) {
+	const endTime = `${String(userSettings.endHour).padStart(2, "0")}:${String(
+		userSettings.endMinutes,
+	).padStart(2, "0")}`;
+	const workday = {
+		...(window.expedientePadrao || {
+			startTime: "08:00",
+			daysOfWeek: [1, 2, 3, 4, 5],
+		}),
+		endTime,
+	};
+	const to = new Date(from);
+	to.setDate(to.getDate() + horizonDays);
+	return window.TimekeeperOccurrences.buildOccurrences(
+		{
+			workday,
+			payments: window.pagamentos || [],
+			holidays: window.feriados || [],
+			counters: userSettings.customCounters || [],
+		},
+		{
+			from,
+			to,
+		},
+	);
+}
+
+const TIMELINE_SVG_NAMESPACE = "http://www.w3.org/2000/svg";
+
+function timelineSvgElement(tagName, attributes = {}, text = "") {
+	const element = document.createElementNS(TIMELINE_SVG_NAMESPACE, tagName);
+	for (const [name, value] of Object.entries(attributes)) {
+		if (value != null) element.setAttribute(name, String(value));
+	}
+	if (text) element.textContent = text;
+	return element;
+}
+
+function timelineOccurrenceBoundary(occurrence) {
+	return Math.max(occurrence.startAtMs, occurrence.endAtMs ?? occurrence.startAtMs);
+}
+
+function timelineScale(value, fromAtMs, toAtMs, start, end) {
+	if (toAtMs <= fromAtMs) return start;
+	const ratio = Math.max(0, Math.min(1, (value - fromAtMs) / (toAtMs - fromAtMs)));
+	return start + ratio * (end - start);
+}
+
+function timelineTickLabel(value, fromAtMs, toAtMs, first) {
+	if (first) return "agora";
+	const duration = toAtMs - fromAtMs;
+	return new Intl.DateTimeFormat("pt-BR", {
+		...(duration <= 36 * 60 * 60 * 1000
+			? { hour: "2-digit", minute: "2-digit" }
+			: { day: "2-digit", month: "short" }),
+	}).format(new Date(value));
+}
+
+function timelineTicks(fromAtMs, toAtMs) {
+	return Array.from({ length: 5 }, (_, index) => {
+		const value = fromAtMs + ((toAtMs - fromAtMs) * index) / 4;
+		return {
+			value,
+			label: timelineTickLabel(value, fromAtMs, toAtMs, index === 0),
+		};
+	});
+}
+
+function timelineLaneKey(occurrence) {
+	if (["workday", "payment", "holiday"].includes(occurrence.sourceType)) {
+		return occurrence.sourceType;
+	}
+	return `counter:${occurrence.sourceId}`;
+}
+
+function timelineLaneMeta(occurrence) {
+	if (occurrence.sourceType === "workday") return "Recorrente";
+	if (occurrence.sourceType === "payment") return "Próximo pagamento";
+	if (occurrence.sourceType === "holiday") return "Próximo feriado";
+	return TIMELINE_SOURCE_LABELS[occurrence.sourceType];
+}
+
+function timelineLanes(occurrences) {
+	const laneMap = new Map();
+	for (const occurrence of occurrences) {
+		const key = timelineLaneKey(occurrence);
+		let lane = laneMap.get(key);
+		if (!lane) {
+			lane = {
+				key,
+				label: occurrence.title,
+				meta: timelineLaneMeta(occurrence),
+				sourceId: occurrence.sourceId,
+				sourceType: occurrence.sourceType,
+				editable: occurrence.editable,
+				color: occurrence.color,
+				occurrences: [],
+			};
+			laneMap.set(key, lane);
+		}
+		lane.occurrences.push(occurrence);
+	}
+	const sourceRank = { workday: 0, payment: 1, holiday: 2, fixed: 3, recurring: 3 };
+	return [...laneMap.values()].sort(
+		(first, second) =>
+			(sourceRank[first.sourceType] ?? 4) - (sourceRank[second.sourceType] ?? 4) ||
+			first.occurrences[0].startAtMs - second.occurrences[0].startAtMs,
+	);
+}
+
+function timelineLaneColor(lane) {
+	if (isHexColor(lane.color)) return lane.color;
+	if (lane.sourceType === "holiday") return "var(--accent-secondary)";
+	return "var(--accent)";
+}
+
+function makeTimelineLaneInteractive(group, lane) {
+	if (!lane.editable) return;
+	const openEditor = () => {
+		const counter = userSettings.customCounters.find(
+			(candidate) => candidate.id === lane.sourceId,
+		);
+		if (counter) openCounterDialog(counter);
+	};
+	group.classList.add("is-editable");
+	group.setAttribute("role", "button");
+	group.setAttribute("tabindex", "0");
+	group.setAttribute("aria-label", `Editar ${lane.label}`);
+	group.addEventListener("click", openEditor);
+	group.addEventListener("keydown", (event) => {
+		if (!["Enter", " "].includes(event.key)) return;
+		event.preventDefault();
+		openEditor();
+	});
+}
+
+function timelineOccurrenceGroup(occurrence, conflicts) {
+	const group = timelineSvgElement("g", {
+		class: `timeline-svg-occurrence timeline-source-${occurrence.sourceType}`,
+		"data-timeline-occurrence": occurrence.id,
+		"data-source-type": occurrence.sourceType,
+		"data-start-at": occurrence.startAtMs,
+		"data-end-at": occurrence.endAtMs ?? "",
+	});
+	if (occurrence.isAnchor) group.classList.add("is-anchor");
+	if ((conflicts.get(occurrence.startAtMs) || 0) > 1) {
+		group.classList.add("has-conflict");
+	}
+	group.append(
+		timelineSvgElement(
+			"title",
+			{},
+			`${occurrence.title} · ${timelineTimeLabel(occurrence)}`,
+		),
+	);
+	return group;
+}
+
+function appendTimelineMarker(group, x, y, occurrence, anchor = false) {
+	const className = `timeline-svg-marker${anchor ? " is-anchor-marker" : ""}`;
+	if (occurrence.sourceType === "payment") {
+		group.append(
+			timelineSvgElement("path", {
+				class: className,
+				d: `M ${x} ${y - 7} L ${x + 7} ${y} L ${x} ${y + 7} L ${x - 7} ${y} Z`,
+			}),
+		);
+		return;
+	}
+	group.append(
+		timelineSvgElement("circle", {
+			class: className,
+			cx: x,
+			cy: y,
+			r: anchor ? 6 : 4,
+		}),
+	);
+}
+
+function appendTimelineOccurrence(
+	parent,
+	occurrence,
+	coordinates,
+	conflicts,
+) {
+	const group = timelineOccurrenceGroup(occurrence, conflicts);
+	const { x1, y1, x2, y2 } = coordinates;
+	if (occurrence.endAtMs != null) {
+		group.append(
+			timelineSvgElement("line", {
+				class: "timeline-svg-segment",
+				x1,
+				y1,
+				x2,
+				y2,
+			}),
+		);
+		if (occurrence.isAnchor) {
+			appendTimelineMarker(group, x2, y2, occurrence, true);
+		}
+	} else {
+		appendTimelineMarker(group, x1, y1, occurrence, occurrence.isAnchor);
+	}
+	parent.append(group);
+	return group;
+}
+
+function timelineAnchorLabel(occurrence) {
+	return new Intl.DateTimeFormat("pt-BR", {
+		day: "2-digit",
+		month: "short",
+		hour: "2-digit",
+		minute: "2-digit",
+	}).format(new Date(timelineOccurrenceBoundary(occurrence)));
+}
+
+function renderHorizontalTimeline(lanes, projection, conflicts) {
+	const width = 1200;
+	const left = 190;
+	const right = 42;
+	const top = 84;
+	const laneHeight = 70;
+	const height = Math.max(250, top + lanes.length * laneHeight + 38);
+	const axisEnd = width - right;
+	const lanesEnd = top + Math.max(0, lanes.length - 1) * laneHeight;
+	const svg = timelineSvgElement("svg", {
+		id: "timeline-svg",
+		class: "timeline-svg",
+		viewBox: `0 0 ${width} ${height}`,
+		role: "group",
+		"data-orientation": "horizontal",
+		"aria-label": `Timeline horizontal com ${lanes.length} trilhas`,
+	});
+	const grid = timelineSvgElement("g", { class: "timeline-svg-grid" });
+	for (const tick of timelineTicks(projection.fromAtMs, projection.toAtMs)) {
+		const x = timelineScale(
+			tick.value,
+			projection.fromAtMs,
+			projection.toAtMs,
+			left,
+			axisEnd,
+		);
+		grid.append(
+			timelineSvgElement("line", {
+				x1: x,
+				y1: 42,
+				x2: x,
+				y2: lanesEnd + 24,
+			}),
+			timelineSvgElement(
+				"text",
+				{ x, y: 25, "text-anchor": x === left ? "start" : x === axisEnd ? "end" : "middle" },
+				tick.label,
+			),
+		);
+	}
+	svg.append(grid);
+	lanes.forEach((lane, laneIndex) => {
+		const y = top + laneIndex * laneHeight;
+		const laneGroup = timelineSvgElement("g", {
+			class: `timeline-svg-lane timeline-source-${lane.sourceType}`,
+			"data-timeline-lane": lane.key,
+		});
+		laneGroup.style.setProperty("--timeline-color", timelineLaneColor(lane));
+		makeTimelineLaneInteractive(laneGroup, lane);
+		if (lane.editable) {
+			laneGroup.append(
+				timelineSvgElement("rect", {
+					class: "timeline-svg-hit-area",
+					x: 0,
+					y: y - 27,
+					width,
+					height: 54,
+				}),
+			);
+		}
+		laneGroup.append(
+			timelineSvgElement("text", { class: "timeline-svg-lane-title", x: 12, y: y - 3 }, lane.label),
+			timelineSvgElement("text", { class: "timeline-svg-lane-meta", x: 12, y: y + 16 }, lane.meta),
+			timelineSvgElement("line", {
+				class: "timeline-svg-rail",
+				x1: left,
+				y1: y,
+				x2: axisEnd,
+				y2: y,
+			}),
+		);
+		for (const occurrence of lane.occurrences) {
+			const startX = timelineScale(
+				Math.max(occurrence.startAtMs, projection.fromAtMs),
+				projection.fromAtMs,
+				projection.toAtMs,
+				left,
+				axisEnd,
+			);
+			let endX = timelineScale(
+				Math.min(timelineOccurrenceBoundary(occurrence), projection.toAtMs),
+				projection.fromAtMs,
+				projection.toAtMs,
+				left,
+				axisEnd,
+			);
+			if (occurrence.endAtMs != null) endX = Math.min(axisEnd, Math.max(startX + 4, endX));
+			appendTimelineOccurrence(
+				laneGroup,
+				occurrence,
+				{ x1: startX, y1: y, x2: endX, y2: y },
+				conflicts,
+			);
+			if (occurrence.isAnchor) {
+				const anchorX = occurrence.endAtMs != null ? endX : startX;
+				laneGroup.append(
+					timelineSvgElement(
+						"text",
+						{
+							class: "timeline-svg-anchor-label",
+							x: anchorX,
+							y: y - 15,
+							"text-anchor": anchorX > axisEnd - 95 ? "end" : anchorX < left + 95 ? "start" : "middle",
+						},
+						timelineAnchorLabel(occurrence),
+					),
+				);
+			}
+		}
+		svg.append(laneGroup);
+	});
+	return svg;
+}
+
+function resolveVerticalAnchorLabels(anchorItems, top, bottom) {
+	const minimumGap = 52;
+	const resolved = [];
+	for (const item of [...anchorItems].sort((first, second) => first.y - second.y)) {
+		resolved.push({
+			...item,
+			labelY: Math.max(
+				item.y,
+				resolved.length
+					? resolved[resolved.length - 1].labelY + minimumGap
+					: top,
+			),
+		});
+	}
+	const overflow = resolved.length
+		? Math.max(0, resolved[resolved.length - 1].labelY - bottom)
+		: 0;
+	if (overflow) resolved.forEach((item) => (item.labelY -= overflow));
+	return resolved;
+}
+
+function renderVerticalTimeline(lanes, projection, conflicts) {
+	const width = 360;
+	const top = 76;
+	const occurrenceCount = lanes.reduce(
+		(total, lane) => total + lane.occurrences.length,
+		0,
+	);
+	const height = Math.min(1500, Math.max(600, 360 + occurrenceCount * 18));
+	const bottom = height - 42;
+	const axisX = 74;
+	const svg = timelineSvgElement("svg", {
+		id: "timeline-svg",
+		class: "timeline-svg",
+		viewBox: `0 0 ${width} ${height}`,
+		role: "group",
+		"data-orientation": "vertical",
+		"aria-label": `Timeline vertical com ${lanes.length} trilhas`,
+	});
+	const grid = timelineSvgElement("g", { class: "timeline-svg-grid" });
+	grid.append(
+		timelineSvgElement("line", {
+			class: "timeline-svg-main-axis",
+			x1: axisX,
+			y1: top,
+			x2: axisX,
+			y2: bottom,
+		}),
+	);
+	for (const tick of timelineTicks(projection.fromAtMs, projection.toAtMs)) {
+		const y = timelineScale(
+			tick.value,
+			projection.fromAtMs,
+			projection.toAtMs,
+			top,
+			bottom,
+		);
+		grid.append(
+			timelineSvgElement("line", { x1: axisX - 7, y1: y, x2: width - 10, y2: y }),
+			timelineSvgElement("text", { x: 8, y: y + 4 }, tick.label),
+		);
+	}
+	svg.append(grid);
+	const anchorItems = [];
+	lanes.forEach((lane, laneIndex) => {
+		const x = axisX + ((laneIndex % 7) - 3) * 4;
+		const laneGroup = timelineSvgElement("g", {
+			class: `timeline-svg-lane timeline-source-${lane.sourceType}`,
+			"data-timeline-lane": lane.key,
+		});
+		laneGroup.style.setProperty("--timeline-color", timelineLaneColor(lane));
+		for (const occurrence of lane.occurrences) {
+			const startY = timelineScale(
+				Math.max(occurrence.startAtMs, projection.fromAtMs),
+				projection.fromAtMs,
+				projection.toAtMs,
+				top,
+				bottom,
+			);
+			let endY = timelineScale(
+				Math.min(timelineOccurrenceBoundary(occurrence), projection.toAtMs),
+				projection.fromAtMs,
+				projection.toAtMs,
+				top,
+				bottom,
+			);
+			if (occurrence.endAtMs != null) endY = Math.min(bottom, Math.max(startY + 5, endY));
+			appendTimelineOccurrence(
+				laneGroup,
+				occurrence,
+				{ x1: x, y1: startY, x2: x, y2: endY },
+				conflicts,
+			);
+			if (occurrence.isAnchor) {
+				anchorItems.push({
+					x,
+					y: occurrence.endAtMs != null ? endY : startY,
+					occurrence,
+					lane,
+				});
+			}
+		}
+		svg.append(laneGroup);
+	});
+	for (const item of resolveVerticalAnchorLabels(anchorItems, top + 18, bottom - 18)) {
+		const connector = timelineSvgElement("g", { class: "timeline-svg-callout" });
+		connector.style.setProperty("--timeline-color", timelineLaneColor(item.lane));
+		connector.append(
+			timelineSvgElement("path", {
+				d: `M ${item.x + 7} ${item.y} L 100 ${item.y} L 108 ${item.labelY}`,
+			}),
+			timelineSvgElement("text", { class: "timeline-svg-callout-title", x: 116, y: item.labelY - 3 }, item.occurrence.title),
+			timelineSvgElement("text", { class: "timeline-svg-callout-meta", x: 116, y: item.labelY + 15 }, timelineAnchorLabel(item.occurrence)),
+		);
+		svg.append(connector);
+	}
+	return svg;
+}
+
+function renderTimelineLegend(lanes) {
+	elements.timelineLegend.replaceChildren();
+	for (const lane of lanes) {
+		const item = document.createElement(lane.editable ? "button" : "span");
+		if (lane.editable) item.type = "button";
+		item.className = "timeline-legend-item";
+		item.style.setProperty("--timeline-color", timelineLaneColor(lane));
+		const marker = document.createElement("i");
+		marker.setAttribute("aria-hidden", "true");
+		const label = document.createElement("span");
+		label.textContent = lane.label;
+		item.append(marker, label);
+		if (lane.editable) {
+			item.setAttribute("aria-label", `Editar ${lane.label}`);
+			item.addEventListener("click", () => {
+				const counter = userSettings.customCounters.find(
+					(candidate) => candidate.id === lane.sourceId,
+				);
+				if (counter) openCounterDialog(counter);
+			});
+		}
+		elements.timelineLegend.append(item);
+	}
+}
+
+function timelineProjection(from) {
+	const endTime = `${String(userSettings.endHour).padStart(2, "0")}:${String(
+		userSettings.endMinutes,
+	).padStart(2, "0")}`;
+	return window.TimekeeperOccurrences.buildTimelineProjection(
+		{
+			workday: {
+				...(window.expedientePadrao || {
+					startTime: "08:00",
+					daysOfWeek: [1, 2, 3, 4, 5],
+				}),
+				endTime,
+			},
+			payments: window.pagamentos || [],
+			holidays: window.feriados || [],
+			counters: userSettings.customCounters || [],
+		},
+		{ from },
+	);
+}
+
+function timelineRangeText(projection) {
+	const durationMs = projection.toAtMs - projection.fromAtMs;
+	const totalHours = Math.max(1, Math.ceil(durationMs / (60 * 60 * 1000)));
+	const span = totalHours >= 48
+		? `${Math.ceil(totalHours / 24)} dias`
+		: `${totalHours} ${totalHours === 1 ? "hora" : "horas"}`;
+	const end = new Intl.DateTimeFormat("pt-BR", {
+		day: "2-digit",
+		month: "long",
+		hour: "2-digit",
+		minute: "2-digit",
+	}).format(new Date(projection.toAtMs));
+	return `Agora → ${end} · ${span} · escala automática`;
+}
+
+function renderTimeline() {
+	if (!elements.timelineList) return;
+	const projection = timelineProjection(new Date());
+	const sourceTypes = new Set(
+		TIMELINE_SOURCE_FILTERS[elements.timelineSourceFilter.value] || [],
+	);
+	const filtered = projection.occurrences.filter(
+		(occurrence) => sourceTypes.size === 0 || sourceTypes.has(occurrence.sourceType),
+	);
+	const lanes = timelineLanes(filtered);
+	const conflicts = new Map();
+	for (const occurrence of filtered) {
+		conflicts.set(
+			occurrence.startAtMs,
+			(conflicts.get(occurrence.startAtMs) || 0) + 1,
+		);
+	}
+	elements.timelineList.replaceChildren();
+	elements.timelineRange.hidden = projection.anchors.length === 0;
+	elements.timelineRange.textContent = projection.anchors.length
+		? timelineRangeText(projection)
+		: "Aguardando um próximo evento.";
+	elements.timelineEmpty.hidden = lanes.length !== 0;
+	renderTimelineLegend(lanes);
+	if (lanes.length) {
+		const svg = timelineOrientationQuery.matches
+			? renderVerticalTimeline(lanes, projection, conflicts)
+			: renderHorizontalTimeline(lanes, projection, conflicts);
+		elements.timelineList.append(svg);
+	}
+	updateTimelineTemporalStates();
+	scheduleNotificationScan();
+}
+
+function notificationSupportState() {
+	if (
+		typeof window.Notification !== "function" ||
+		!("serviceWorker" in navigator)
+	) {
+		return "unsupported";
+	}
+	return Notification.permission;
+}
+
+function notificationStorageKey(userId) {
+	return `timekeeper:notification-deliveries:${userId}`;
+}
+
+function readNotificationDeliveries(userId) {
+	try {
+		const parsed = JSON.parse(
+			localStorage.getItem(notificationStorageKey(userId)) || "{}",
+		);
+		return parsed && typeof parsed === "object" ? parsed : {};
+	} catch {
+		return {};
+	}
+}
+
+function writeNotificationDeliveries(userId, deliveries) {
+	const now = Date.now();
+	const active = Object.fromEntries(
+		Object.entries(deliveries)
+			.filter(([, value]) => Number(value?.expiresAtMs) > now)
+			.sort(
+				([, first], [, second]) =>
+					Number(second.expiresAtMs) - Number(first.expiresAtMs),
+			)
+			.slice(0, 500),
+	);
+	try {
+		localStorage.setItem(notificationStorageKey(userId), JSON.stringify(active));
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+async function claimNotificationDelivery(candidate) {
+	if (!currentUser) return false;
+	const userId = currentUser.uid;
+	const token = crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`;
+	const claim = () => {
+		const deliveries = readNotificationDeliveries(userId);
+		if (Number(deliveries[candidate.id]?.expiresAtMs) > Date.now()) return false;
+		deliveries[candidate.id] = {
+			token,
+			expiresAtMs: candidate.eventAtMs + 2 * 86400000,
+		};
+		return writeNotificationDeliveries(userId, deliveries);
+	};
+	if (navigator.locks?.request) {
+		return navigator.locks.request(
+			`timekeeper-notifications:${userId}`,
+			{ mode: "exclusive" },
+			claim,
+		);
+	}
+	if (!claim()) return false;
+	await new Promise((resolve) => window.setTimeout(resolve, 40));
+	return readNotificationDeliveries(userId)[candidate.id]?.token === token;
+}
+
+function releaseNotificationDelivery(candidateId, userId = currentUser?.uid) {
+	if (!userId) return;
+	const deliveries = readNotificationDeliveries(userId);
+	delete deliveries[candidateId];
+	writeNotificationDeliveries(userId, deliveries);
+}
+
+function clearNotificationDeliveryState(userId) {
+	if (!userId) return;
+	try {
+		localStorage.removeItem(notificationStorageKey(userId));
+	} catch {
+		// O armazenamento local pode estar indisponível em modo privado restrito.
+	}
+}
+
+function currentPushDeviceId() {
+	if (pushDeviceId) return pushDeviceId;
+	try {
+		pushDeviceId = localStorage.getItem("timekeeper:push-device-id");
+		if (!pushDeviceId) {
+			pushDeviceId = crypto.randomUUID();
+			localStorage.setItem("timekeeper:push-device-id", pushDeviceId);
+		}
+	} catch {
+		pushDeviceId = crypto.randomUUID();
+	}
+	return pushDeviceId;
+}
+
+function pushCallable(name) {
+	const functions = ensurePushBackend();
+	return functions ? httpsCallable(functions, name) : null;
+}
+
+async function uploadPushFid(fid) {
+	const user = currentUser;
+	const registerDevice = pushCallable("registerPushDevice");
+	if (!user || !registerDevice || !fid) return false;
+	try {
+		await registerDevice({
+			deviceId: currentPushDeviceId(),
+			fid,
+			timeZone:
+				Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Sao_Paulo",
+			platform:
+				navigator.userAgentData?.platform || navigator.platform || "Web",
+		});
+		if (currentUser?.uid === user.uid) {
+			pushRegistrationState = "active";
+			syncNotificationUi();
+		}
+		return true;
+	} catch (error) {
+		console.error("Falha ao registrar dispositivo para push.", error);
+		if (currentUser?.uid === user.uid) {
+			pushRegistrationState = "error";
+			elements.notificationMessage.textContent =
+				"Os alertas locais continuam ativos, mas o push não pôde ser configurado.";
+			syncNotificationUi();
+		}
+		return false;
+	}
+}
+
+async function showPushNotification(payload) {
+	if (Notification.permission !== "granted") return;
+	const data = payload?.data || {};
+	const registration = await navigator.serviceWorker.ready;
+	await registration.showNotification(data.title || "Timekeeper", {
+		body: data.body || "Um evento da sua Timeline está próximo.",
+		icon: "/src/assets/icon-192.png",
+		badge: "/src/assets/icon-192.png",
+		tag: data.tag || "timekeeper-push",
+		renotify: false,
+		data: {
+			url: data.url || "/#dashboard-timeline-section",
+			sourceId: data.sourceId || "",
+		},
+	});
+}
+
+async function ensurePushListeners() {
+	if (pushListenersReady) return true;
+	if (!pushConfigured || !(await messagingIsSupported())) return false;
+	pushMessaging = getMessaging(app);
+	onRegistered(pushMessaging, (fid) => {
+		uploadPushFid(fid);
+	});
+	onUnregistered(pushMessaging, async () => {
+		const revokeDevice = pushCallable("revokePushDevice");
+		if (!currentUser || !revokeDevice) return;
+		try {
+			await revokeDevice({ deviceId: currentPushDeviceId() });
+		} catch (error) {
+			console.error("Falha ao confirmar revogação do dispositivo.", error);
+		}
+	});
+	onMessage(pushMessaging, (payload) => {
+		showPushNotification(payload).catch((error) => {
+			console.error("Falha ao exibir push em primeiro plano.", error);
+		});
+	});
+	pushListenersReady = true;
+	return true;
+}
+
+async function registerPushForCurrentUser() {
+	if (
+		!pushConfigured ||
+		!currentUser ||
+		!userSettings.notificationsEnabled ||
+		Notification.permission !== "granted"
+	) {
+		return false;
+	}
+	if (pushRegistrationState === "active") return true;
+	if (pushRegistrationPromise) return pushRegistrationPromise;
+	pushRegistrationState = "registering";
+	syncNotificationUi();
+	pushRegistrationPromise = (async () => {
+		if (!(await ensurePushListeners())) {
+			throw new Error("FCM não é suportado neste navegador.");
+		}
+		const registration = await navigator.serviceWorker.ready;
+		await registerMessaging(pushMessaging, {
+			vapidKey: pushConfig.vapidKey,
+			serviceWorkerRegistration: registration,
+		});
+		return true;
+	})()
+		.catch((error) => {
+			console.error("Falha ao iniciar o push.", error);
+			pushRegistrationState = "error";
+			elements.notificationMessage.textContent =
+				"Os alertas locais continuam ativos, mas o push não está disponível.";
+			syncNotificationUi();
+			return false;
+		})
+		.finally(() => {
+			pushRegistrationPromise = null;
+		});
+	return pushRegistrationPromise;
+}
+
+async function revokeCurrentPushDevice({ deleteAll = false } = {}) {
+	if (!pushConfigured) return true;
+	const user = currentUser;
+	let serverRevoked = true;
+	if (user) {
+		const callable = pushCallable(deleteAll ? "deletePushData" : "revokePushDevice");
+		if (callable) {
+			try {
+				await callable(
+					deleteAll ? {} : { deviceId: currentPushDeviceId() },
+				);
+			} catch (error) {
+				serverRevoked = false;
+				console.error("Falha ao remover dados de push.", error);
+			}
+		}
+	}
+	try {
+		if (pushMessaging) await unregisterMessaging(pushMessaging);
+	} catch (error) {
+		console.error("Falha ao remover a inscrição FCM local.", error);
+	}
+	pushRegistrationState = "idle";
+	syncNotificationUi();
+	return serverRevoked;
+}
+
+function syncNotificationUi() {
+	if (!elements.notificationsEnabled) return;
+	if (currentUser) {
+		writeNotificationDeliveries(
+			currentUser.uid,
+			readNotificationDeliveries(currentUser.uid),
+		);
+	}
+	const preferences = window.TimekeeperNotifications.normalizePreferences(
+		userSettings,
+	);
+	const support = notificationSupportState();
+	const active =
+		preferences.notificationsEnabled && support === "granted" && Boolean(currentUser);
+	elements.notificationsEnabled.checked =
+		active || (preferences.notificationsEnabled && support === "denied");
+	elements.notificationsEnabled.disabled =
+		!currentUser ||
+		support === "unsupported" ||
+		(support === "denied" && !preferences.notificationsEnabled);
+	elements.notificationControls.classList.toggle("is-disabled", !active);
+	for (const input of document.querySelectorAll('[name="notificationLead"]')) {
+		input.checked = preferences.notificationLeadMinutes.includes(
+			Number(input.value),
+		);
+		input.disabled = !active;
+	}
+	for (const input of document.querySelectorAll('[name="notificationSource"]')) {
+		input.checked = preferences.notificationSources[input.value] === true;
+		input.disabled = !active;
+	}
+	elements.notificationQuietEnabled.checked =
+		preferences.notificationQuietHours.enabled;
+	elements.notificationQuietEnabled.disabled = !active;
+	elements.notificationQuietStart.value =
+		preferences.notificationQuietHours.startTime;
+	elements.notificationQuietEnd.value = preferences.notificationQuietHours.endTime;
+	const quietDisabled = !active || !preferences.notificationQuietHours.enabled;
+	elements.notificationQuietTimes.classList.toggle("is-disabled", quietDisabled);
+	elements.notificationQuietStart.disabled = quietDisabled;
+	elements.notificationQuietEnd.disabled = quietDisabled;
+
+	let state = "connecting";
+	let label = "Não autorizado";
+	let delivery = "Ative para escolher os alertas e autorizar este dispositivo.";
+	if (support === "unsupported") {
+		state = "error";
+		label = "Não suportado";
+		delivery = "Este navegador não oferece notificações locais via service worker.";
+	} else if (support === "denied") {
+		state = "error";
+		label = "Bloqueado";
+		delivery = "A permissão foi negada. Reative-a nas configurações do navegador.";
+	} else if (active) {
+		state = "live";
+		if (pushRegistrationState === "active") {
+			label = "Push ativo";
+			delivery =
+				"Entrega por push configurada neste dispositivo, inclusive com o app fechado.";
+		} else if (pushRegistrationState === "registering") {
+			label = "Configurando";
+			delivery = "Registrando este dispositivo no Firebase Cloud Messaging...";
+		} else {
+			label = "Ativo";
+			delivery = pushConfigured
+				? "Entrega local ativa; o cadastro push será tentado novamente."
+				: "Entrega limitada: mantenha a página ou o PWA em execução. Configure FCM e App Check para ativar push.";
+		}
+	} else if (support === "granted") {
+		label = "Desativado";
+		delivery = "Este dispositivo está autorizado, mas os alertas estão desativados.";
+	}
+	elements.notificationState.dataset.state = state;
+	elements.notificationState.textContent = label;
+	elements.notificationDeliveryState.textContent = delivery;
+}
+
+function notificationPreferencesFromControls() {
+	const leadMinutes = Array.from(
+		document.querySelectorAll('[name="notificationLead"]:checked'),
+	).map((input) => Number(input.value));
+	const notificationSources = Object.fromEntries(
+		window.TimekeeperNotifications.SOURCE_KEYS.map((key) => [
+			key,
+			document.querySelector(
+				`[name="notificationSource"][value="${key}"]`,
+			)?.checked === true,
+		]),
+	);
+	return window.TimekeeperNotifications.normalizePreferences({
+		notificationsEnabled: true,
+		notificationLeadMinutes: leadMinutes,
+		notificationSources,
+		notificationQuietHours: {
+			enabled: elements.notificationQuietEnabled.checked,
+			startTime: elements.notificationQuietStart.value,
+			endTime: elements.notificationQuietEnd.value,
+		},
+	});
+}
+
+async function persistNotificationPreferences(nextPreferences) {
+	const previous = window.TimekeeperNotifications.normalizePreferences(userSettings);
+	const normalized = window.TimekeeperNotifications.normalizePreferences(
+		nextPreferences,
+	);
+	Object.assign(userSettings, normalized);
+	syncNotificationUi();
+	scheduleNotificationScan();
+	if (!(await saveSettings(normalized))) {
+		Object.assign(userSettings, previous);
+		syncNotificationUi();
+		return false;
+	}
+	return true;
+}
+
+async function showLocalNotification(candidate) {
+	const userId = currentUser?.uid;
+	if (!userId || !(await claimNotificationDelivery(candidate))) return;
+	try {
+		const registration = await navigator.serviceWorker.ready;
+		await registration.showNotification(`Timekeeper · ${candidate.title}`, {
+			body: window.TimekeeperNotifications.candidateBody(candidate),
+			icon: "/src/assets/icon-192.png",
+			badge: "/src/assets/icon-192.png",
+			tag: candidate.id,
+			renotify: false,
+			data: {
+				url: "/#dashboard-timeline-section",
+				sourceId: candidate.sourceId,
+			},
+		});
+	} catch (error) {
+		releaseNotificationDelivery(candidate.id, userId);
+		console.error("Falha ao emitir notificação local.", error);
+		elements.notificationMessage.textContent =
+			"Não foi possível emitir um alerta neste dispositivo.";
+	}
+}
+
+async function scanNotifications() {
+	if (notificationScanInProgress || !currentUser) return;
+	const preferences = window.TimekeeperNotifications.normalizePreferences(
+		userSettings,
+	);
+	if (
+		!preferences.notificationsEnabled ||
+		notificationSupportState() !== "granted" ||
+		pushRegistrationState === "active"
+	) {
+		return;
+	}
+	notificationScanInProgress = true;
+	try {
+		const now = Date.now();
+		const occurrences = buildUpcomingOccurrences(new Date(now), 90);
+		const candidates = window.TimekeeperNotifications.buildCandidates(
+			occurrences,
+			preferences,
+		);
+		const due = window.TimekeeperNotifications.dueCandidates(candidates, now);
+		for (const candidate of due) {
+			if (
+				window.TimekeeperNotifications.isQuietTime(
+					new Date(now),
+					preferences.notificationQuietHours,
+				)
+			) {
+				continue;
+			}
+			await showLocalNotification(candidate);
+		}
+	} finally {
+		notificationScanInProgress = false;
+	}
+}
+
+function scheduleNotificationScan(delay = 250) {
+	window.clearTimeout(notificationScanTimer);
+	notificationScanTimer = window.setTimeout(scanNotifications, delay);
+}
+
 function applySettings(data) {
 	const currentCounters = userSettings.customCounters || [];
 	userSettings = {
@@ -1715,9 +3111,30 @@ function applySettings(data) {
 		...data,
 		customCounters: currentCounters,
 	};
+	userSettings.weatherWidgets = window.TimekeeperWeather.normalizeWidgets(
+		data.weatherWidgets,
+	);
+	Object.assign(
+		userSettings,
+		window.TimekeeperNotifications.normalizePreferences(data),
+	);
 	syncTimeControls(userSettings.endHour, userSettings.endMinutes);
 	applyAccents(userSettings.accentPrimary, userSettings.accentSecondary);
 	applyBackground(userSettings);
+	Object.assign(userSettings, applyDashboardPreferences(userSettings));
+	if (currentUser) cacheDashboardPreferences(userSettings);
+	renderDashboardSectionControls(userSettings);
+	renderWeatherWidgetList();
+	renderWeatherWidgets();
+	syncNotificationUi();
+	if (
+		currentUser &&
+		userSettings.notificationsEnabled &&
+		notificationSupportState() === "granted"
+	) {
+		registerPushForCurrentUser();
+	}
+	renderTimeline();
 	updateCustomVisibility(currentCounters);
 }
 
@@ -1810,6 +3227,7 @@ function normalizeCounters(counters) {
 function applyCounters(counters) {
 	userSettings.customCounters = normalizeCounters(counters);
 	renderCustomCounters(userSettings.customCounters);
+	renderTimeline();
 }
 
 function unsubscribeUserData() {
@@ -1821,6 +3239,8 @@ function unsubscribeUserData() {
 	unsubscribeCounters = null;
 	unsubscribeImages = null;
 	unsubscribeProfile = null;
+	countersReady = false;
+	elements.openCounterModal.disabled = true;
 	setAdminAccess(false);
 	imageLoadVersion += 1;
 }
@@ -1866,7 +3286,14 @@ async function ensureUserData(user) {
 	if (!settingsSnapshot.exists()) {
 		await accountDataOperation(
 			`criar users/${user.uid}/data/settings`,
-			() => setDoc(settingsDoc, {
+			() => {
+				const dashboardPreferences = normalizeDashboardPreferences(legacy);
+				const weatherWidgets = window.TimekeeperWeather.normalizeWidgets(
+					legacy.weatherWidgets,
+				);
+				const notificationPreferences =
+					window.TimekeeperNotifications.normalizePreferences(legacy);
+				return setDoc(settingsDoc, {
 				endHour: legacy.endHour ?? DEFAULTS.endHour,
 				endMinutes: legacy.endMinutes ?? DEFAULTS.endMinutes,
 				accentPrimary: isHexColor(legacy.accentPrimary)
@@ -1901,8 +3328,12 @@ async function ensureUserData(user) {
 					DEFAULTS.backgroundIntensity,
 				),
 				showCustomCounters: legacy.showCustomCounters !== false,
+				...dashboardPreferences,
+				weatherWidgets,
+				...notificationPreferences,
 				updatedAt: serverTimestamp(),
-			}),
+				});
+			},
 		);
 	}
 	if (!countersSnapshot.exists()) {
@@ -1945,6 +3376,7 @@ async function ensureUserData(user) {
 async function subscribeToUserData(user) {
 	unsubscribeUserData();
 	setSaveState("Conectando...", true);
+	countersReady = false;
 	setCounterState("Conectando...", "connecting");
 	let imagesAvailable;
 	try {
@@ -1986,6 +3418,7 @@ async function subscribeToUserData(user) {
 	unsubscribeCounters = onSnapshot(
 		countersReference(user.uid),
 		(snapshot) => {
+			countersReady = true;
 			applyCounters(snapshot.exists() ? snapshot.data().items : []);
 			setCounterState("Ao vivo", "live");
 		},
@@ -2263,6 +3696,9 @@ elements.customVisibilityButton.addEventListener("click", async () => {
 });
 elements.signOutButton.addEventListener("click", async () => {
 	closeSidebar();
+	clearNotificationDeliveryState(currentUser?.uid);
+	localStorage.removeItem(DASHBOARD_CACHE_KEY);
+	await revokeCurrentPushDevice();
 	await signOut(auth);
 });
 elements.deleteAccountButton.addEventListener("click", async () => {
@@ -2276,6 +3712,9 @@ elements.deleteAccountButton.addEventListener("click", async () => {
 	elements.deleteAccountButton.disabled = true;
 	try {
 		await reauthenticateWithPopup(userToDelete, googleProvider);
+		if (!(await revokeCurrentPushDevice({ deleteAll: true }))) {
+			throw new Error("push-data-delete-failed");
+		}
 		activeUploadTask?.cancel();
 		await Promise.all(
 			Array.from({ length: MAX_IMAGES }, async (_, slot) => {
@@ -2293,6 +3732,7 @@ elements.deleteAccountButton.addEventListener("click", async () => {
 			deleteDoc(doc(db, "users", userToDelete.uid, "data", "images")),
 		]);
 		await deleteDoc(userRef);
+		clearNotificationDeliveryState(userToDelete.uid);
 		await deleteUser(userToDelete);
 		closeSidebar();
 		showToast("Conta e dados excluídos permanentemente.");
@@ -2341,6 +3781,106 @@ elements.accentPrimary.addEventListener("change", () => {
 });
 elements.accentSecondary.addEventListener("change", () => {
 	saveSettings({ accentSecondary: elements.accentSecondary.value });
+});
+elements.dashboardLayout.addEventListener("change", () => {
+	persistDashboardPreferences({
+		...userSettings,
+		dashboardLayout: elements.dashboardLayout.value,
+	});
+});
+elements.timelineSourceFilter.addEventListener("change", renderTimeline);
+elements.notificationsEnabled.addEventListener("change", async () => {
+	elements.notificationMessage.textContent = "";
+	if (!elements.notificationsEnabled.checked) {
+		const disabled = await persistNotificationPreferences({
+			...userSettings,
+			notificationsEnabled: false,
+		});
+		if (disabled) await revokeCurrentPushDevice();
+		return;
+	}
+	if (notificationSupportState() === "unsupported") {
+		syncNotificationUi();
+		return;
+	}
+	let permission = Notification.permission;
+	if (permission === "default") {
+		permission = await Notification.requestPermission();
+	}
+	if (permission !== "granted") {
+		elements.notificationMessage.textContent =
+			permission === "denied"
+				? "Permissão negada. O app não solicitará novamente automaticamente."
+				: "A permissão não foi concedida.";
+		syncNotificationUi();
+		return;
+	}
+	const enabled = await persistNotificationPreferences({
+		...userSettings,
+		notificationsEnabled: true,
+	});
+	if (enabled) await registerPushForCurrentUser();
+});
+for (const input of document.querySelectorAll(
+	'[name="notificationLead"], [name="notificationSource"]',
+)) {
+	input.addEventListener("change", async () => {
+		elements.notificationMessage.textContent = "";
+		const checkedLeads = document.querySelectorAll(
+			'[name="notificationLead"]:checked',
+		);
+		if (input.name === "notificationLead" && checkedLeads.length === 0) {
+			input.checked = true;
+			elements.notificationMessage.textContent =
+				"Mantenha pelo menos uma antecedência.";
+			return;
+		}
+		await persistNotificationPreferences(notificationPreferencesFromControls());
+	});
+}
+elements.notificationQuietEnabled.addEventListener("change", async () => {
+	await persistNotificationPreferences(notificationPreferencesFromControls());
+});
+for (const input of [
+	elements.notificationQuietStart,
+	elements.notificationQuietEnd,
+]) {
+	input.addEventListener("change", async () => {
+		await persistNotificationPreferences(notificationPreferencesFromControls());
+	});
+}
+elements.addWeatherWidget.addEventListener("click", () => openWeatherWidgetForm());
+elements.cancelWeatherWidget.addEventListener("click", closeWeatherWidgetForm);
+elements.weatherWidgetForm.addEventListener("submit", async (event) => {
+	event.preventDefault();
+	const data = new FormData(elements.weatherWidgetForm);
+	const editingId = String(data.get("id") || "");
+	const widget = window.TimekeeperWeather.normalizeWidget({
+		id: editingId || undefined,
+		label1: data.get("label1"),
+		label2: data.get("label2"),
+		forecastUrl: data.get("forecastUrl"),
+		enabled: data.get("enabled") === "on",
+	});
+	if (!widget) {
+		elements.weatherWidgetMessage.textContent =
+			"Use um link completo do Forecast7, como https://forecast7.com/pt/.../.../.";
+		return;
+	}
+	const current = window.TimekeeperWeather.normalizeWidgets(
+		userSettings.weatherWidgets,
+	);
+	if (!editingId && current.length >= window.TimekeeperWeather.MAX_WIDGETS) {
+		elements.weatherWidgetMessage.textContent = "O limite é de cinco cidades.";
+		return;
+	}
+	const next = editingId
+		? current.map((item) => (item.id === editingId ? widget : item))
+		: [...current, widget];
+	const submit = elements.weatherWidgetForm.querySelector('[type="submit"]');
+	submit.disabled = true;
+	if (await persistWeatherWidgets(next)) closeWeatherWidgetForm();
+	submit.disabled = false;
 });
 elements.backgroundEnabled.addEventListener("change", () => {
 	const settings = backgroundSettingsFromControls();
@@ -2491,6 +4031,7 @@ elements.counterForm.addEventListener("submit", async (event) => {
 
 onAuthStateChanged(auth, (user) => {
 	currentUser = user;
+	if (!user) pushRegistrationState = pushConfigured ? "idle" : "local";
 	document.body.classList.toggle("signed-in", Boolean(user));
 	elements.guestTimeConfig.hidden = Boolean(user);
 	updateAccountUi(user);
@@ -2525,9 +4066,21 @@ window.addEventListener("blur", () => {
 	constellationState.pointerY = null;
 });
 document.addEventListener("visibilitychange", syncConstellation);
+document.addEventListener("visibilitychange", () => {
+	if (document.visibilityState !== "visible") return;
+	syncNotificationUi();
+	scheduleNotificationScan();
+});
 if (typeof reducedMotionQuery.addEventListener === "function") {
 	reducedMotionQuery.addEventListener("change", syncConstellation);
 } else {
 	reducedMotionQuery.addListener(syncConstellation);
 }
+if (typeof timelineOrientationQuery.addEventListener === "function") {
+	timelineOrientationQuery.addEventListener("change", renderTimeline);
+} else {
+	timelineOrientationQuery.addListener(renderTimeline);
+}
 window.setInterval(updateCustomCounters, 1000);
+window.setInterval(updateTimelineTemporalStates, 60000);
+window.setInterval(scanNotifications, 15000);

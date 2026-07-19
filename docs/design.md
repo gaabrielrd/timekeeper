@@ -60,10 +60,30 @@ A seção entra por transição de `grid-template-rows`, margem e opacidade, imi
 acordeão. O intervalo em relação aos contadores padrão é compacto. Cards mantêm
 opacidade suficiente para legibilidade, mas deixam o fundo animado aparecer.
 
+### Layouts da dashboard
+
+Os presets `focus`, `balanced` e `compact` alteram densidade e proporção sem mudar
+o conteúdo dos contadores. Usuários autenticados podem reordenar seções por botões
+e ocultar seções opcionais; os contadores padrão permanecem sempre disponíveis.
+Ordem, visibilidade e preset sincronizam pelo documento de settings.
+
+### Timeline
+
+A Timeline é uma régua temporal SVG. No desktop, as fontes ocupam trilhas
+horizontais; até 700 px, o eixo gira para a vertical e os marcos recebem chamadas
+laterais. Expedientes e contadores recorrentes aparecem como segmentos individuais,
+enquanto pagamento, feriado e eventos pontuais usam marcadores rotulados. A escala
+termina automaticamente no mais distante entre o próximo pagamento, o próximo
+feriado e a próxima ocorrência de contador pessoal. Halo indica item ativo ou
+próximo, e conflitos preservam uma diferenciação visual discreta. Para evitar alvos
+sobrepostos no eixo estreito, a legenda mobile concentra a ação de edição e mantém
+cada trilha identificável e acessível por teclado.
+
 ### Sidebar e modal
 
 A sidebar ocupa o lado direito, bloqueia interação externa via backdrop/`inert` e
-contém rotina, contadores, aparência e ações da conta no mesmo fluxo rolável. Sair
+contém rotina, contadores, aparência, clima, notificações e ações da conta no mesmo
+fluxo rolável. Sair
 precede excluir conta, que encerra o conteúdo. Um `<dialog>` reúne criação e
 edição com uma prévia compacta que reage a nome, cor, imagem e opacidades; outro
 apresenta upload, quota e biblioteca de imagens em uma grade compacta. A seleção de

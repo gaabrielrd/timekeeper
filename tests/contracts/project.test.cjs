@@ -72,12 +72,78 @@ test("todos os backgrounds da interface possuem descrição no cliente", () => {
 test("scripts locais essenciais carregam antes do runtime inline", () => {
 	const html = read("public/index.html");
 	const dataIndex = html.indexOf('src="src/data.js"');
+	const runtimeConfigIndex = html.indexOf('src="src/runtime-config.js"');
 	const timeIndex = html.indexOf('src="src/time.js"');
+	const occurrencesIndex = html.indexOf('src="src/occurrences.js"');
+	const weatherIndex = html.indexOf('src="src/weather.js"');
+	const notificationsIndex = html.indexOf('src="src/notifications.js"');
 	const progressIndex = html.indexOf('src="src/progressbar.min.js"');
 	const inlineRuntime = html.indexOf("var pBars = []");
 	assert.ok(dataIndex >= 0 && dataIndex < inlineRuntime);
-	assert.ok(timeIndex > dataIndex && timeIndex < inlineRuntime);
-	assert.ok(progressIndex > timeIndex && progressIndex < inlineRuntime);
+	assert.ok(runtimeConfigIndex > dataIndex && runtimeConfigIndex < inlineRuntime);
+	assert.ok(timeIndex > runtimeConfigIndex && timeIndex < inlineRuntime);
+	assert.ok(occurrencesIndex > timeIndex && occurrencesIndex < inlineRuntime);
+	assert.ok(weatherIndex > occurrencesIndex && weatherIndex < inlineRuntime);
+	assert.ok(notificationsIndex > weatherIndex && notificationsIndex < inlineRuntime);
+	assert.ok(progressIndex > notificationsIndex && progressIndex < inlineRuntime);
+});
+
+test("fundações do roadmap mantêm clima e seções em contratos únicos", () => {
+	const html = read("public/index.html");
+	const client = read("public/src/firebase.js");
+	const weather = read("public/src/weather.js");
+	for (const section of ["standard", "custom", "weather"]) {
+		assert.match(html, new RegExp(`data-dashboard-section="${section}"`));
+	}
+	assert.match(weather, /const SCRIPT_ID = "weatherwidget-io-js"/);
+	assert.match(weather, /function applyColors\(/);
+	assert.doesNotMatch(html, /function loadWeatherWidget\(/);
+	assert.match(client, /TimekeeperWeather\?\.applyColors/);
+	assert.match(client, /function normalizeDashboardPreferences\(/);
+	assert.match(client, /function applyDashboardPreferences\(/);
+	assert.match(client, /function iconButton\(/);
+	assert.match(client, /DASHBOARD_CACHE_KEY/);
+	assert.match(client, /section !== "standard"/);
+});
+
+test("layouts da dashboard permanecem alinhados entre UI, cliente e rules", () => {
+	const html = read("public/index.html");
+	const client = read("public/src/firebase.js");
+	const rules = read("firestore.rules");
+	assert.match(html, /id="dashboard-layout"/);
+	assert.match(html, /id="dashboard-section-controls"/);
+	for (const layout of ["focus", "balanced", "compact"]) {
+		assert.match(client, new RegExp(`"${layout}"`));
+		assert.match(rules, new RegExp(`'${layout}'`));
+	}
+	for (const field of [
+		"dashboardLayout",
+		"dashboardSectionOrder",
+		"hiddenDashboardSections",
+	]) {
+		assert.match(client, new RegExp(`\\b${field}:`));
+		assert.match(rules, new RegExp(`'${field}'`));
+	}
+	assert.match(rules, /dashboardSectionOrder\.toSet\(\)\.size\(\)/);
+	assert.match(rules, /hiddenDashboardSections\.toSet\(\)\.size\(\)/);
+});
+
+test("widgets de clima personalizados mantêm limite e fornecedor alinhados", () => {
+	const html = read("public/index.html");
+	const client = read("public/src/firebase.js");
+	const weather = read("public/src/weather.js");
+	const rules = read("firestore.rules");
+	assert.match(html, /id="weather-widget-list"/);
+	assert.match(html, /id="weather-widget-form"/);
+	assert.match(html, /id="weather-forecasts"/);
+	assert.match(client, /weatherWidgets: window\.TimekeeperWeather\.cloneDefaults\(\)/);
+	assert.match(client, /saveSettings\(\{ weatherWidgets: normalized \}\)/);
+	assert.match(weather, /const MAX_WIDGETS = 5;/);
+	assert.match(weather, /FORECAST_URL_PATTERN/);
+	assert.match(weather, /function render\(/);
+	assert.match(rules, /function hasValidWeatherWidgets\(/);
+	assert.match(rules, /items\.size\(\) <= 5/);
+	assert.match(rules, /forecast7\[\.\]com/);
 });
 
 test("Analytics depende de consentimento explícito", () => {
@@ -107,6 +173,7 @@ test("exclusão de conta remove dados após reautenticação Google", () => {
 
 test("Hosting evita cache misto e emuladores usam portas documentadas", () => {
 	const config = JSON.parse(read("firebase.json"));
+	const e2eConfig = JSON.parse(read("firebase.e2e.json"));
 	const rulesTestConfig = JSON.parse(read("firebase.rules-test.json"));
 	const noCacheSources = config.hosting.headers
 		.filter((entry) =>
@@ -117,11 +184,17 @@ test("Hosting evita cache misto e emuladores usam portas documentadas", () => {
 			),
 		)
 		.map((entry) => entry.source);
-	assert.deepEqual(noCacheSources, ["**"]);
+	assert.ok(noCacheSources.includes("**"));
+	assert.ok(noCacheSources.includes("/sw.js"));
+	assert.ok(noCacheSources.includes("/manifest.webmanifest"));
 	assert.equal(config.emulators.auth.port, 9099);
 	assert.equal(config.emulators.firestore.port, 8080);
 	assert.equal(config.emulators.hosting.port, 5000);
 	assert.equal(config.emulators.storage.port, 9199);
+	assert.equal(e2eConfig.emulators.auth.port, 9099);
+	assert.equal(e2eConfig.emulators.firestore.port, 8080);
+	assert.equal(e2eConfig.emulators.storage.port, 9199);
+	assert.equal(e2eConfig.emulators.ui.enabled, false);
 	assert.equal(rulesTestConfig.emulators.firestore.port, 8081);
 	assert.equal(rulesTestConfig.emulators.storage.port, 9198);
 	assert.equal(rulesTestConfig.emulators.ui.enabled, false);
@@ -136,6 +209,114 @@ test("cliente ativa emuladores apenas por opt-in local e inclui fallback Safari"
 	assert.match(client, /connectStorageEmulator\(storage/);
 	assert.doesNotMatch(client, /Object\.hasOwn\(/);
 	assert.match(client, /reducedMotionQuery\.addListener\(syncConstellation\)/);
+});
+
+test("PWA possui manifest, shell offline e cache restrito à própria origem", () => {
+	const html = read("public/index.html");
+	const manifest = JSON.parse(read("public/manifest.webmanifest"));
+	const serviceWorker = read("public/sw.js");
+	const pwa = read("public/src/pwa.js");
+	assert.match(html, /rel="manifest" href="manifest\.webmanifest"/);
+	assert.match(html, /id="install-app-button"[\s\S]*?hidden/);
+	assert.match(html, /id="pwa-update-button"/);
+	assert.equal(manifest.display, "standalone");
+	assert.equal(manifest.start_url, "/");
+	for (const expectedSize of ["192x192", "512x512"]) {
+		assert.ok(manifest.icons.some((icon) => icon.sizes === expectedSize));
+	}
+	assert.ok(manifest.icons.some((icon) => icon.purpose === "maskable"));
+	for (const icon of manifest.icons) {
+		assert.ok(fs.existsSync(path.join(root, "public", icon.src)));
+	}
+	assert.ok(fs.existsSync(path.join(root, "public/offline.html")));
+	assert.match(serviceWorker, /url\.origin !== self\.location\.origin/);
+	assert.match(serviceWorker, /async function networkFirst/);
+	assert.match(serviceWorker, /async function staleWhileRevalidate/);
+	assert.doesNotMatch(serviceWorker, /googleapis|firebasestorage|weatherwidget\.io/);
+	assert.match(pwa, /beforeinstallprompt/);
+	assert.match(pwa, /SKIP_WAITING/);
+	assert.match(pwa, /root\.isSecureContext/);
+});
+
+test("timeline deriva ocorrências sem persistir uma cópia", () => {
+	const html = read("public/index.html");
+	const client = read("public/src/firebase.js");
+	const occurrences = read("public/src/occurrences.js");
+	assert.match(html, /id="dashboard-timeline-section"/);
+	assert.match(html, /id="timeline-source-filter"/);
+	assert.match(html, /id="timeline-range"/);
+	assert.doesNotMatch(html, /id="timeline-horizon"/);
+	assert.match(client, /TimekeeperOccurrences\.buildOccurrences/);
+	assert.match(client, /TimekeeperOccurrences\.buildTimelineProjection/);
+	assert.match(client, /timelineSvgElement\("svg"/);
+	assert.match(client, /data-orientation/);
+	assert.match(client, /setInterval\(updateTimelineTemporalStates, 60000\)/);
+	assert.doesNotMatch(client, /saveSettings\(\{[^}]*timeline/i);
+	assert.match(occurrences, /function groupOccurrences/);
+	assert.match(occurrences, /function buildTimelineProjection/);
+	assert.match(occurrences, /const primaryAnchors = \[nextPayment, nextHoliday, nextCustom\]/);
+});
+
+test("notificações locais exigem gesto explícito e usam deduplicação", () => {
+	const html = read("public/index.html");
+	const client = read("public/src/firebase.js");
+	const notifications = read("public/src/notifications.js");
+	const serviceWorker = read("public/sw.js");
+	const rules = read("firestore.rules");
+	assert.match(html, /id="notifications-enabled"/);
+	assert.match(html, /A permissão só será solicitada ao ativar/);
+	assert.match(client, /notificationsEnabled\.addEventListener\("change"/);
+	assert.match(client, /Notification\.requestPermission\(\)/);
+	assert.doesNotMatch(client, /onAuthStateChanged[\s\S]{0,300}requestPermission/);
+	assert.match(client, /navigator\.locks\?\.request/);
+	assert.match(client, /showNotification/);
+	assert.match(notifications, /function buildCandidates/);
+	assert.match(notifications, /function isQuietTime/);
+	assert.match(serviceWorker, /notificationclick/);
+	for (const field of [
+		"notificationsEnabled",
+		"notificationLeadMinutes",
+		"notificationSources",
+		"notificationQuietHours",
+	]) {
+		assert.match(rules, new RegExp(`'${field}'`));
+	}
+});
+
+test("push confiável usa FID privado, App Check, fila idempotente e TTL", () => {
+	const client = read("public/src/firebase.js");
+	const runtimeConfig = read("public/src/runtime-config.js");
+	const serviceWorker = read("public/sw.js");
+	const functions = read("functions/index.js");
+	const functionsPackage = JSON.parse(read("functions/package.json"));
+	const rules = read("firestore.rules");
+	const indexes = JSON.parse(read("firestore.indexes.json"));
+	const config = JSON.parse(read("firebase.json"));
+
+	assert.equal(config.functions[0].source, "functions");
+	assert.equal(config.emulators.functions.port, 5001);
+	assert.equal(config.emulators.pubsub.port, 8085);
+	assert.equal(functionsPackage.engines.node, "22");
+	assert.match(runtimeConfig, /functionsRegion: "southamerica-east1"/);
+	assert.match(client, /new ReCaptchaEnterpriseProvider/);
+	assert.match(client, /onRegistered\(pushMessaging/);
+	assert.match(client, /registerMessaging\(pushMessaging/);
+	assert.match(client, /serviceWorkerRegistration: registration/);
+	assert.match(client, /deletePushData/);
+	assert.match(serviceWorker, /onBackgroundMessage/);
+	assert.match(functions, /enforceAppCheck: true/);
+	assert.match(functions, /schedule: "every 1 minutes"/);
+	assert.match(functions, /fid: device\.fid/);
+	assert.match(functions, /notificationJobId\(uid, deviceId, candidate\)/);
+	assert.match(rules, /match \/devices\/\{deviceId\}[\s\S]*allow read, write: if false/);
+	assert.match(rules, /match \/notificationQueue\/\{jobId\}[\s\S]*allow read, write: if false/);
+	for (const collectionGroup of ["devices", "notificationQueue", "pushMetrics"]) {
+		assert.ok(
+			indexes.fieldOverrides.some(
+				(item) => item.collectionGroup === collectionGroup && item.ttl === true,
+			),
+		);
+	}
 });
 
 test("limites da biblioteca permanecem alinhados entre UI, cliente e Storage", () => {
@@ -202,6 +383,7 @@ test("todos os links Markdown locais resolvem", () => {
 	const markdownFiles = [
 		path.join(root, "README.md"),
 		path.join(root, "AGENTS.md"),
+		path.join(root, "roadmap.md"),
 		...fs
 			.readdirSync(path.join(root, "docs"))
 			.filter((file) => file.endsWith(".md"))

@@ -22,6 +22,97 @@ service cloud.firestore {
       return !('updatedAt' in data) || data.updatedAt is timestamp;
     }
 
+    function hasValidDashboardPreferences(data) {
+      return (!('dashboardLayout' in data)
+          || data.dashboardLayout in ['focus', 'balanced', 'compact'])
+        && (!('dashboardSectionOrder' in data)
+          || (data.dashboardSectionOrder is list
+            && data.dashboardSectionOrder.size() >= 1
+            && data.dashboardSectionOrder.size() <= 4
+            && data.dashboardSectionOrder.hasOnly([
+              'standard',
+              'custom',
+              'timeline',
+              'weather'
+            ])
+            && data.dashboardSectionOrder.toSet().size()
+              == data.dashboardSectionOrder.size()))
+        && (!('hiddenDashboardSections' in data)
+          || (data.hiddenDashboardSections is list
+            && data.hiddenDashboardSections.size() <= 3
+            && data.hiddenDashboardSections.hasOnly([
+              'custom',
+              'timeline',
+              'weather'
+            ])
+            && data.hiddenDashboardSections.toSet().size()
+              == data.hiddenDashboardSections.size()));
+    }
+
+    function isValidWeatherWidget(widget) {
+      return widget is map
+        && widget.keys().hasOnly([
+          'id',
+          'label1',
+          'label2',
+          'forecastUrl',
+          'enabled'
+        ])
+        && widget.id.matches('^.{1,100}$')
+        && widget.label1.matches('^.{1,40}$')
+        && widget.label2.matches('^.{1,40}$')
+        && widget.forecastUrl.matches(
+          '^https://forecast7[.]com/[a-z]{2}/[a-z0-9-]+/[a-z0-9-]+/$'
+        )
+        && widget.enabled is bool;
+    }
+
+    function isValidWeatherWidgetAt(items, index) {
+      return items.size() <= index ? true : isValidWeatherWidget(items[index]);
+    }
+
+    function hasValidWeatherWidgets(items) {
+      return items is list
+        && items.size() <= 5
+        && isValidWeatherWidgetAt(items, 0)
+        && isValidWeatherWidgetAt(items, 1)
+        && isValidWeatherWidgetAt(items, 2)
+        && isValidWeatherWidgetAt(items, 3)
+        && isValidWeatherWidgetAt(items, 4);
+    }
+
+    function hasValidNotificationLeads(items) {
+      return items is list
+        && items.size() >= 1
+        && items.size() <= 5
+        && items.hasOnly([0, 5, 15, 60, 1440])
+        && items.toSet().size() == items.size();
+    }
+
+    function hasValidNotificationSources(sources) {
+      return sources is map
+        && sources.keys().hasOnly([
+          'workday',
+          'payment',
+          'holiday',
+          'counters'
+        ])
+        && sources.keys().size() == 4
+        && sources.workday is bool
+        && sources.payment is bool
+        && sources.holiday is bool
+        && sources.counters is bool;
+    }
+
+    function hasValidNotificationQuietHours(quietHours) {
+      return quietHours is map
+        && quietHours.keys().hasOnly(['enabled', 'startTime', 'endTime'])
+        && quietHours.keys().size() == 3
+        && quietHours.enabled is bool
+        && quietHours.startTime.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')
+        && quietHours.endTime.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$');
+    }
+
     function hasValidSettingsFields(data) {
       return (!('endHour' in data)
           || (data.endHour is int && data.endHour >= 0 && data.endHour <= 23))
@@ -52,7 +143,18 @@ service cloud.firestore {
           || (data.backgroundIntensity is int
             && data.backgroundIntensity >= 15
             && data.backgroundIntensity <= 100))
-        && (!('showCustomCounters' in data) || data.showCustomCounters is bool);
+        && (!('showCustomCounters' in data) || data.showCustomCounters is bool)
+        && hasValidDashboardPreferences(data)
+        && (!('weatherWidgets' in data)
+          || hasValidWeatherWidgets(data.weatherWidgets))
+        && (!('notificationsEnabled' in data)
+          || data.notificationsEnabled is bool)
+        && (!('notificationLeadMinutes' in data)
+          || hasValidNotificationLeads(data.notificationLeadMinutes))
+        && (!('notificationSources' in data)
+          || hasValidNotificationSources(data.notificationSources))
+        && (!('notificationQuietHours' in data)
+          || hasValidNotificationQuietHours(data.notificationQuietHours));
     }
 
     function hasValidProfileFields(data) {
@@ -73,6 +175,14 @@ service cloud.firestore {
           'backgroundSpeed',
           'backgroundIntensity',
           'showCustomCounters',
+          'dashboardLayout',
+          'dashboardSectionOrder',
+          'hiddenDashboardSections',
+          'weatherWidgets',
+          'notificationsEnabled',
+          'notificationLeadMinutes',
+          'notificationSources',
+          'notificationQuietHours',
           'customCounters'
         ])
         && (!('displayName' in data)
@@ -188,6 +298,14 @@ service cloud.firestore {
           'backgroundSpeed',
           'backgroundIntensity',
           'showCustomCounters',
+          'dashboardLayout',
+          'dashboardSectionOrder',
+          'hiddenDashboardSections',
+          'weatherWidgets',
+          'notificationsEnabled',
+          'notificationLeadMinutes',
+          'notificationSources',
+          'notificationQuietHours',
           'updatedAt'
         ])
         && hasValidSettingsFields(data)
@@ -315,6 +433,18 @@ service cloud.firestore {
       match /data/{documentId} {
         allow read, write: if false;
       }
+
+      match /devices/{deviceId} {
+        allow read, write: if false;
+      }
+    }
+
+    match /notificationQueue/{jobId} {
+      allow read, write: if false;
+    }
+
+    match /pushMetrics/{metricId} {
+      allow read, write: if false;
     }
   }
 }

@@ -5,18 +5,31 @@
 		<meta name="author" content="Gabriel Roda" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 		<meta name="theme-color" content="#0b0d0c" />
+		<meta name="application-name" content="Timekeeper" />
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<meta
+			name="apple-mobile-web-app-status-bar-style"
+			content="black-translucent"
+		/>
 		<title>Timekeeper</title>
 
 		<link rel="shortcut icon" href="src/favicon.png" type="image/png" />
+		<link rel="apple-touch-icon" href="src/assets/icon-192.png" />
+		<link rel="manifest" href="manifest.webmanifest" />
 		<link rel="preconnect" href="https://use.typekit.net" />
 		<link rel="stylesheet" href="https://use.typekit.net/yhy2qvv.css" />
 		<link rel="stylesheet" href="src/normalize.css" />
 		<link rel="stylesheet" href="src/style.css" />
 
 		<script src="src/data.js"></script>
+		<script src="src/runtime-config.js"></script>
 		<script src="src/time.js"></script>
+		<script src="src/occurrences.js"></script>
+		<script src="src/weather.js"></script>
+		<script src="src/notifications.js"></script>
 		<script src="src/progressbar.min.js"></script>
 		<script defer src="src/analytics.js"></script>
+		<script defer src="src/pwa.js"></script>
 	</head>
 
 	<body>
@@ -132,6 +145,17 @@
 				</button>
 
 				<button
+					id="install-app-button"
+					class="header-tool-button"
+					type="button"
+					title="Instalar Timekeeper"
+					hidden
+				>
+					<i class="material-icons" aria-hidden="true">install_desktop</i>
+					<span>Instalar</span>
+				</button>
+
+				<button
 					id="toggle-config"
 					onclick="toggleFs()"
 					aria-label="Alternar tela cheia"
@@ -143,7 +167,12 @@
 		</div>
 
 		<main>
-			<section class="overview" aria-label="Contadores">
+			<section
+				id="dashboard-standard-section"
+				class="overview"
+				data-dashboard-section="standard"
+				aria-label="Contadores"
+			>
 				<div id="top-panels">
 					<article class="a-panel featured">
 						<div class="panel-top">
@@ -176,94 +205,85 @@
 						<div class="progress-bar"></div>
 					</article>
 				</div>
-
-				<section
-					id="custom-counters-section"
-					class="custom-counters-section"
-					aria-labelledby="custom-counters-title"
-					aria-hidden="true"
-				>
-					<div class="custom-counters-reveal">
-						<div class="section-heading">
-							<div>
-								<p class="section-kicker">Sua conta</p>
-								<h2 id="custom-counters-title">Meus contadores</h2>
-							</div>
-							<span
-								id="counter-live-state"
-								class="live-state"
-								data-state="connecting"
-								>Conectando...</span
-							>
-						</div>
-						<div id="custom-panels" class="custom-panels"></div>
-					</div>
-				</section>
 			</section>
 
-			<section class="weather-section" aria-label="Previsão do tempo">
-				<div class="forecasts">
-					<div class="forecast">
-						<a
-							class="weatherwidget-io"
-							href="https://forecast7.com/pt/n26d90n49d24/indaial/"
-							data-label_1="INDAIAL"
-							data-label_2="SANTA CATARINA"
-							data-font="Roboto"
-							data-icons="Climacons Animated"
-							data-days="7"
-							data-theme="pure"
-							data-basecolor="#17151c"
-							data-accent="#362860"
-							data-textcolor="#f7f5fa"
-							data-highcolor="#f7f5fa"
-							data-lowcolor="#9993a3"
-							data-suncolor="#c4b5fd"
-							data-cloudfill="#302c39"
-							>INDAIAL · SANTA CATARINA</a
+			<section
+				id="custom-counters-section"
+				class="custom-counters-section"
+				data-dashboard-section="custom"
+				aria-labelledby="custom-counters-title"
+				aria-hidden="true"
+			>
+				<div class="custom-counters-reveal">
+					<div class="section-heading">
+						<div>
+							<p class="section-kicker">Sua conta</p>
+							<h2 id="custom-counters-title">Meus contadores</h2>
+						</div>
+						<span
+							id="counter-live-state"
+							class="live-state"
+							data-state="connecting"
+							>Conectando...</span
 						>
 					</div>
-					<div class="forecast">
-						<a
-							class="weatherwidget-io"
-							href="https://forecast7.com/pt/n23d42n51d93/maringa/"
-							data-label_1="MARINGÁ"
-							data-label_2="PARANÁ"
-							data-font="Roboto"
-							data-icons="Climacons Animated"
-							data-days="7"
-							data-theme="pure"
-							data-basecolor="#17151c"
-							data-accent="#362860"
-							data-textcolor="#f7f5fa"
-							data-highcolor="#f7f5fa"
-							data-lowcolor="#9993a3"
-							data-suncolor="#c4b5fd"
-							data-cloudfill="#302c39"
-							>MARINGÁ · PARANÁ</a
-						>
+					<div id="custom-panels" class="custom-panels"></div>
+				</div>
+			</section>
+
+			<section
+				id="dashboard-timeline-section"
+				class="timeline-section"
+				data-dashboard-section="timeline"
+				aria-labelledby="timeline-title"
+			>
+				<div class="timeline-heading">
+					<div>
+						<p class="section-kicker">Próximos eventos</p>
+						<h2 id="timeline-title">Timeline</h2>
 					</div>
-					<div class="forecast">
-						<a
-							class="weatherwidget-io"
-							href="https://forecast7.com/pt/n23d55n46d63/sao-paulo/"
-							data-label_1="SÃO PAULO"
-							data-label_2="SÃO PAULO"
-							data-font="Roboto"
-							data-icons="Climacons Animated"
-							data-days="7"
-							data-theme="pure"
-							data-basecolor="#17151c"
-							data-accent="#362860"
-							data-textcolor="#f7f5fa"
-							data-highcolor="#f7f5fa"
-							data-lowcolor="#9993a3"
-							data-suncolor="#c4b5fd"
-							data-cloudfill="#302c39"
-							>SÃO PAULO · SÃO PAULO</a
-						>
+					<div class="timeline-filters" aria-label="Filtros da timeline">
+						<label>
+							<span>Tipo</span>
+							<select id="timeline-source-filter">
+								<option value="all">Todos</option>
+								<option value="workday">Expediente</option>
+								<option value="calendar">Pagamentos e feriados</option>
+								<option value="counters">Meus contadores</option>
+							</select>
+						</label>
 					</div>
 				</div>
+				<p id="timeline-range" class="timeline-range" aria-live="polite"></p>
+				<div
+					id="timeline-list"
+					class="timeline-visual"
+					aria-label="Visualização cronológica"
+				></div>
+				<div
+					id="timeline-legend"
+					class="timeline-legend"
+					aria-label="Legenda"
+				></div>
+				<p id="timeline-empty" class="timeline-empty" hidden>
+					Nenhum próximo evento disponível para este filtro.
+				</p>
+			</section>
+
+			<section
+				id="dashboard-weather-section"
+				class="weather-section"
+				data-dashboard-section="weather"
+				aria-label="Previsão do tempo"
+			>
+				<div id="weather-forecasts" class="forecasts" aria-live="polite"></div>
+				<p id="weather-empty" class="weather-empty" hidden>
+					Nenhuma cidade visível. Adicione ou ative uma cidade nas
+					configurações.
+				</p>
+				<p id="weather-offline-message" class="weather-offline-message" hidden>
+					A previsão do tempo precisa de conexão.
+				</p>
 			</section>
 		</main>
 
@@ -391,6 +411,26 @@
 					</div>
 
 					<div class="appearance-divider"></div>
+					<p class="setting-label">Layout da dashboard</p>
+					<label class="field-label">
+						Densidade
+						<select id="dashboard-layout" class="settings-select">
+							<option value="focus">Foco</option>
+							<option value="balanced">Equilibrado</option>
+							<option value="compact">Compacto</option>
+						</select>
+					</label>
+					<div
+						id="dashboard-section-controls"
+						class="dashboard-section-controls"
+						aria-label="Ordem e visibilidade das seções"
+					></div>
+					<p class="setting-help">
+						Use as setas para organizar as seções. Os contadores padrão
+						permanecem visíveis.
+					</p>
+
+					<div class="appearance-divider"></div>
 					<label class="toggle-field" for="background-enabled">
 						<span>
 							<strong>Fundo animado</strong>
@@ -471,6 +511,226 @@
 							/>
 						</label>
 					</div>
+				</section>
+
+				<section
+					class="settings-section"
+					aria-labelledby="weather-settings-title"
+				>
+					<div class="settings-heading">
+						<div>
+							<p class="section-kicker">Até cinco</p>
+							<h2 id="weather-settings-title">Previsão do tempo</h2>
+						</div>
+						<span id="weather-widget-count" class="counter-count">3 / 5</span>
+					</div>
+					<div
+						id="weather-widget-list"
+						class="weather-widget-list"
+						aria-live="polite"
+					></div>
+					<button
+						id="add-weather-widget"
+						class="secondary-button"
+						type="button"
+						style="display: flex; align-items: center"
+					>
+						<i class="material-icons" aria-hidden="true">add_location</i>
+						Adicionar cidade
+					</button>
+					<form id="weather-widget-form" class="weather-widget-form" hidden>
+						<input name="id" type="hidden" />
+						<label class="field-label">
+							Cidade
+							<input name="label1" type="text" maxlength="40" required />
+						</label>
+						<label class="field-label">
+							Estado ou região
+							<input name="label2" type="text" maxlength="40" required />
+						</label>
+						<label class="field-label">
+							Link do Forecast7
+							<input
+								name="forecastUrl"
+								type="url"
+								placeholder="https://forecast7.com/pt/.../.../"
+								required
+							/>
+						</label>
+						<label
+							class="toggle-field compact-toggle"
+							for="weather-widget-enabled"
+						>
+							<span><strong>Exibir widget</strong></span>
+							<input
+								id="weather-widget-enabled"
+								name="enabled"
+								type="checkbox"
+								role="switch"
+								checked
+							/>
+						</label>
+						<p
+							id="weather-widget-message"
+							class="form-message"
+							aria-live="polite"
+						></p>
+						<div class="weather-widget-form-actions">
+							<button class="primary-button" type="submit">
+								Salvar cidade
+							</button>
+							<button
+								id="cancel-weather-widget"
+								class="secondary-button"
+								type="button"
+							>
+								Cancelar
+							</button>
+						</div>
+					</form>
+				</section>
+
+				<section
+					class="settings-section notification-settings"
+					aria-labelledby="notification-settings-title"
+				>
+					<div class="settings-heading">
+						<div>
+							<p class="section-kicker">Alertas inteligentes</p>
+							<h2 id="notification-settings-title">Notificações</h2>
+						</div>
+						<span
+							id="notification-state"
+							class="live-state compact"
+							data-state="connecting"
+							>Verificando...</span
+						>
+					</div>
+					<label class="toggle-field" for="notifications-enabled">
+						<span>
+							<strong>Ativar neste dispositivo</strong>
+							<small>A permissão só será solicitada ao ativar.</small>
+						</span>
+						<input id="notifications-enabled" type="checkbox" role="switch" />
+					</label>
+					<div
+						id="notification-controls"
+						class="notification-controls is-disabled"
+					>
+						<fieldset class="notification-options">
+							<legend>Antecedência</legend>
+							<div class="notification-choice-grid notification-lead-grid">
+								<label
+									><input
+										type="checkbox"
+										name="notificationLead"
+										value="0"
+									/><span>No horário</span></label
+								>
+								<label
+									><input
+										type="checkbox"
+										name="notificationLead"
+										value="5"
+									/><span>5 min</span></label
+								>
+								<label
+									><input
+										type="checkbox"
+										name="notificationLead"
+										value="15"
+									/><span>15 min</span></label
+								>
+								<label
+									><input
+										type="checkbox"
+										name="notificationLead"
+										value="60"
+									/><span>1 hora</span></label
+								>
+								<label
+									><input
+										type="checkbox"
+										name="notificationLead"
+										value="1440"
+									/><span>1 dia</span></label
+								>
+							</div>
+						</fieldset>
+						<fieldset class="notification-options">
+							<legend>Eventos</legend>
+							<div class="notification-source-list">
+								<label
+									><input
+										type="checkbox"
+										name="notificationSource"
+										value="workday"
+									/><span>Expediente</span></label
+								>
+								<label
+									><input
+										type="checkbox"
+										name="notificationSource"
+										value="payment"
+									/><span>Pagamentos</span></label
+								>
+								<label
+									><input
+										type="checkbox"
+										name="notificationSource"
+										value="holiday"
+									/><span>Feriados</span></label
+								>
+								<label
+									><input
+										type="checkbox"
+										name="notificationSource"
+										value="counters"
+									/><span>Meus contadores</span></label
+								>
+							</div>
+						</fieldset>
+						<label
+							class="toggle-field compact-toggle"
+							for="notification-quiet-enabled"
+						>
+							<span>
+								<strong>Horário de silêncio</strong>
+								<small>Não emitir alertas nesse intervalo.</small>
+							</span>
+							<input
+								id="notification-quiet-enabled"
+								type="checkbox"
+								role="switch"
+							/>
+						</label>
+						<div id="notification-quiet-times" class="notification-quiet-times">
+							<label class="field-label"
+								>Início<input
+									id="notification-quiet-start"
+									type="time"
+									value="22:00"
+							/></label>
+							<label class="field-label"
+								>Fim<input
+									id="notification-quiet-end"
+									type="time"
+									value="07:00"
+							/></label>
+						</div>
+					</div>
+					<p
+						id="notification-delivery-state"
+						class="notification-delivery-state"
+					>
+						Entrega local disponível; o push exige a configuração do
+						dispositivo.
+					</p>
+					<p
+						id="notification-message"
+						class="form-message"
+						aria-live="polite"
+					></p>
 				</section>
 
 				<footer class="sidebar-footer">
@@ -1017,6 +1277,12 @@
 			role="status"
 			aria-live="polite"
 		></div>
+		<div id="pwa-update-banner" class="pwa-update-banner" role="status" hidden>
+			<span>Uma nova versão do Timekeeper está disponível.</span>
+			<button id="pwa-update-button" class="primary-button" type="button">
+				Atualizar agora
+			</button>
+		</div>
 		<section
 			id="privacy-banner"
 			class="privacy-banner"
@@ -1169,13 +1435,6 @@
 				else document.exitFullscreen?.();
 			}
 
-			function loadWeatherWidget() {
-				var script = document.createElement("script");
-				script.src = "https://weatherwidget.io/js/widget.min.js";
-				script.id = "weatherwidget-io-js";
-				document.body.appendChild(script);
-			}
-
 			window.addEventListener("load", () => {
 				var hora = getCookie("hourTime");
 				var minutos = getCookie("minutesTime");
@@ -1192,7 +1451,11 @@
 				document.getElementById("guest-config-minutos").value =
 					document.getElementById("config-minutos").value;
 				fill();
-				loadWeatherWidget();
+				window.TimekeeperWeather.render(
+					document,
+					window.TimekeeperWeather.DEFAULT_WIDGETS,
+					{ primary: "#a78bfa", secondary: "#362860" },
+				);
 			});
 			window.setInterval(fill, 1000);
 		</script>
