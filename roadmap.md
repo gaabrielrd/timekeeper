@@ -47,7 +47,7 @@ sem interromper a experiência de visitantes ou a sincronização atual pelo Fir
 - [x] Fase 7 — modo de foco (zen screen)
 - [x] Fase 8 — histórico e arquivo de contadores (conquistas)
 - [x] Fase 9 — visualização em grade de calendário
-- [ ] Fase 10 — clima dinâmico nos cards
+- [x] Fase 10 — clima dinâmico nos cards
 
 As marcações acima representam implementação, documentação e gates automatizados
 concluídos. A validação manual em navegadores e dispositivos reais permanece no
@@ -398,6 +398,7 @@ Aumentar a excelência visual dos widgets de clima, estilizando dinamicamente os
 ### Critérios de aceite
 - Respeita o `prefers-reduced-motion` desativando as micropartículas de forma estrita.
 - Os cards mantêm o contraste de texto e a visibilidade dos controles de edição/exclusão sob qualquer efeito climático.
+- A condição usa somente coordenadas já presentes na URL Forecast7 e não adiciona campos persistidos ou chaves privadas.
 
 ## Testes transversais
 

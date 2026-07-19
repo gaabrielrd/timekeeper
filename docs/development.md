@@ -107,9 +107,11 @@ A mesma suíte roda em `.github/workflows/ci.yml` com Node 22 e Java 21.
 
 ## Serviços externos durante desenvolvimento
 
-O navegador precisa de rede para baixar Firebase SDK, Adobe Fonts, WeatherWidget e
-Google Analytics. Bloqueadores podem gerar erros no console que não representam
-falha da lógica central. O widget meteorológico é carregado depois do evento load.
+O navegador precisa de rede para baixar Firebase SDK, Adobe Fonts, WeatherWidget,
+condições atuais do Open-Meteo e Google Analytics. Bloqueadores podem gerar erros
+no console que não representam falha da lógica central. O widget meteorológico é
+carregado depois do evento load; a condição é consultada somente quando o card
+entra no viewport.
 
 ## Configuração de outro Firebase
 

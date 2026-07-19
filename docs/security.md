@@ -117,6 +117,8 @@ fazem sanitização.
 - Google Analytics só é carregado depois de consentimento explícito persistido no
   navegador; contadores e horários pessoais não são enviados pelo código do app.
 - WeatherWidget.io recebe requests do navegador e localização selecionada no link.
+- Open-Meteo recebe as coordenadas públicas codificadas nesse link para retornar
+  somente código da condição atual e estado de dia/noite.
 - Adobe Typekit e Firebase CDN recebem requests de assets.
 - Firebase armazena email, nome, URL da foto e imagens enviadas pelo usuário.
 - Quando push é ativado, Firebase armazena FID, fuso, plataforma mínima, estado do
@@ -127,7 +129,7 @@ funcionais; Analytics é opcional e separado. A conta, os quatro documentos oper
 podem ser apagados pelo usuário após reautenticação Google no menu da conta.
 
 O service worker da PWA intercepta somente requisições GET da própria origem. Ele
-não armazena respostas de Firebase, Cloud Storage, WeatherWidget, Analytics ou
+não armazena respostas de Firebase, Cloud Storage, WeatherWidget, Open-Meteo, Analytics ou
 fontes externas. O cache contém apenas o shell público da aplicação e é versionado
 para permitir limpeza de versões anteriores.
 

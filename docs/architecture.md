@@ -14,6 +14,7 @@ flowchart LR
     A --> DB["Cloud Firestore"]
     A --> S["Cloud Storage"]
     A --> W["WeatherWidget.io"]
+    A --> M["Open-Meteo"]
     A --> F["Adobe Fonts"]
     A --> G["Google Analytics"]
     AUTH -->|"Google OAuth"| O["Google Identity"]
@@ -56,8 +57,11 @@ sendo a fonte compartilhada pela Timeline, pelo calendário e pelas notificaçõ
 ### Integração meteorológica — `public/src/weather.js`
 
 Centraliza validação do fornecedor Forecast7, normalização das cidades, estados de
-carregamento/erro e carregamento idempotente do script WeatherWidget. Mudanças de
-cor ou lista removem iframes antigos sem duplicar o script externo.
+carregamento/erro e carregamento idempotente do script WeatherWidget. Também extrai
+as coordenadas codificadas na URL, consulta somente condição atual e dia/noite no
+Open-Meteo e mapeia códigos WMO para atmosferas CSS. `IntersectionObserver`, estado
+da aba e um intervalo de quinze minutos controlam execução e atualização. Mudanças
+de cor ou lista removem iframes e observers antigos sem duplicar scripts ou timers.
 
 ### Notificações e push — cliente e Functions
 
@@ -209,6 +213,7 @@ O expediente é modelado como recorrência de segunda a sexta, iniciando às 08:
 | Cloud Storage | Imagens dos cards pessoais | Cards continuam sem imagem |
 | Adobe Fonts | Tipografia | Fallback para `system-ui`/monospace |
 | WeatherWidget.io | Previsões | Espaços de clima podem ficar vazios |
+| Open-Meteo | Condição atual das atmosferas | Widget permanece neutro |
 | Google Analytics | Métricas | Produto continua funcional |
 
 ## Hosting e rotas

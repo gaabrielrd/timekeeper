@@ -118,6 +118,18 @@ Usuários autenticados também escolhem entre layouts `focus`, `balanced` e
 `compact`, reordenam as seções disponíveis e ocultam áreas opcionais. Os contadores
 padrão não podem ser ocultados. Essas preferências sincronizam entre abas.
 
+## Previsão do tempo
+
+Os widgets Forecast7 mantêm até cinco cidades configuráveis. Cada card usa as
+coordenadas já codificadas em sua URL para consultar apenas `weather_code` e
+`is_day` no Open-Meteo. A condição atual seleciona uma atmosfera discreta de sol,
+noite, nuvens, neblina, chuva, neve ou tempestade sem substituir a previsão.
+
+As partículas não recebem interação, pausam assim que o card sai do viewport ou a
+aba fica oculta e desaparecem estritamente sob `prefers-reduced-motion`. Falha na
+consulta da condição remove somente a atmosfera; o Forecast7 continua sendo o
+conteúdo principal do card.
+
 ## Timeline
 
 A seção Timeline combina expediente, pagamentos, feriados e ocorrências fixas ou
@@ -195,9 +207,6 @@ pode ser excluído permanentemente após uma nova confirmação. Contadores reco
 não podem ser arquivados.
 
 ## Evoluções da V2
-
-### Clima Dinâmico nos Cards
-Os cards de previsão de clima exibem micropartículas atmosféricas baseadas na condição meteorológica atual (chuva, sol, noite limpa, nublado). A animação é desativada sob movimento reduzido (`prefers-reduced-motion`) e entra em suspensão quando os cards não estão visíveis no viewport para poupar desempenho de CPU/GPU.
 
 ### Mini-Checklists nos Contadores
 Cada contador pessoal suporta a adição de até 3 subtarefas (checkpoints) em formato de lista interativa. A conclusão de cada subtarefa atualiza o progresso parcial no card de forma complementar ao progresso temporal. A interface atualiza o estado de forma otimista e sincroniza as edições em tempo real.

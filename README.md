@@ -24,6 +24,7 @@ real com Firebase.
 - Aplicação instalável com shell offline e atualização controlada.
 - Presets, ordem e visibilidade sincronizados para as seções da dashboard.
 - Até cinco widgets de clima configuráveis, reordenáveis e sincronizados.
+- Atmosferas climáticas por condição real, pausadas fora da tela e sob movimento reduzido.
 - Timeline SVG responsiva de expediente, próximos marcos de calendário e contadores pessoais.
 - Grade mensal da Timeline com recorte semanal no celular e detalhes por dia.
 - Modo de foco imersivo para qualquer contador, restaurado durante a sessão.
@@ -43,7 +44,7 @@ Navegador
 ├── Cloud Firestore (dados em tempo real)
 ├── Cloud Storage (imagens privadas dos contadores)
 ├── Firebase Cloud Messaging e App Check
-└── serviços externos (Adobe Fonts, WeatherWidget e Google Analytics)
+└── serviços externos (Adobe Fonts, WeatherWidget, Open-Meteo e Google Analytics)
 
 Cloud Functions (southamerica-east1)
 ├── cadastro/revogação privada de dispositivos por FID
@@ -88,7 +89,7 @@ configurado. Veja [Desenvolvimento](docs/development.md).
 │       ├── analytics.js       # Consentimento e carregamento opcional de métricas
 │       ├── time.js            # Cálculos temporais compartilhados e testáveis
 │       ├── occurrences.js     # Ocorrências derivadas para timeline e alertas
-│       ├── weather.js         # Widgets Forecast7 configuráveis
+│       ├── weather.js         # Widgets Forecast7 e atmosferas via Open-Meteo
 │       ├── notifications.js   # Candidatos e preferências de alertas locais
 │       ├── focus.js           # Tela imersiva e restauração transitória do contador
 │       ├── runtime-config.js  # Chaves públicas VAPID/App Check e região

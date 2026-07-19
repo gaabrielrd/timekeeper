@@ -94,7 +94,7 @@ remoções intencionais.
 | `dashboardLayout` | `focus`, `balanced` ou `compact` | `balanced` | valor conhecido |
 | `dashboardSectionOrder` | string[] | `standard`, `custom`, `timeline`, `weather` | IDs conhecidos, únicos, até quatro |
 | `hiddenDashboardSections` | string[] | `[]` | IDs únicos; `standard` não pode ser ocultado |
-| `weatherWidgets` | object[] | três cidades atuais | até cinco; Forecast7, textos e chaves validados |
+| `weatherWidgets` | object[] | três cidades atuais | até cinco; Forecast7 com coordenadas codificadas, textos e chaves validados |
 | `notificationsEnabled` | boolean | `false` | verdadeiro somente após ativação explícita |
 | `notificationLeadMinutes` | number[] | `[15]` | valores únicos entre 0, 5, 15, 60 e 1440 |
 | `notificationSources` | map | todas `true` | chaves `workday`, `payment`, `holiday`, `counters` |

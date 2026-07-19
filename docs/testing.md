@@ -3,8 +3,8 @@
 ## Estado atual
 
 O projeto usa Node Test Runner, Playwright e Firebase Emulator Suite. A suíte atual
-contém 59 testes unitários/contratuais do cliente, 7 testes do domínio das Functions,
-40 E2E em Chromium (20 cenários em desktop e mobile) e 20 testes de
+contém 63 testes unitários/contratuais do cliente, 7 testes do domínio das Functions,
+42 E2E em Chromium (21 cenários em desktop e mobile) e 20 testes de
 Firestore/Storage Rules. GitHub Actions executa todos em pushes, pull requests e
 disparos manuais.
 
@@ -45,6 +45,7 @@ outro diretório silenciosamente.
 - projeção automática da Timeline, próximos marcos por categoria, recorrências,
   fallback, filtros, empate e preservação da data civil local;
 - grade mensal/semanal, sobreposição por dia civil e fuso local;
+- coordenadas Forecast7, códigos WMO e resposta mínima do Open-Meteo;
 - normalização de alertas, início/fim, fontes, silêncio e janela de vencimento.
 - materialização server-side no fuso IANA, calendário civil, meia-noite e recuperação
   de execuções agendadas atrasadas.
@@ -68,6 +69,7 @@ outro diretório silenciosamente.
 - marcação, armazenamento de sessão, saída por teclado e cache offline do Modo de
   Foco.
 - ação manual, transação, limite e marcação do arquivo de Conquistas.
+- camada climática isolada, pausa por visibilidade e bloqueio por reduced motion.
 
 ### Firestore Rules
 
@@ -109,6 +111,8 @@ outro diretório silenciosamente.
 - upload, associação, opacidades e remoção de imagem do card.
 - Timeline SVG geral e pessoal, orientação responsiva, filtros, marcadores únicos,
   segmentos recorrentes e abertura do editor.
+- condição climática controlada, partículas sem eventos de ponteiro, pausa fora do
+  viewport e remoção estrita sob movimento reduzido.
 - notificações concedidas, negadas e indisponíveis sem prompt automático.
 - Modo de Foco padrão e pessoal, reload da sessão, `Esc`, botão de fechar, reduced
   motion e ausência de overflow em desktop/mobile.

@@ -157,6 +157,65 @@ test("calendário destaca hoje, abre o dia e reduz para semana no celular", asyn
 	await expect(page.locator(".timeline-calendar-detail-item").first()).toBeVisible();
 });
 
+test("clima dinâmico reage à condição, pausa fora da tela e respeita reduced motion", async ({
+	page,
+}) => {
+	await page.route("https://api.open-meteo.com/**", async (route) => {
+		await route.fulfill({
+			contentType: "application/json",
+			body: JSON.stringify({
+				current: { weather_code: 63, is_day: 1 },
+			}),
+		});
+	});
+	await page.reload();
+	const weatherSection = page.locator("#dashboard-weather-section");
+	await weatherSection.scrollIntoViewIfNeeded();
+	const cards = page.locator(".forecast");
+	await expect(cards).toHaveCount(3);
+	await expect
+		.poll(() => cards.first().getAttribute("data-weather-condition"))
+		.toBe("rain");
+	await expect(page.locator(".forecast-atmosphere")).toHaveCount(3);
+	const activeEffect = await cards.first().evaluate((card) => {
+		const atmosphere = card.querySelector(".forecast-atmosphere");
+		const particle = atmosphere?.querySelector("i");
+		return {
+			animationState: particle
+				? getComputedStyle(particle).animationPlayState
+				: "missing",
+			pointerEvents: atmosphere
+				? getComputedStyle(atmosphere).pointerEvents
+				: "missing",
+		};
+	});
+	expect(activeEffect).toEqual({
+		animationState: "running",
+		pointerEvents: "none",
+	});
+	await page.locator("#dashboard-timeline-section").scrollIntoViewIfNeeded();
+	await expect
+		.poll(() => cards.first().getAttribute("data-weather-visible"))
+		.toBe("false");
+	await expect
+		.poll(() =>
+			cards.first().evaluate((card) => {
+				const particle = card.querySelector(".forecast-atmosphere i");
+				return particle ? getComputedStyle(particle).animationPlayState : "missing";
+			}),
+		)
+		.toBe("paused");
+	await page.emulateMedia({ reducedMotion: "reduce" });
+	await expect
+		.poll(() =>
+			cards.first().evaluate((card) => {
+				const atmosphere = card.querySelector(".forecast-atmosphere");
+				return atmosphere ? getComputedStyle(atmosphere).display : "missing";
+			}),
+		)
+		.toBe("none");
+});
+
 test("PWA registra o shell e reabre offline", async ({ page, context }) => {
 	await expect
 		.poll(() =>

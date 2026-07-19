@@ -80,6 +80,18 @@ o conteúdo dos contadores. Usuários autenticados podem reordenar seções por 
 e ocultar seções opcionais; os contadores padrão permanecem sempre disponíveis.
 Ordem, visibilidade e preset sincronizam pelo documento de settings.
 
+### Clima dinâmico
+
+Cada `.forecast` contém uma camada `forecast-atmosphere` isolada sobre o iframe e
+sem eventos de ponteiro. Sol e noite usam brilho e pontos; nuvens e neblina usam
+faixas desfocadas; chuva, neve e tempestade usam no máximo doze partículas. A
+opacidade permanece baixa para preservar texto, ícones e controles do fornecedor.
+
+`IntersectionObserver` pausa as animações fora do viewport, `visibilitychange`
+pausa a aba oculta e a atualização da condição ocorre a cada quinze minutos. Em
+`prefers-reduced-motion: reduce`, a camada inteira usa `display: none`, não apenas
+uma animação encurtada. Falhas externas deixam o card na superfície neutra.
+
 ### Timeline
 
 A Timeline é uma régua temporal SVG. No desktop, as fontes ocupam trilhas

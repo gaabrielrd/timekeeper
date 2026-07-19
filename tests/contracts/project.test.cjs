@@ -147,6 +147,24 @@ test("widgets de clima personalizados mantêm limite e fornecedor alinhados", ()
 	assert.match(rules, /forecast7\[\.\]com/);
 });
 
+test("clima dinâmico usa condição real com animação isolada e pausável", () => {
+	const weather = read("public/src/weather.js");
+	const styles = read("public/src/style.css");
+	const serviceWorker = read("public/sw.js");
+	assert.match(weather, /OPEN_METEO_URL = "https:\/\/api\.open-meteo\.com/);
+	assert.match(weather, /function forecastCoordinates/);
+	assert.match(weather, /function weatherCondition/);
+	assert.match(weather, /IntersectionObserver/);
+	assert.match(weather, /visibilitychange/);
+	assert.match(styles, /\.forecast-atmosphere/);
+	assert.match(styles, /data-weather-visible="false"/);
+	assert.match(
+		styles,
+		/@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\.forecast-atmosphere \{[\s\S]*?display: none !important/,
+	);
+	assert.doesNotMatch(serviceWorker, /api\.open-meteo\.com/);
+});
+
 test("Analytics depende de consentimento explícito", () => {
 	const html = read("public/index.html");
 	const analytics = read("public/src/analytics.js");

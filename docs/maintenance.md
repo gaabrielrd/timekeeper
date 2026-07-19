@@ -23,7 +23,7 @@ calendário vencido.
 
 - Consultar uso/custos de Firestore, Hosting e Auth.
 - Conferir erros de login e permissions no console.
-- Validar widget de clima e fontes externas.
+- Validar widget de clima, condição Open-Meteo e fontes externas.
 - Testar o site publicado em janela privada no Safari móvel.
 
 ### Por release
