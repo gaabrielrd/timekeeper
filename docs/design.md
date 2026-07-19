@@ -92,18 +92,32 @@ próximo, e conflitos preservam uma diferenciação visual discreta. Para evitar
 sobrepostos no eixo estreito, a legenda mobile concentra a ação de edição e mantém
 cada trilha identificável e acessível por teclado.
 
+Um controle segmentado alterna a régua com uma grade mensal. Cada célula mantém
+tags compactas nas cores das fontes, hoje recebe contorno e número preenchido, e
+o dia selecionado revela uma lista de detalhes logo abaixo. Até 700 px, a grade
+mostra somente a semana atual e transforma as tags em pontos, evitando overflow
+em 320 px sem perder os nomes expostos por acessibilidade. O calendário não usa
+animação indispensável e herda o comportamento global de movimento reduzido.
+
 ### Sidebar e modal
 
 A sidebar ocupa o lado direito, bloqueia interação externa via backdrop/`inert` e
 contém rotina, contadores, aparência, clima, notificações e ações da conta no mesmo
-fluxo rolável. Sair
+fluxo rolável. Abaixo da biblioteca, `Arquivados` abre o histórico fora desse fluxo.
+Sair
 precede excluir conta, que encerra o conteúdo. Um `<dialog>` reúne criação e
 edição com uma prévia compacta que reage a nome, cor, imagem e opacidades; outro
-apresenta upload, quota e biblioteca de imagens em uma grade compacta. A seleção de
+apresenta upload, quota e biblioteca de imagens em uma grade compacta. Um terceiro
+modal apresenta as Conquistas em lista vertical rolável, com estado de sincronização,
+quota e exclusão permanente por item. A seleção de
 cor e imagem compartilha o painel `Visual`; a imagem usa miniatura e ações por ícone
 para preservar espaço vertical.
 
-Administradores recebem um terceiro dialog operacional, mais largo, com três abas:
+Cards fixos concluídos revelam a ação de arquivar junto ao botão de foco durante
+hover ou foco por teclado. Em dispositivos sem hover, a ação permanece visível;
+contadores ainda em andamento e recorrentes não reservam esse controle.
+
+Administradores recebem outro dialog operacional, mais largo, com três abas:
 expediente, pagamentos e feriados. A navegação usa sublinhado discreto, o expediente
 fica em um formulário curto e os calendários usam listas lineares com ações por
 ícone. O expediente e os controles de data ficam em cards semitransparentes. Início,

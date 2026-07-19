@@ -3,8 +3,8 @@
 ## Estado atual
 
 O projeto usa Node Test Runner, Playwright e Firebase Emulator Suite. A suíte atual
-contém 54 testes unitários/contratuais do cliente, 7 testes do domínio das Functions,
-38 E2E em Chromium (19 cenários em desktop e mobile) e 16 testes de
+contém 59 testes unitários/contratuais do cliente, 7 testes do domínio das Functions,
+40 E2E em Chromium (20 cenários em desktop e mobile) e 20 testes de
 Firestore/Storage Rules. GitHub Actions executa todos em pushes, pull requests e
 disparos manuais.
 
@@ -44,6 +44,7 @@ outro diretório silenciosamente.
 - ordenação estável e recorrências que atravessam a meia-noite.
 - projeção automática da Timeline, próximos marcos por categoria, recorrências,
   fallback, filtros, empate e preservação da data civil local;
+- grade mensal/semanal, sobreposição por dia civil e fuso local;
 - normalização de alertas, início/fim, fontes, silêncio e janela de vencimento.
 - materialização server-side no fuso IANA, calendário civil, meia-noite e recuperação
   de execuções agendadas atrasadas.
@@ -66,6 +67,7 @@ outro diretório silenciosamente.
   Functions.
 - marcação, armazenamento de sessão, saída por teclado e cache offline do Modo de
   Foco.
+- ação manual, transação, limite e marcação do arquivo de Conquistas.
 
 ### Firestore Rules
 
@@ -76,6 +78,8 @@ outro diretório silenciosamente.
 - cinco permitidos e seis negados;
 - nomes, cores, horários e dias inválidos negados;
 - documentos fora da allowlist negados;
+- arquivo criado vazio, inserção fixa no início e exclusão unitária aceitas;
+- recorrentes, mutação do histórico e 101 itens no arquivo negados;
 - leitura do proprietário permitida.
 - metadados de imagens limitados a dez itens válidos.
 - leitura pública de `generalConfig`, escrita exclusiva por administrador Google,
@@ -100,6 +104,7 @@ outro diretório silenciosamente.
 - concessão local de `isAdmin`, seed e CRUD do modal administrativo;
 - criação fixa com início padrão próximo de “agora” e cor própria;
 - edição para recorrente, reordenação, toggle, reload e subscriptions;
+- arquivamento manual somente de fixos e exclusão permanente da conquista;
 - reautenticação e exclusão integral da conta e dos dados conhecidos.
 - upload, associação, opacidades e remoção de imagem do card.
 - Timeline SVG geral e pessoal, orientação responsiva, filtros, marcadores únicos,
@@ -142,7 +147,7 @@ Viewports sugeridos: 320, 390, 768, 1024 e 1440 px.
 
 - Popup permite escolher uma conta Google.
 - Cancelar popup mostra mensagem amigável.
-- Primeiro login cria perfil, settings e counters.
+- Primeiro login cria perfil, settings, counters, archive e images.
 - Login existente não sobrescreve preferências.
 - Foto/nome/email aparecem corretamente.
 - Logout cancela subscriptions e volta ao horário local dos cookies.
@@ -164,6 +169,10 @@ Viewports sugeridos: 320, 390, 768, 1024 e 1440 px.
   e uma única ocorrência para o próximo pagamento e o próximo feriado.
 - Eventos simultâneos, ativo e próximo recebem os estados visuais corretos.
 - Clicar em contador pessoal abre seu editor; evento geral é somente leitura.
+- Alternar para calendário destaca hoje; desktop mostra o mês e 320/390 px mostram
+  sete dias da semana atual sem overflow.
+- Selecionar um dia abre os eventos filtrados; intervalos de vários dias e
+  recorrências noturnas aparecem em todos os dias civis atravessados.
 - Permissão só aparece depois de ativar e negar não repete o prompt.
 - Horário de silêncio atravessa meia-noite e alteração/exclusão invalida candidatos.
 - Duas abas não emitem o mesmo ID de ocorrência e os registros expiram.
@@ -210,6 +219,18 @@ Viewports sugeridos: 320, 390, 768, 1024 e 1440 px.
 - A composição não cria overflow em 320, 390, 768 px ou desktop.
 - O fundo ativo não é remontado, o contraste permanece legível e reduced motion
   praticamente elimina a transição.
+
+### Conquistas
+
+- Somente contadores fixos exibem a ação de arquivar.
+- Ao chegar a zero, o card fixo revela `Arquivar` no hover/foco e continua acessível
+  em telas de toque; recorrentes e fixos em andamento não exibem a ação.
+- Cancelar a confirmação preserva o contador ativo; confirmar move o item de forma
+  atômica e libera uma vaga entre as cinco.
+- O histórico sincroniza entre abas, mantém o mais recente no topo e bloqueia a
+  ação quando alcança 100 itens.
+- O botão `Arquivados`, abaixo da biblioteca, abre e fecha o modal sem overflow.
+- Excluir uma conquista exige confirmação e não restaura o contador ativo.
 
 ### Biblioteca de imagens
 

@@ -129,6 +129,34 @@ test("timeline SVG adapta orientação, recorrências e próximos marcos", async
 	await expect(page.locator('#timeline-svg [data-source-type="holiday"]')).toHaveCount(1);
 });
 
+test("calendário destaca hoje, abre o dia e reduz para semana no celular", async ({
+	page,
+}) => {
+	await page.locator("#privacy-decline").click();
+	await page.getByRole("button", { name: "Calendário mensal" }).click();
+	await expect(
+		page.getByRole("button", { name: "Calendário mensal" }),
+	).toHaveAttribute("aria-pressed", "true");
+	const calendar = page.locator(".timeline-calendar");
+	await expect(calendar).toBeVisible();
+	const mobile = page.viewportSize().width <= 700;
+	await expect(calendar).toHaveAttribute(
+		"data-calendar-mode",
+		mobile ? "week" : "month",
+	);
+	await expect(page.locator("#timeline-range")).toContainText("fuso local");
+	await expect(page.locator('.timeline-calendar-day[aria-current="date"]')).toHaveCount(1);
+	await expect(page.locator(".timeline-calendar-day")).toHaveCount(
+		mobile ? 7 : 35,
+	);
+	const eventDay = page.locator(".timeline-calendar-day.has-events").first();
+	await expect(eventDay).toBeVisible();
+	await eventDay.click();
+	await expect(eventDay).toHaveAttribute("aria-pressed", "true");
+	await expect(page.locator("#timeline-calendar-details")).toBeVisible();
+	await expect(page.locator(".timeline-calendar-detail-item").first()).toBeVisible();
+});
+
 test("PWA registra o shell e reabre offline", async ({ page, context }) => {
 	await expect
 		.poll(() =>

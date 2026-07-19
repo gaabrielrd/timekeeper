@@ -2,6 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
 	DASHBOARD_SECTION_IDS,
+	buildCalendarProjection,
 	buildOccurrences,
 	buildTimelineProjection,
 	filterOccurrences,
@@ -9,6 +10,88 @@ const {
 	normalizedOccurrence,
 	timelineGroupKey,
 } = require("../../public/src/occurrences.js");
+
+test("calendário mensal cria grade civil e destaca hoje", () => {
+	const projection = buildCalendarProjection(
+		{
+			payments: [new Date(2026, 6, 15, 0, 30)],
+			counters: [
+				{
+					id: "release",
+					name: "Release",
+					type: "fixed",
+					startAtMs: new Date(2026, 6, 14, 9).getTime(),
+					endAtMs: new Date(2026, 6, 16, 10).getTime(),
+				},
+			],
+		},
+		{
+			month: new Date(2026, 6, 1),
+			actualTime: new Date(2026, 6, 15, 12),
+		},
+	);
+	assert.equal(projection.days[0].key, "2026-06-28");
+	assert.equal(projection.days.at(-1).key, "2026-08-01");
+	assert.equal(projection.days.find((day) => day.isToday)?.key, "2026-07-15");
+	assert.deepEqual(
+		projection.days
+			.filter((day) =>
+				day.occurrences.some((item) => item.sourceId === "release"),
+			)
+			.map((day) => day.key),
+		["2026-07-14", "2026-07-15", "2026-07-16"],
+	);
+});
+
+test("calendário semanal usa sete dias e preserva recorrência noturna", () => {
+	const projection = buildCalendarProjection(
+		{
+			counters: [
+				{
+					id: "overnight",
+					name: "Plantão",
+					type: "recurring",
+					startTime: "22:00",
+					endTime: "06:00",
+					daysOfWeek: [1],
+				},
+			],
+		},
+		{
+			month: new Date(2026, 6, 22, 12),
+			actualTime: new Date(2026, 6, 22, 12),
+			weekOnly: true,
+		},
+	);
+	assert.equal(projection.days.length, 7);
+	assert.deepEqual(
+		projection.days
+			.filter((day) => day.occurrences.length > 0)
+			.map((day) => day.key),
+		["2026-07-20", "2026-07-21"],
+	);
+});
+
+test("calendário usa a data local mesmo próximo da meia-noite", () => {
+	const previousTimezone = process.env.TZ;
+	process.env.TZ = "America/Sao_Paulo";
+	try {
+		const payment = new Date(2026, 6, 15, 0, 15);
+		const projection = buildCalendarProjection(
+			{ payments: [payment] },
+			{
+				month: new Date(2026, 6, 1),
+				actualTime: new Date(2026, 6, 15, 12),
+			},
+		);
+		assert.equal(
+			projection.days.find((day) => day.occurrences.length)?.key,
+			"2026-07-15",
+		);
+	} finally {
+		process.env.TZ = previousTimezone;
+	}
+});
 
 test("projeção usa somente o próximo marco de cada categoria", () => {
 	const from = new Date("2026-07-20T10:00:00");

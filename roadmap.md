@@ -30,7 +30,7 @@ sem interromper a experiência de visitantes ou a sincronização atual pelo Fir
 | 5B | Push confiável | Fase 5A + backend | Alertas com a aplicação fechada |
 | 6 | Mini-Checklists | Fases 0 e 2 | Subtarefas em cards e progresso parcial |
 | 7 | Modo de Foco | Fases 0 e 2 | Tela cheia imersiva focada em um único contador com fundo animado |
-| 8 | Arquivo & Conquistas | Fases 0 e 2 | Histórico de contadores finalizados e persistência em `/data/archive` |
+| 8 | Arquivo & Conquistas | Fases 0 e 2 | Histórico de contadores fixos arquivados manualmente em `/data/archive` |
 | 9 | Calendário Mensal | Fases 0, 2 e 4 | Grade visual de calendário para ocorrências da Timeline |
 | 10 | Clima Dinâmico | Fases 0, 2 e 3 | Efeitos climáticos (chuva, sol, noite) nos cards de previsão |
 
@@ -45,8 +45,8 @@ sem interromper a experiência de visitantes ou a sincronização atual pelo Fir
 - [x] Fase 5B — push confiável (ativação remota depende de configuração e deploy)
 - [ ] Fase 6 — mini-checklists nos contadores
 - [x] Fase 7 — modo de foco (zen screen)
-- [ ] Fase 8 — histórico e arquivo de contadores (conquistas)
-- [ ] Fase 9 — visualização em grade de calendário
+- [x] Fase 8 — histórico e arquivo de contadores (conquistas)
+- [x] Fase 9 — visualização em grade de calendário
 - [ ] Fase 10 — clima dinâmico nos cards
 
 As marcações acima representam implementação, documentação e gates automatizados
@@ -356,10 +356,10 @@ Oferecer uma visualização em tela cheia de um contador selecionado, integrando
 ## Fase 8 — Histórico e Arquivo de Contadores (Conquistas)
 
 ### Objetivo
-Implementar o arquivamento de contadores fixos completados para manter o painel de contadores ativos limpo, sem perder o registro histórico das metas concluídas.
+Implementar o arquivamento manual de contadores fixos para manter o painel de contadores ativos limpo, sem perder o registro histórico das metas.
 
 ### Escopo MVP
-- Mover contadores fixos que chegaram a 100% de progresso para a coleção de arquivo (`/users/{uid}/data/archive`).
+- Permitir mover um contador fixo para o arquivo (`/users/{uid}/data/archive`) somente por ação manual do usuário e após confirmação.
 - Adicionar um painel / histórico de "Conquistas" na biblioteca ou configurações onde o usuário possa rever as últimas 100 metas concluídas.
 - Exibir a data e hora em que a meta foi alcançada.
 - Permitir excluir permanentemente itens do arquivo.
@@ -367,6 +367,7 @@ Implementar o arquivamento de contadores fixos completados para manter o painel 
 ### Critérios de aceite
 - As Firestore Rules limitam o arquivo a no máximo 100 itens por usuário para preservar o limite de armazenamento.
 - A migração de um contador ativo para o arquivo libera instantaneamente o budget para a criação de um novo contador ativo (mantendo o limite de 5 ativos).
+- Contadores recorrentes não exibem a ação de arquivar e nenhum contador é arquivado automaticamente ao atingir 100%.
 
 ## Fase 9 — Visualização em Grade de Calendário
 
@@ -382,6 +383,7 @@ Expandir as visualizações temporais da seção *Timeline* permitindo alternar 
 ### Critérios de aceite
 - A grade de calendário permanece responsiva de 320 px a desktop, reduzindo para visualização semanal ou lista compacta em celulares.
 - O cálculo e a renderização das datas do calendário utilizam o fuso horário local do dispositivo do usuário.
+- A troca de visualização e a seleção do dia são estados transitórios; nenhuma cópia das ocorrências é persistida.
 
 ## Fase 10 — Clima Dinâmico nos Cards
 

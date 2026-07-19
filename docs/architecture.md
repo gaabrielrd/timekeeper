@@ -48,8 +48,10 @@ Normaliza expediente, calendários e contadores pessoais em ocorrências ordenad
 com IDs estáveis e limites temporais em milissegundos. Para a Timeline, também
 projeta uma escala automática cujo limite é o mais distante entre o próximo marco
 de pagamento, feriado e contador pessoal, expandindo os intervalos recorrentes que
-cabem nessa escala. O módulo é puro, funciona no navegador e em CommonJS e continua
-sendo a fonte compartilhada pela Timeline e pelas notificações locais.
+cabem nessa escala. O mesmo módulo projeta a grade do mês corrente ou da semana
+atual, associa intervalos a todos os dias civis locais que eles atravessam e não
+persiste uma cópia. O módulo é puro, funciona no navegador e em CommonJS e continua
+sendo a fonte compartilhada pela Timeline, pelo calendário e pelas notificações locais.
 
 ### Integração meteorológica — `public/src/weather.js`
 
@@ -98,12 +100,12 @@ Responsável por:
 - assinar a configuração geral pública e popular seu seed quando um administrador
   encontra a coleção vazia;
 - controlar autorização e CRUD do modal administrativo;
-- assinar configurações, contadores e metadados de imagens com `onSnapshot`;
+- assinar configurações, contadores, arquivo e metadados de imagens com `onSnapshot`;
 - salvar preferências e CRUD de contadores;
 - enviar, reutilizar e excluir imagens privadas da biblioteca;
 - renderizar cards e lista de gerenciamento;
 - aplicar cores e fundos;
-- renderizar Timeline e central de notificações local/push;
+- renderizar Timeline linear, calendário e central de notificações local/push;
 - criar os cards pessoais com ações e IDs estáveis consumidos pelo modo de foco;
 - executar canvas da constelação e sincronizar anéis cronológicos.
 
@@ -178,6 +180,12 @@ flowchart LR
 
 Esse modelo simplifica ordenação e o limite de cinco, mas todo o array é regravado
 em cada alteração. Para o volume atual, o custo é pequeno.
+
+O arquivamento é uma exceção intencional ao fluxo otimista: após confirmação do
+usuário, uma transação lê as versões atuais, remove o contador fixo de `counters` e
+o insere no início de `archive` com `archivedAt`. A UI aguarda o `onSnapshot` dos
+dois documentos, evitando apresentar uma vaga livre antes de o movimento atômico
+ter sido aceito. A exclusão de uma conquista também usa transação.
 
 ## Cálculo temporal
 

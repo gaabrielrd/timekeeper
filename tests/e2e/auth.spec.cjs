@@ -170,6 +170,68 @@ test("usuário cria, edita, reordena e oculta contadores", async (
 	);
 });
 
+test("usuário arquiva manualmente apenas contador fixo e exclui a conquista", async (
+	{ page },
+	testInfo,
+) => {
+	await loginWithGoogleEmulator(page, testInfo.project.name);
+	await page.locator("#auth-button").click();
+	await expect(page.locator("#archive-state")).toHaveText("Ao vivo");
+
+	await page.locator("#open-counter-modal").click();
+	await page.locator('[name="name"]').fill("Rotina recorrente");
+	await page.locator("#counter-type").selectOption("recurring");
+	await page.locator("#counter-submit").click();
+
+	await page.locator("#open-counter-modal").click();
+	await page.locator('[name="name"]').fill("Meta concluída");
+	const completedRange = await page.evaluate(() => {
+		const localInput = (date) => {
+			const offset = date.getTimezoneOffset() * 60_000;
+			return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+		};
+		return {
+			start: localInput(new Date(Date.now() - 120_000)),
+			end: localInput(new Date(Date.now() - 60_000)),
+		};
+	});
+	await page.locator('[name="startAt"]').fill(completedRange.start);
+	await page.locator('[name="endAt"]').fill(completedRange.end);
+	await page.locator("#counter-submit").click();
+	await expect(
+		page.getByRole("button", {
+			name: "Arquivar contador Rotina recorrente",
+		}),
+	).toHaveCount(0);
+
+	const completedCard = page
+		.locator("#custom-panels .user-panel")
+		.filter({ hasText: "Meta concluída" });
+	const cardArchiveButton = completedCard.getByRole("button", {
+		name: "Arquivar contador Meta concluída",
+	});
+	if (testInfo.project.name === "chromium") {
+		await expect(cardArchiveButton).toHaveCSS("opacity", "0");
+		await completedCard.hover();
+	}
+	await expect(cardArchiveButton).toHaveCSS("opacity", "1");
+	page.once("dialog", (dialog) => dialog.accept());
+	await cardArchiveButton.click();
+	await expect(page.locator("#counter-count")).toHaveText("1 / 5");
+	await expect(page.locator("#archive-count")).toHaveText("1 / 100");
+	await expect(page.locator("#archive-list")).toContainText("Meta concluída");
+	await expect(page.locator("#archive-list")).toContainText("Arquivado em");
+	await page.locator("#open-archive-dialog").click();
+	await expect(page.locator("#archive-dialog")).toBeVisible();
+
+	page.once("dialog", (dialog) => dialog.accept());
+	await page
+		.getByRole("button", { name: "Excluir Meta concluída permanentemente" })
+		.click();
+	await expect(page.locator("#archive-count")).toHaveText("0 / 100");
+	await expect(page.locator("#archive-empty")).toBeVisible();
+});
+
 test("usuário personaliza o layout e sincroniza entre abas", async (
 	{ page, context },
 	testInfo,

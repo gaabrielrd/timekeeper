@@ -2,7 +2,7 @@
 
 ## Visão geral
 
-Cada conta Google possui um documento de perfil e três documentos operacionais.
+Cada conta Google possui um documento de perfil e quatro documentos operacionais.
 Os três contadores padrão usam uma coleção pública separada.
 
 ```text
@@ -23,6 +23,10 @@ users/{uid}/data/counters
 
 users/{uid}/data/images
 ├── items[0..9]
+└── updatedAt
+
+users/{uid}/data/archive
+├── items[0..99]
 └── updatedAt
 
 generalConfig/workday
@@ -203,12 +207,12 @@ impõem 50 MiB por usuário nas Storage Rules, independentemente dos metadados.
 
 ```js
 {
-  items: [/* até 100 objetos do tipo fixed, em ordem decrescente de finalização */],
+  items: [/* até 100 objetos do tipo fixed, do arquivamento mais recente ao mais antigo */],
   updatedAt: serverTimestamp()
 }
 ```
 
-Cada item no arquivo estende o formato de um contador do tipo `fixed` adicionando a data de arquivamento:
+Cada item no arquivo estende o formato de um contador do tipo `fixed` adicionando a data de arquivamento. O movimento é manual, exige confirmação e grava os documentos `counters` e `archive` na mesma transação. Alcançar 100% não arquiva o contador automaticamente.
 
 | Campo | Tipo | Regra |
 | --- | --- | --- |
@@ -230,11 +234,14 @@ nem `HttpOnly`, pois são configurações não sensíveis acessadas pelo JavaScr
 
 ## Sincronização e concorrência
 
-Há uma subscription pública de `generalConfig` e quatro subscriptions de conta:
-perfil, settings, counters e metadados de images.
+Há uma subscription pública de `generalConfig` e cinco subscriptions de conta:
+perfil, settings, counters, archive e metadados de images.
 Escritas de contadores substituem o documento completo para remover campos legados
 fora da allowlist. Duas abas podem produzir last-write-wins; `onSnapshot` reconcilia a UI
 com a versão aceita pelo servidor.
+Arquivar usa uma transação para remover um item fixo de `counters` e inseri-lo no
+início de `archive`; a exclusão permanente também usa transação para não sobrescrever
+uma alteração concorrente do histórico.
 
 ## Regras atuais
 

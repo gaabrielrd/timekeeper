@@ -217,6 +217,98 @@
 		);
 	}
 
+	function occurrenceOverlapsLocalDay(occurrence, dayStartAtMs, dayEndAtMs) {
+		if (occurrence.endAtMs == null) {
+			return (
+				occurrence.startAtMs >= dayStartAtMs &&
+				occurrence.startAtMs < dayEndAtMs
+			);
+		}
+		return (
+			occurrence.startAtMs < dayEndAtMs &&
+			occurrence.endAtMs > dayStartAtMs
+		);
+	}
+
+	function calendarVisibleRange(focusDate, weekOnly) {
+		const monthStart = new Date(
+			focusDate.getFullYear(),
+			focusDate.getMonth(),
+			1,
+		);
+		const from = localDay(weekOnly ? focusDate : monthStart);
+		from.setDate(from.getDate() - from.getDay());
+		const to = weekOnly
+			? new Date(from)
+			: new Date(focusDate.getFullYear(), focusDate.getMonth() + 1, 0);
+		to.setHours(0, 0, 0, 0);
+		to.setDate(to.getDate() + (weekOnly ? 6 : 6 - to.getDay()));
+		return { from, monthStart, to };
+	}
+
+	function buildCalendarProjection(
+		{
+			workday = null,
+			payments = [],
+			holidays = [],
+			counters = [],
+		} = {},
+		{
+			month = new Date(),
+			actualTime = new Date(),
+			weekOnly = false,
+		} = {},
+	) {
+		const focusDate = validDate(month);
+		const today = validDate(actualTime);
+		if (!focusDate || !today) {
+			return {
+				fromAtMs: null,
+				toAtMs: null,
+				monthAtMs: null,
+				weekOnly: Boolean(weekOnly),
+				days: [],
+				occurrences: [],
+			};
+		}
+		const range = calendarVisibleRange(focusDate, Boolean(weekOnly));
+		const rangeEnd = new Date(range.to);
+		rangeEnd.setDate(rangeEnd.getDate() + 1);
+		const occurrences = buildOccurrences(
+			{ workday, payments, holidays, counters },
+			{ from: range.from, to: new Date(rangeEnd.getTime() - 1) },
+		);
+		const todayKey = localDateKey(today);
+		const days = [];
+		eachLocalDay(range.from, range.to, (date) => {
+			const nextDay = new Date(date);
+			nextDay.setDate(nextDay.getDate() + 1);
+			days.push({
+				key: localDateKey(date),
+				dateAtMs: date.getTime(),
+				inMonth:
+					date.getFullYear() === focusDate.getFullYear() &&
+					date.getMonth() === focusDate.getMonth(),
+				isToday: localDateKey(date) === todayKey,
+				occurrences: occurrences.filter((occurrence) =>
+					occurrenceOverlapsLocalDay(
+						occurrence,
+						date.getTime(),
+						nextDay.getTime(),
+					),
+				),
+			});
+		});
+		return {
+			fromAtMs: range.from.getTime(),
+			toAtMs: rangeEnd.getTime() - 1,
+			monthAtMs: range.monthStart.getTime(),
+			weekOnly: Boolean(weekOnly),
+			days,
+			occurrences,
+		};
+	}
+
 	function nextCalendarOccurrence(dates, sourceType, title, fromMs) {
 		return (Array.isArray(dates) ? dates : [])
 			.map((date, index) =>
@@ -387,6 +479,7 @@
 
 	return {
 		DASHBOARD_SECTION_IDS,
+		buildCalendarProjection,
 		buildOccurrences,
 		buildTimelineProjection,
 		filterOccurrences,

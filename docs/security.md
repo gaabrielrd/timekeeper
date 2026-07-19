@@ -36,13 +36,15 @@ Para `/generalConfig/{configId}`:
 
 Para `/users/{userId}/data/{documentId}`:
 
-- apenas `settings`, `counters` e `images` são permitidos;
+- apenas `settings`, `counters`, `archive` e `images` são permitidos;
 - cada documento usa um `match` literal próprio para não somar os três schemas no
   limite de expressões das Rules;
 - somente o dono Google pode ler/escrever/excluir;
 - settings validam allowlist, tipos, cores, estilos, layouts, widgets de clima e
   preferências aninhadas de notificação;
 - counters validam allowlist, limite cinco e schemas fixo/recorrente;
+- archive nasce vazio, aceita até 100 itens e só permite inserir um contador fixo
+  válido no início ou remover exatamente um item existente;
 - o tipo do contador seleciona o schema antes da validação e os dias usam uma
   allowlist de `0` a `6`, reduzindo o orçamento de expressões sem relaxar dados;
 - nomes, IDs, cores, horários e dias recebem validação de formato/range.
@@ -121,7 +123,7 @@ fazem sanitização.
   dispositivo e fila técnica; App Check avalia a legitimidade da aplicação.
 
 `public/privacy.html` documenta essas finalidades. Os cookies de expediente são
-funcionais; Analytics é opcional e separado. A conta, os três documentos operacionais e as imagens
+funcionais; Analytics é opcional e separado. A conta, os quatro documentos operacionais e as imagens
 podem ser apagados pelo usuário após reautenticação Google no menu da conta.
 
 O service worker da PWA intercepta somente requisições GET da própria origem. Ele

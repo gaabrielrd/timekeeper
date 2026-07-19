@@ -107,6 +107,13 @@ function recurringCounter() {
 	};
 }
 
+function archivedCounter(index = 1) {
+	return {
+		...fixedCounter(index),
+		archivedAt: "2026-07-19T15:30:00.000Z",
+	};
+}
+
 async function seedProfile(uid, isAdmin = false) {
 	await environment.withSecurityRulesDisabled(async (context) => {
 		await setDoc(doc(context.firestore(), "users", uid), {
@@ -439,6 +446,58 @@ test("rejeita checklists inválidos ou com mais de 3 itens", async () => {
 			}),
 		);
 	}
+});
+
+test("arquivo aceita inserção de contador fixo no início e exclusão permanente", async () => {
+	const reference = doc(googleDb(), "users/alice/data/archive");
+	await assertSucceeds(
+		setDoc(reference, { items: [], updatedAt: serverTimestamp() }),
+	);
+	await assertSucceeds(
+		setDoc(reference, {
+			items: [archivedCounter()],
+			updatedAt: serverTimestamp(),
+		}),
+	);
+	await assertSucceeds(
+		setDoc(reference, { items: [], updatedAt: serverTimestamp() }),
+	);
+});
+
+test("arquivo rejeita recorrentes, alteração de histórico e mais de 100 itens", async () => {
+	const ownerDb = googleDb();
+	const reference = doc(ownerDb, "users/alice/data/archive");
+	await assertSucceeds(setDoc(reference, { items: [] }));
+	await assertFails(
+		setDoc(reference, {
+			items: [
+				{
+					...recurringCounter(),
+					archivedAt: "2026-07-19T15:30:00.000Z",
+				},
+			],
+		}),
+	);
+	await assertSucceeds(setDoc(reference, { items: [archivedCounter()] }));
+	await assertFails(
+		setDoc(reference, {
+			items: [{ ...archivedCounter(), name: "Alterado" }],
+		}),
+	);
+	await environment.withSecurityRulesDisabled(async (context) => {
+		await setDoc(doc(context.firestore(), "users/alice/data/archive"), {
+			items: Array.from({ length: 100 }, (_, index) => archivedCounter(index)),
+		});
+	});
+	await assertFails(
+		setDoc(reference, {
+			items: [
+				archivedCounter(101),
+				...Array.from({ length: 100 }, (_, index) => archivedCounter(index)),
+			],
+		}),
+	);
+	await assertFails(getDoc(doc(googleDb("bob"), "users/alice/data/archive")));
 });
 
 test("nega subdocumentos fora da allowlist", async () => {

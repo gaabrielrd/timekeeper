@@ -365,6 +365,26 @@
 						class="timeline-filters"
 						aria-label="Filtros da timeline"
 					>
+						<div
+							class="timeline-view-switch"
+							role="group"
+							aria-label="Visualização da timeline"
+						>
+							<button
+								type="button"
+								data-timeline-view="linear"
+								aria-pressed="true"
+							>
+								Lista linear
+							</button>
+							<button
+								type="button"
+								data-timeline-view="calendar"
+								aria-pressed="false"
+							>
+								Calendário mensal
+							</button>
+						</div>
 						<label>
 							<span>Tipo</span>
 							<select id="timeline-source-filter">
@@ -521,6 +541,14 @@
 							>photo_library</i
 						>
 						Biblioteca de imagens
+					</button>
+					<button
+						id="open-archive-dialog"
+						class="secondary-button library-button"
+						type="button"
+					>
+						<i class="material-icons" aria-hidden="true">archive</i>
+						Arquivados
 					</button>
 				</section>
 
@@ -1266,6 +1294,45 @@
 					</button>
 				</div>
 			</form>
+		</dialog>
+		<dialog
+			id="archive-dialog"
+			class="counter-dialog archive-dialog"
+			aria-labelledby="archive-title"
+		>
+			<div class="archive-dialog-shell">
+				<div class="modal-heading">
+					<div>
+						<p class="section-kicker">Histórico</p>
+						<h2 id="archive-title">Conquistas</h2>
+					</div>
+					<button
+						id="archive-dialog-close"
+						class="icon-button"
+						type="button"
+						aria-label="Fechar histórico"
+					>
+						<i class="material-icons">close</i>
+					</button>
+				</div>
+				<div class="archive-dialog-meta">
+					<span
+						id="archive-state"
+						class="live-state compact"
+						data-state="connecting"
+						>Conectando...</span
+					>
+					<span id="archive-count" class="counter-count">0 / 100</span>
+				</div>
+				<p id="archive-empty" class="archive-empty">
+					Nenhum contador arquivado.
+				</p>
+				<div
+					id="archive-list"
+					class="archive-list"
+					aria-live="polite"
+				></div>
+			</div>
 		</dialog>
 		<dialog
 			id="image-library-dialog"

@@ -15,15 +15,17 @@ real com Firebase.
 - Até cinco contadores pessoais por conta.
 - Contadores de período fixo ou eventos recorrentes por dias da semana.
 - Criação e edição em modal, exclusão e ordenação por botões.
+- Arquivamento manual de contadores fixos e histórico de até 100 conquistas.
 - Biblioteca privada com até dez imagens reutilizáveis nos contadores pessoais.
 - Opacidade independente da imagem e da sobreposição do card.
-- Sincronização ao vivo de configurações, contadores e biblioteca com Firestore.
+- Sincronização ao vivo de configurações, contadores, conquistas e biblioteca com Firestore.
 - Duas cores de destaque e sete fundos animados personalizáveis.
 - Layout responsivo, tela cheia e respeito a `prefers-reduced-motion`.
 - Aplicação instalável com shell offline e atualização controlada.
 - Presets, ordem e visibilidade sincronizados para as seções da dashboard.
 - Até cinco widgets de clima configuráveis, reordenáveis e sincronizados.
 - Timeline SVG responsiva de expediente, próximos marcos de calendário e contadores pessoais.
+- Grade mensal da Timeline com recorte semanal no celular e detalhes por dia.
 - Modo de foco imersivo para qualquer contador, restaurado durante a sessão.
 - Notificações locais e push FCM com antecedência, fontes e silêncio configuráveis.
 

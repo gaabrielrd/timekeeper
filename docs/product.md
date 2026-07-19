@@ -129,6 +129,13 @@ próprios, eventos pontuais como marcadores rotulados, e o filtro por origem nã
 o alcance calculado. Itens pessoais abrem o editor do contador; eventos gerais
 permanecem somente leitura.
 
+O seletor da seção alterna essa régua com o Calendário mensal. A grade usa o mês
+corrente, destaca hoje e distribui expediente, pagamentos, feriados e contadores
+pelos dias civis em que cada ocorrência está ativa. Selecionar um dia abre seu
+detalhamento; contadores pessoais continuam levando ao editor. Em telas de até
+700 px, o calendário reduz para a semana atual, mantendo os mesmos filtros. A
+visualização e o dia selecionado são estados transitórios e não são sincronizados.
+
 ## Notificações locais e push
 
 Usuários autenticados podem ativar alertas no dispositivo, escolher fontes,
@@ -172,13 +179,22 @@ fechar ou pela tecla `Esc`.
 - `Erro de conexão`: leitura ou escrita falhou; um toast explica o problema.
 - `Limite atingido`: já existem cinco contadores e a criação fica desabilitada.
 
+## Histórico e Arquivo de Contadores (Conquistas)
+
+Contadores fixos exibem a ação de arquivar na lista de gerenciamento. O movimento
+só acontece após interação e confirmação explícitas; atingir 100% não altera o
+contador automaticamente. Quando a contagem chega a zero, o card também revela a
+ação de arquivar no hover ou foco; em telas de toque, ela permanece visível. A
+transação remove o item da lista ativa e o adiciona ao
+histórico, liberando imediatamente uma das cinco vagas.
+
+O botão `Arquivados`, logo abaixo de `Biblioteca de imagens`, abre o modal
+`Conquistas`. Ele mantém até 100 itens, ordenados do arquivamento mais recente ao
+mais antigo, e mostra nome, data e hora da ação e resumo do checklist. Cada item
+pode ser excluído permanentemente após uma nova confirmação. Contadores recorrentes
+não podem ser arquivados.
+
 ## Evoluções da V2
-
-### Histórico e Arquivo de Contadores (Conquistas)
-Os contadores fixos que atingem 100% de progresso são automaticamente movidos para uma coleção de arquivo (`/users/{uid}/data/archive`). O usuário pode visualizar até 100 metas concluídas no painel de "Conquistas", liberando o budget de 5 contadores ativos para novas metas. O histórico exibe o nome do contador, o checklist concluído e a data/hora do arquivamento.
-
-### Grade de Calendário
-A Timeline ganha um novo modo de visualização em formato de grade mensal ou semanal clássico. Os dias do mês indicam a presença de expediente, datas de pagamento, feriados e contadores ativos por meio de marcações coloridas discretas. O clique em um dia específico abre o detalhamento dos eventos. A exibição adapta-se de forma responsiva a dispositivos móveis.
 
 ### Clima Dinâmico nos Cards
 Os cards de previsão de clima exibem micropartículas atmosféricas baseadas na condição meteorológica atual (chuva, sol, noite limpa, nublado). A animação é desativada sob movimento reduzido (`prefers-reduced-motion`) e entra em suspensão quando os cards não estão visíveis no viewport para poupar desempenho de CPU/GPU.

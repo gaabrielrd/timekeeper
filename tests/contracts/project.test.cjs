@@ -22,6 +22,7 @@ test("documentos Firestore usam matches isolados para preservar o orçamento de 
 	const rules = read("firestore.rules");
 	assert.match(rules, /match \/data\/settings \{/);
 	assert.match(rules, /match \/data\/counters \{/);
+	assert.match(rules, /match \/data\/archive \{/);
 	assert.match(rules, /match \/data\/images \{/);
 	assert.doesNotMatch(rules, /function isValidDocument\(\)/);
 	assert.match(rules, /days\.hasOnly\(\[0, 1, 2, 3, 4, 5, 6\]\)/);
@@ -165,6 +166,7 @@ test("exclusão de conta remove dados após reautenticação Google", () => {
 	assert.match(client, /reauthenticateWithPopup\(userToDelete, googleProvider\)/);
 	assert.match(client, /deleteDoc\(doc\(db, "users", userToDelete\.uid, "data", "settings"\)\)/);
 	assert.match(client, /deleteDoc\(doc\(db, "users", userToDelete\.uid, "data", "counters"\)\)/);
+	assert.match(client, /deleteDoc\(doc\(db, "users", userToDelete\.uid, "data", "archive"\)\)/);
 	assert.match(client, /deleteDoc\(doc\(db, "users", userToDelete\.uid, "data", "images"\)\)/);
 	assert.match(client, /deleteObject\(imageStorageReference\(userToDelete\.uid, slot\)\)/);
 	assert.match(client, /deleteUser\(userToDelete\)/);
@@ -255,6 +257,25 @@ test("timeline deriva ocorrências sem persistir uma cópia", () => {
 	assert.match(occurrences, /function groupOccurrences/);
 	assert.match(occurrences, /function buildTimelineProjection/);
 	assert.match(occurrences, /const primaryAnchors = \[nextPayment, nextHoliday, nextCustom\]/);
+});
+
+test("calendário alterna a Timeline sem criar estado persistido", () => {
+	const html = read("public/index.html");
+	const client = read("public/src/firebase.js");
+	const occurrences = read("public/src/occurrences.js");
+	const styles = read("public/src/style.css");
+	assert.match(html, /data-timeline-view="linear"/);
+	assert.match(html, /data-timeline-view="calendar"/);
+	assert.match(html, /Calendário mensal/);
+	assert.match(client, /TimekeeperOccurrences\.buildCalendarProjection/);
+	assert.match(client, /weekOnly: timelineOrientationQuery\.matches/);
+	assert.match(client, /aria-current", "date"/);
+	assert.match(client, /timeline-calendar-details/);
+	assert.match(occurrences, /function buildCalendarProjection/);
+	assert.match(occurrences, /function occurrenceOverlapsLocalDay/);
+	assert.match(styles, /\.timeline-calendar-grid/);
+	assert.match(styles, /@media \(max-width: 700px\)[\s\S]*\.timeline-calendar-day/);
+	assert.doesNotMatch(client, /saveSettings\(\{[^}]*calendar/i);
 });
 
 test("notificações locais exigem gesto explícito e usam deduplicação", () => {
@@ -365,6 +386,31 @@ test("modo de foco cobre todos os cards, restaura a sessão e integra o shell PW
 	assert.match(styles, /body\.focus-mode-active \.focus-mode/);
 	assert.match(styles, /@media \(max-width: 800px\), \(orientation: portrait\)/);
 	assert.match(serviceWorker, /"\/src\/focus\.js"/);
+});
+
+test("arquivo de conquistas exige ação manual e mantém limite alinhado", () => {
+	const html = read("public/index.html");
+	const client = read("public/src/firebase.js");
+	const styles = read("public/src/style.css");
+	const rules = read("firestore.rules");
+	const roadmap = read("roadmap.md");
+	assert.match(html, /id="archive-list"/);
+	assert.match(html, /id="archive-count"[^>]*>0 \/ 100</);
+	assert.match(
+		html,
+		/id="open-image-library"[\s\S]*id="open-archive-dialog"[\s\S]*>\s*Arquivados\s*<\/button>/,
+	);
+	assert.match(html, /id="archive-dialog"[\s\S]*aria-labelledby="archive-title"/);
+	assert.match(client, /const MAX_ARCHIVED_COUNTERS = 100;/);
+	assert.match(client, /runTransaction\(db, async \(transaction\)/);
+	assert.match(client, /window\.confirm\(`Arquivar o contador/);
+	assert.match(client, /counter\.type === "fixed"/);
+	assert.match(client, /archiveButton\.hidden = !isComplete/);
+	assert.match(client, /className = "counter-card-archive"/);
+	assert.match(styles, /\.a-panel:hover \.counter-card-archive/);
+	assert.match(rules, /data\.items\.size\(\) <= 100/);
+	assert.match(rules, /function isValidArchivedCounter\(/);
+	assert.match(roadmap, /ação manual[^.]+após confirmação/);
 });
 
 test("JavaScript inline do HTML compila", () => {

@@ -17,6 +17,7 @@ import {
 	getDoc,
 	getFirestore,
 	onSnapshot,
+	runTransaction,
 	serverTimestamp,
 	setDoc,
 	writeBatch,
@@ -234,6 +235,7 @@ function cacheDashboardPreferences(preferences) {
 
 applyDashboardPreferences(cachedDashboardPreferences());
 const MAX_COUNTERS = 5;
+const MAX_ARCHIVED_COUNTERS = 100;
 const MAX_IMAGES = 10;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const MAX_USER_IMAGE_BYTES = MAX_IMAGES * MAX_IMAGE_BYTES;
@@ -319,6 +321,7 @@ const elements = {
 	timelineRange: document.querySelector("#timeline-range"),
 	timelineLegend: document.querySelector("#timeline-legend"),
 	timelineSourceFilter: document.querySelector("#timeline-source-filter"),
+	timelineViewOptions: document.querySelectorAll("[data-timeline-view]"),
 	constellationCanvas: document.querySelector("#constellation-canvas"),
 	settingsState: document.querySelector("#settings-state"),
 	counterForm: document.querySelector("#counter-form"),
@@ -335,10 +338,17 @@ const elements = {
 	openCounterModal: document.querySelector("#open-counter-modal"),
 	openCounterModalLabel: document.querySelector("#open-counter-modal-label"),
 	openImageLibrary: document.querySelector("#open-image-library"),
+	openArchiveDialog: document.querySelector("#open-archive-dialog"),
 	counterList: document.querySelector("#counter-list"),
 	counterCount: document.querySelector("#counter-count"),
 	counterLiveState: document.querySelector("#counter-live-state"),
 	counterSidebarState: document.querySelector("#counter-sidebar-state"),
+	archiveList: document.querySelector("#archive-list"),
+	archiveEmpty: document.querySelector("#archive-empty"),
+	archiveCount: document.querySelector("#archive-count"),
+	archiveState: document.querySelector("#archive-state"),
+	archiveDialog: document.querySelector("#archive-dialog"),
+	archiveDialogClose: document.querySelector("#archive-dialog-close"),
 	counterMessage: document.querySelector("#counter-message"),
 	counterSubmit: document.querySelector("#counter-submit"),
 	counterChecklistInputs: document.querySelector("#counter-checklist-inputs"),
@@ -409,6 +419,7 @@ let currentUser = null;
 let userSettings = { ...DEFAULTS };
 let unsubscribeSettings = null;
 let unsubscribeCounters = null;
+let unsubscribeArchive = null;
 let unsubscribeImages = null;
 let unsubscribeProfile = null;
 let unsubscribeGeneralConfig = null;
@@ -423,6 +434,11 @@ let librarySelectsCounter = false;
 let imageLibraryAvailable = true;
 let currentUserIsAdmin = false;
 let countersReady = false;
+let archivedCounters = [];
+let archiveReady = false;
+let timelineView = "linear";
+let selectedCalendarDayKey = null;
+let renderedCalendarTodayKey = null;
 let generalConfigDocuments = [];
 let generalConfigHasRemoteData = false;
 let generalConfigSnapshotReady = false;
@@ -514,12 +530,21 @@ function setCounterState(label, state = "live") {
 	if (state !== "live") elements.openCounterModal.disabled = true;
 }
 
+function setArchiveState(label, state = "live") {
+	elements.archiveState.textContent = label;
+	elements.archiveState.dataset.state = state;
+}
+
 function settingsReference(userId) {
 	return doc(db, "users", userId, "data", "settings");
 }
 
 function countersReference(userId) {
 	return doc(db, "users", userId, "data", "counters");
+}
+
+function archiveReference(userId) {
+	return doc(db, "users", userId, "data", "archive");
 }
 
 function imagesReference(userId) {
@@ -950,6 +975,18 @@ function openImageLibrary(selectForCounter = false) {
 
 function closeImageLibrary() {
 	if (elements.imageLibraryDialog.open) elements.imageLibraryDialog.close();
+}
+
+function openArchiveDialog() {
+	if (!currentUser) return;
+	closeSidebar();
+	renderArchive(archivedCounters);
+	elements.archiveDialog.showModal();
+	window.requestAnimationFrame(() => elements.archiveDialogClose.focus());
+}
+
+function closeArchiveDialog() {
+	if (elements.archiveDialog.open) elements.archiveDialog.close();
 }
 
 function setImageLibraryAvailability(isAvailable) {
@@ -1969,6 +2006,18 @@ function updateCustomCounters() {
 			window.intervalBreakdown(state.target - now),
 		);
 		bar.animate(state.progress);
+		const panel = elements.customPanels.querySelector(
+			`.user-panel[data-id="${CSS.escape(counter.id)}"]`,
+		);
+		const archiveButton = panel?.querySelector(".counter-card-archive");
+		if (archiveButton) {
+			const isComplete =
+				counter.type === "fixed" &&
+				state.target - now < 1000;
+			archiveButton.hidden = !isComplete;
+			archiveButton.disabled =
+				!archiveReady || archivedCounters.length >= MAX_ARCHIVED_COUNTERS;
+		}
 	});
 }
 
@@ -2015,6 +2064,21 @@ function createCustomPanel(counter, index) {
 	focusButton.innerHTML =
 		'<i class="material-icons" aria-hidden="true">center_focus_strong</i>';
 	top.append(focusButton);
+	const archiveButton = document.createElement("button");
+	archiveButton.type = "button";
+	archiveButton.className = "counter-card-archive";
+	archiveButton.hidden = true;
+	archiveButton.title = `Arquivar ${counter.name}`;
+	archiveButton.setAttribute("aria-label", `Arquivar contador ${counter.name}`);
+	archiveButton.innerHTML =
+		'<i class="material-icons" aria-hidden="true">archive</i>';
+	archiveButton.addEventListener("click", () => {
+		const currentCounter = userSettings.customCounters.find(
+			(item) => item.id === panel.dataset.id,
+		);
+		if (currentCounter) archiveCounter(currentCounter);
+	});
+	top.append(archiveButton);
 	if (counter.imageId) {
 		const removeImage = document.createElement("button");
 		removeImage.type = "button";
@@ -2176,6 +2240,16 @@ function renderCounterList(counters) {
 				openCounterDialog(counter),
 			),
 		);
+		if (counter.type === "fixed") {
+			const archive = actionButton(
+				"archive",
+				`Arquivar contador ${counter.name}`,
+				() => archiveCounter(counter),
+				!archiveReady || archivedCounters.length >= MAX_ARCHIVED_COUNTERS,
+			);
+			archive.classList.add("archive-counter");
+			actions.append(archive);
+		}
 		const remove = actionButton(
 			"delete_outline",
 			`Excluir contador ${counter.name}`,
@@ -2186,6 +2260,49 @@ function renderCounterList(counters) {
 		item.append(dot, copy, actions);
 		elements.counterList.append(item);
 	});
+}
+
+function formatArchivedAt(value) {
+	return new Intl.DateTimeFormat("pt-BR", {
+		dateStyle: "medium",
+		timeStyle: "short",
+	}).format(new Date(value));
+}
+
+function renderArchive(counters) {
+	elements.archiveList.replaceChildren();
+	elements.archiveEmpty.hidden = counters.length > 0;
+	elements.archiveCount.textContent = `${counters.length} / ${MAX_ARCHIVED_COUNTERS}`;
+	for (const counter of counters) {
+		const item = document.createElement("article");
+		item.className = "archive-item";
+		const copy = document.createElement("div");
+		copy.className = "archive-item-copy";
+		const name = document.createElement("strong");
+		name.textContent = counter.name;
+		const date = document.createElement("span");
+		date.textContent = `Arquivado em ${formatArchivedAt(counter.archivedAt)}`;
+		copy.append(name, date);
+		if (Array.isArray(counter.checklist) && counter.checklist.length > 0) {
+			const checklist = document.createElement("span");
+			const completed = counter.checklist.filter((entry) => entry.done).length;
+			checklist.textContent = `${completed} de ${counter.checklist.length} subtarefas concluídas`;
+			copy.append(checklist);
+		}
+		const remove = document.createElement("button");
+		remove.className = "counter-action delete-counter";
+		remove.type = "button";
+		remove.title = `Excluir ${counter.name} permanentemente`;
+		remove.setAttribute(
+			"aria-label",
+			`Excluir ${counter.name} permanentemente`,
+		);
+		remove.disabled = !archiveReady;
+		remove.innerHTML = '<i class="material-icons" aria-hidden="true">delete_forever</i>';
+		remove.addEventListener("click", () => deleteArchivedCounter(counter));
+		item.append(copy, remove);
+		elements.archiveList.append(item);
+	}
 }
 
 function updateCustomVisibility(counters = userSettings.customCounters) {
@@ -2233,6 +2350,12 @@ function renderCustomCounters(counters) {
 			}
 			const focusButton = panel.querySelector(".focus-mode-trigger");
 			focusButton?.setAttribute("aria-label", `Focar contador ${counter.name}`);
+			const archiveButton = panel.querySelector(".counter-card-archive");
+			archiveButton?.setAttribute(
+				"aria-label",
+				`Arquivar contador ${counter.name}`,
+			);
+			if (archiveButton) archiveButton.title = `Arquivar ${counter.name}`;
 
 			// 2. Sync color variables
 			const color = counter.color || userSettings.accentPrimary;
@@ -2641,6 +2764,11 @@ function timelineTimeLabel(occurrence) {
 
 function updateTimelineTemporalStates() {
 	if (!elements.timelineList) return;
+	if (timelineView === "calendar") {
+		const todayKey = calendarDateKey(new Date());
+		if (renderedCalendarTodayKey !== todayKey) renderTimeline();
+		return;
+	}
 	const now = Date.now();
 	const items = Array.from(
 		elements.timelineList.querySelectorAll("[data-timeline-occurrence]"),
@@ -3168,12 +3296,250 @@ function timelineRangeText(projection) {
 	return `Agora → ${end} · ${span} · escala automática`;
 }
 
+function calendarDateKey(value) {
+	const date = value instanceof Date ? value : new Date(value);
+	return [
+		date.getFullYear(),
+		String(date.getMonth() + 1).padStart(2, "0"),
+		String(date.getDate()).padStart(2, "0"),
+	].join("-");
+}
+
+function calendarProjection(from) {
+	const endTime = `${String(userSettings.endHour).padStart(2, "0")}:${String(
+		userSettings.endMinutes,
+	).padStart(2, "0")}`;
+	return window.TimekeeperOccurrences.buildCalendarProjection(
+		{
+			workday: {
+				...(window.expedientePadrao || {
+					startTime: "08:00",
+					daysOfWeek: [1, 2, 3, 4, 5],
+				}),
+				endTime,
+			},
+			payments: window.pagamentos || [],
+			holidays: window.feriados || [],
+			counters: userSettings.customCounters || [],
+		},
+		{
+			month: from,
+			actualTime: from,
+			weekOnly: timelineOrientationQuery.matches,
+		},
+	);
+}
+
+function calendarRangeText(projection) {
+	if (projection.weekOnly) {
+		const formatter = new Intl.DateTimeFormat("pt-BR", {
+			day: "numeric",
+			month: "long",
+			year: "numeric",
+		});
+		return `Semana de ${formatter.format(new Date(projection.fromAtMs))} a ${formatter.format(new Date(projection.toAtMs))} · fuso local`;
+	}
+	const label = new Intl.DateTimeFormat("pt-BR", {
+		month: "long",
+		year: "numeric",
+	}).format(new Date(projection.monthAtMs));
+	return `${label} · grade mensal · fuso local`;
+}
+
+function calendarDayLabel(day, count) {
+	const date = new Intl.DateTimeFormat("pt-BR", {
+		weekday: "long",
+		day: "numeric",
+		month: "long",
+		year: "numeric",
+	}).format(new Date(day.dateAtMs));
+	return `${date}, ${count} ${count === 1 ? "evento" : "eventos"}`;
+}
+
+function calendarOccurrenceColor(occurrence) {
+	return timelineLaneColor({
+		color: occurrence.color,
+		sourceType: occurrence.sourceType,
+	});
+}
+
+function renderCalendarDayDetails(day, occurrences) {
+	const details = document.createElement("section");
+	details.id = "timeline-calendar-details";
+	details.className = "timeline-calendar-details";
+	details.setAttribute("aria-live", "polite");
+	const kicker = document.createElement("p");
+	kicker.className = "section-kicker";
+	kicker.textContent = "Eventos do dia";
+	const heading = document.createElement("h3");
+	heading.textContent = new Intl.DateTimeFormat("pt-BR", {
+		weekday: "long",
+		day: "numeric",
+		month: "long",
+	}).format(new Date(day.dateAtMs));
+	details.append(kicker, heading);
+	if (!occurrences.length) {
+		const empty = document.createElement("p");
+		empty.className = "timeline-calendar-detail-empty";
+		empty.textContent = "Nenhum evento neste dia para o filtro selecionado.";
+		details.append(empty);
+		return details;
+	}
+	const list = document.createElement("div");
+	list.className = "timeline-calendar-detail-list";
+	for (const occurrence of occurrences) {
+		const item = document.createElement(occurrence.editable ? "button" : "div");
+		if (occurrence.editable) item.type = "button";
+		item.className = "timeline-calendar-detail-item";
+		item.style.setProperty("--timeline-color", calendarOccurrenceColor(occurrence));
+		const marker = document.createElement("i");
+		marker.setAttribute("aria-hidden", "true");
+		const copy = document.createElement("span");
+		const title = document.createElement("strong");
+		title.textContent = occurrence.title;
+		const meta = document.createElement("span");
+		meta.textContent = `${TIMELINE_SOURCE_LABELS[occurrence.sourceType]} · ${timelineTimeLabel(occurrence)}`;
+		copy.append(title, meta);
+		item.append(marker, copy);
+		if (occurrence.editable) {
+			item.setAttribute("aria-label", `Editar ${occurrence.title}`);
+			item.addEventListener("click", () => {
+				const counter = userSettings.customCounters.find(
+					(candidate) => candidate.id === occurrence.sourceId,
+				);
+				if (counter) openCounterDialog(counter);
+			});
+		}
+		list.append(item);
+	}
+	details.append(list);
+	return details;
+}
+
+function renderCalendarTimeline(projection, sourceTypes) {
+	const days = projection.days.map((day) => ({
+		...day,
+		occurrences: day.occurrences.filter(
+			(occurrence) =>
+				sourceTypes.size === 0 || sourceTypes.has(occurrence.sourceType),
+		),
+	}));
+	if (!days.some((day) => day.key === selectedCalendarDayKey)) {
+		selectedCalendarDayKey =
+			days.find((day) => day.isToday)?.key ||
+			days.find((day) => day.inMonth)?.key ||
+			days[0]?.key ||
+			null;
+	}
+	const calendar = document.createElement("section");
+	calendar.className = "timeline-calendar";
+	calendar.dataset.calendarMode = projection.weekOnly ? "week" : "month";
+	calendar.setAttribute(
+		"aria-label",
+		projection.weekOnly ? "Calendário da semana atual" : "Calendário do mês atual",
+	);
+	const weekdays = document.createElement("div");
+	weekdays.className = "timeline-calendar-weekdays";
+	for (const label of ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"]) {
+		const weekday = document.createElement("span");
+		weekday.textContent = label;
+		weekdays.append(weekday);
+	}
+	const grid = document.createElement("div");
+	grid.className = "timeline-calendar-grid";
+	for (const day of days) {
+		const button = document.createElement("button");
+		button.type = "button";
+		button.className = "timeline-calendar-day";
+		button.dataset.date = day.key;
+		button.classList.toggle("is-outside-month", !day.inMonth);
+		button.classList.toggle("is-today", day.isToday);
+		button.classList.toggle("has-events", day.occurrences.length > 0);
+		button.setAttribute(
+			"aria-pressed",
+			String(day.key === selectedCalendarDayKey),
+		);
+		button.setAttribute("aria-label", calendarDayLabel(day, day.occurrences.length));
+		button.setAttribute("aria-controls", "timeline-calendar-details");
+		if (day.isToday) button.setAttribute("aria-current", "date");
+		const date = document.createElement("time");
+		date.dateTime = day.key;
+		date.textContent = String(new Date(day.dateAtMs).getDate());
+		button.append(date);
+		const tags = document.createElement("span");
+		tags.className = "timeline-calendar-tags";
+		for (const occurrence of day.occurrences.slice(0, 3)) {
+			const tag = document.createElement("span");
+			tag.className = `timeline-calendar-tag timeline-source-${occurrence.sourceType}`;
+			tag.style.setProperty("--timeline-color", calendarOccurrenceColor(occurrence));
+			tag.title = occurrence.title;
+			tag.textContent = occurrence.title;
+			tags.append(tag);
+		}
+		if (day.occurrences.length > 3) {
+			const more = document.createElement("span");
+			more.className = "timeline-calendar-more";
+			more.textContent = `+${day.occurrences.length - 3}`;
+			tags.append(more);
+		}
+		button.append(tags);
+		button.addEventListener("click", () => {
+			selectedCalendarDayKey = day.key;
+			renderCalendarTimeline(projection, sourceTypes);
+			elements.timelineList
+				.querySelector(`[data-date="${day.key}"]`)
+				?.focus();
+		});
+		grid.append(button);
+	}
+	calendar.append(weekdays, grid);
+	const selectedDay =
+		days.find((day) => day.key === selectedCalendarDayKey) || days[0];
+	elements.timelineList.replaceChildren(
+		calendar,
+		...(selectedDay
+			? [renderCalendarDayDetails(selectedDay, selectedDay.occurrences)]
+			: []),
+	);
+}
+
 function renderTimeline() {
 	if (!elements.timelineList) return;
-	const projection = timelineProjection(new Date());
+	for (const option of elements.timelineViewOptions) {
+		option.setAttribute(
+			"aria-pressed",
+			String(option.dataset.timelineView === timelineView),
+		);
+	}
 	const sourceTypes = new Set(
 		TIMELINE_SOURCE_FILTERS[elements.timelineSourceFilter.value] || [],
 	);
+	if (timelineView === "calendar") {
+		const projection = calendarProjection(new Date());
+		const filtered = projection.occurrences.filter(
+			(occurrence) =>
+				sourceTypes.size === 0 || sourceTypes.has(occurrence.sourceType),
+		);
+		renderedCalendarTodayKey = calendarDateKey(new Date());
+		elements.timelineList.dataset.view = "calendar";
+		elements.timelineList.setAttribute(
+			"aria-label",
+			projection.weekOnly
+				? "Visualização semanal do calendário"
+				: "Visualização mensal do calendário",
+		);
+		elements.timelineRange.hidden = false;
+		elements.timelineRange.textContent = calendarRangeText(projection);
+		elements.timelineEmpty.hidden = filtered.length !== 0;
+		renderTimelineLegend(timelineLanes(filtered));
+		renderCalendarTimeline(projection, sourceTypes);
+		scheduleNotificationScan();
+		return;
+	}
+	renderedCalendarTodayKey = null;
+	elements.timelineList.dataset.view = "linear";
+	elements.timelineList.setAttribute("aria-label", "Visualização cronológica");
+	const projection = timelineProjection(new Date());
 	const filtered = projection.occurrences.filter(
 		(occurrence) => sourceTypes.size === 0 || sourceTypes.has(occurrence.sourceType),
 	);
@@ -3764,22 +4130,51 @@ function normalizeCounters(counters) {
 		.filter(Boolean);
 }
 
+function normalizeArchivedCounter(counter) {
+	if (counter?.type !== "fixed" || typeof counter.archivedAt !== "string") {
+		return null;
+	}
+	const archivedAt = counter.archivedAt.slice(0, 40);
+	if (!archivedAt || Number.isNaN(new Date(archivedAt).getTime())) return null;
+	const normalized = normalizeCounter(counter);
+	return normalized?.type === "fixed"
+		? { ...normalized, archivedAt }
+		: null;
+}
+
+function normalizeArchive(counters) {
+	return (Array.isArray(counters) ? counters : [])
+		.slice(0, MAX_ARCHIVED_COUNTERS)
+		.map(normalizeArchivedCounter)
+		.filter(Boolean);
+}
+
 function applyCounters(counters) {
 	userSettings.customCounters = normalizeCounters(counters);
 	renderCustomCounters(userSettings.customCounters);
 	renderTimeline();
 }
 
+function applyArchive(counters) {
+	archivedCounters = normalizeArchive(counters);
+	renderArchive(archivedCounters);
+	renderCounterList(userSettings.customCounters);
+	updateCustomCounters();
+}
+
 function unsubscribeUserData() {
 	unsubscribeSettings?.();
 	unsubscribeCounters?.();
+	unsubscribeArchive?.();
 	unsubscribeImages?.();
 	unsubscribeProfile?.();
 	unsubscribeSettings = null;
 	unsubscribeCounters = null;
+	unsubscribeArchive = null;
 	unsubscribeImages = null;
 	unsubscribeProfile = null;
 	countersReady = false;
+	archiveReady = false;
 	elements.openCounterModal.disabled = true;
 	setAdminAccess(false);
 	imageLoadVersion += 1;
@@ -3799,18 +4194,23 @@ async function ensureUserData(user) {
 	const profileReference = doc(db, "users", user.uid);
 	const settingsDoc = settingsReference(user.uid);
 	const countersDoc = countersReference(user.uid);
+	const archiveDoc = archiveReference(user.uid);
 	const imagesDoc = imagesReference(user.uid);
-	const [legacySnapshot, settingsSnapshot, countersSnapshot] = await Promise.all([
-		accountDataOperation(`ler users/${user.uid}`, () =>
-			getDoc(profileReference),
-		),
-		accountDataOperation(`ler users/${user.uid}/data/settings`, () =>
-			getDoc(settingsDoc),
-		),
-		accountDataOperation(`ler users/${user.uid}/data/counters`, () =>
-			getDoc(countersDoc),
-		),
-	]);
+	const [legacySnapshot, settingsSnapshot, countersSnapshot, archiveSnapshot] =
+		await Promise.all([
+			accountDataOperation(`ler users/${user.uid}`, () =>
+				getDoc(profileReference),
+			),
+			accountDataOperation(`ler users/${user.uid}/data/settings`, () =>
+				getDoc(settingsDoc),
+			),
+			accountDataOperation(`ler users/${user.uid}/data/counters`, () =>
+				getDoc(countersDoc),
+			),
+			accountDataOperation(`ler users/${user.uid}/data/archive`, () =>
+				getDoc(archiveDoc),
+			),
+		]);
 	let imagesSnapshot = null;
 	let imagesAvailable = true;
 	try {
@@ -3885,6 +4285,15 @@ async function ensureUserData(user) {
 			}),
 		);
 	}
+	if (!archiveSnapshot.exists()) {
+		await accountDataOperation(
+			`criar users/${user.uid}/data/archive`,
+			() => setDoc(archiveDoc, {
+				items: [],
+				updatedAt: serverTimestamp(),
+			}),
+		);
+	}
 	await accountDataOperation(`normalizar users/${user.uid}`, () =>
 		setDoc(profileReference, {
 			displayName: user.displayName || "",
@@ -3918,6 +4327,8 @@ async function subscribeToUserData(user) {
 	setSaveState("Conectando...", true);
 	countersReady = false;
 	setCounterState("Conectando...", "connecting");
+	archiveReady = false;
+	setArchiveState("Conectando...", "connecting");
 	let imagesAvailable;
 	try {
 		imagesAvailable = await ensureUserData(user);
@@ -3925,6 +4336,7 @@ async function subscribeToUserData(user) {
 		console.error("Falha ao preparar dados da conta.", error);
 		setSaveState("Erro de conexão");
 		setCounterState("Erro de conexão", "error");
+		setArchiveState("Erro de conexão", "error");
 		showToast(
 			error.accountOperation
 				? `Permissão negada ao ${error.accountOperation}.`
@@ -3968,6 +4380,20 @@ async function subscribeToUserData(user) {
 			showToast("Não foi possível atualizar os contadores em tempo real.");
 		},
 	);
+	unsubscribeArchive = onSnapshot(
+		archiveReference(user.uid),
+		(snapshot) => {
+			archiveReady = true;
+			applyArchive(snapshot.exists() ? snapshot.data().items : []);
+			setArchiveState("Ao vivo", "live");
+		},
+		(error) => {
+			console.error("Falha ao acompanhar o arquivo de contadores.", error);
+			archiveReady = false;
+			setArchiveState("Erro de conexão", "error");
+			showToast("Não foi possível atualizar o histórico em tempo real.");
+		},
+	);
 	if (!imagesAvailable) {
 		applyImages([], user.uid);
 		return;
@@ -3998,6 +4424,110 @@ async function deleteCounter(counter) {
 	if (!(await saveCounters(nextCounters))) {
 		userSettings.customCounters = previousCounters;
 		renderCustomCounters(previousCounters);
+	}
+}
+
+async function archiveCounter(counter) {
+	if (!currentUser || counter.type !== "fixed" || !archiveReady) return;
+	if (archivedCounters.length >= MAX_ARCHIVED_COUNTERS) {
+		showToast("O histórico atingiu o limite de 100 conquistas.");
+		return;
+	}
+	if (!window.confirm(`Arquivar o contador “${counter.name}”?`)) return;
+	const userId = currentUser.uid;
+	archiveReady = false;
+	setCounterState("Arquivando...", "saving");
+	setArchiveState("Arquivando...", "saving");
+	renderCounterList(userSettings.customCounters);
+	updateCustomCounters();
+	try {
+		await runTransaction(db, async (transaction) => {
+			const countersDoc = countersReference(userId);
+			const archiveDoc = archiveReference(userId);
+			const [countersSnapshot, archiveSnapshot] = await Promise.all([
+				transaction.get(countersDoc),
+				transaction.get(archiveDoc),
+			]);
+			if (!countersSnapshot.exists() || !archiveSnapshot.exists()) {
+				throw new Error("archive-documents-missing");
+			}
+			const active = normalizeCounters(countersSnapshot.data().items);
+			const target = active.find((item) => item.id === counter.id);
+			if (!target || target.type !== "fixed") {
+				throw new Error("counter-no-longer-available");
+			}
+			const archive = normalizeArchive(archiveSnapshot.data().items);
+			if (archive.length >= MAX_ARCHIVED_COUNTERS) {
+				throw new Error("archive-limit-reached");
+			}
+			transaction.set(countersDoc, {
+				items: active.filter((item) => item.id !== target.id),
+				updatedAt: serverTimestamp(),
+			});
+			transaction.set(archiveDoc, {
+				items: [
+					{ ...target, archivedAt: new Date().toISOString() },
+					...archive,
+				],
+				updatedAt: serverTimestamp(),
+			});
+		});
+		showToast("Contador movido para Conquistas.");
+	} catch (error) {
+		console.error("Falha ao arquivar contador.", error);
+		archiveReady = true;
+		setCounterState("Ao vivo", "live");
+		setArchiveState("Ao vivo", "live");
+		renderCounterList(userSettings.customCounters);
+		updateCustomCounters();
+		showToast(
+			error.code === "permission-denied"
+				? "As regras do Firestore precisam ser publicadas para arquivar."
+				: error.message === "archive-limit-reached"
+				? "O histórico atingiu o limite de 100 conquistas."
+				: "Não foi possível arquivar o contador.",
+		);
+	}
+}
+
+async function deleteArchivedCounter(counter) {
+	if (!currentUser || !archiveReady) return;
+	if (
+		!window.confirm(
+			`Excluir “${counter.name}” permanentemente do histórico?`,
+		)
+	) {
+		return;
+	}
+	const userId = currentUser.uid;
+	archiveReady = false;
+	setArchiveState("Excluindo...", "saving");
+	renderArchive(archivedCounters);
+	try {
+		await runTransaction(db, async (transaction) => {
+			const archiveDoc = archiveReference(userId);
+			const snapshot = await transaction.get(archiveDoc);
+			if (!snapshot.exists()) throw new Error("archive-document-missing");
+			const archive = normalizeArchive(snapshot.data().items);
+			if (!archive.some((item) => item.id === counter.id)) {
+				throw new Error("archive-item-no-longer-available");
+			}
+			transaction.set(archiveDoc, {
+				items: archive.filter((item) => item.id !== counter.id),
+				updatedAt: serverTimestamp(),
+			});
+		});
+		showToast("Conquista excluída permanentemente.");
+	} catch (error) {
+		console.error("Falha ao excluir contador arquivado.", error);
+		archiveReady = true;
+		setArchiveState("Ao vivo", "live");
+		renderArchive(archivedCounters);
+		showToast(
+			error.code === "permission-denied"
+				? "As regras do Firestore precisam ser publicadas para alterar o histórico."
+				: "Não foi possível excluir a conquista.",
+		);
 	}
 }
 
@@ -4239,6 +4769,7 @@ for (const form of [elements.adminPaymentForm, elements.adminHolidayForm]) {
 }
 elements.openCounterModal.addEventListener("click", () => openCounterDialog());
 elements.openImageLibrary.addEventListener("click", () => openImageLibrary());
+elements.openArchiveDialog.addEventListener("click", openArchiveDialog);
 elements.chooseCounterImage.addEventListener("click", () =>
 	openImageLibrary(true),
 );
@@ -4259,6 +4790,13 @@ elements.addChecklistItem.addEventListener("click", () => {
 elements.imageLibraryClose.addEventListener("click", closeImageLibrary);
 elements.imageLibraryDialog.addEventListener("click", (event) => {
 	if (event.target === elements.imageLibraryDialog) closeImageLibrary();
+});
+elements.archiveDialogClose.addEventListener("click", closeArchiveDialog);
+elements.archiveDialog.addEventListener("click", (event) => {
+	if (event.target === elements.archiveDialog) closeArchiveDialog();
+});
+elements.archiveDialog.addEventListener("close", () => {
+	elements.authButton.focus();
 });
 elements.imageUploadInput.addEventListener("change", () => {
 	uploadLibraryImage(elements.imageUploadInput.files?.[0]);
@@ -4307,7 +4845,7 @@ elements.signOutButton.addEventListener("click", async () => {
 elements.deleteAccountButton.addEventListener("click", async () => {
 	if (!currentUser) return;
 	const confirmed = window.confirm(
-		"Excluir permanentemente sua conta, configurações, contadores e imagens? Esta ação não pode ser desfeita.",
+		"Excluir permanentemente sua conta, configurações, contadores, histórico e imagens? Esta ação não pode ser desfeita.",
 	);
 	if (!confirmed) return;
 
@@ -4332,6 +4870,7 @@ elements.deleteAccountButton.addEventListener("click", async () => {
 		await Promise.all([
 			deleteDoc(doc(db, "users", userToDelete.uid, "data", "settings")),
 			deleteDoc(doc(db, "users", userToDelete.uid, "data", "counters")),
+			deleteDoc(doc(db, "users", userToDelete.uid, "data", "archive")),
 			deleteDoc(doc(db, "users", userToDelete.uid, "data", "images")),
 		]);
 		await deleteDoc(userRef);
@@ -4392,6 +4931,13 @@ elements.dashboardLayout.addEventListener("change", () => {
 	});
 });
 elements.timelineSourceFilter.addEventListener("change", renderTimeline);
+for (const option of elements.timelineViewOptions) {
+	option.addEventListener("click", () => {
+		timelineView = option.dataset.timelineView === "calendar" ? "calendar" : "linear";
+		selectedCalendarDayKey = null;
+		renderTimeline();
+	});
+}
 elements.notificationsEnabled.addEventListener("change", async () => {
 	elements.notificationMessage.textContent = "";
 	if (!elements.notificationsEnabled.checked) {
@@ -4653,6 +5199,7 @@ onAuthStateChanged(auth, (user) => {
 	activeUploadTask?.cancel();
 	activeUploadTask = null;
 	closeImageLibrary();
+	closeArchiveDialog();
 	closeAdminDialog();
 	closeSidebar();
 	userImages = [];
@@ -4661,6 +5208,8 @@ onAuthStateChanged(auth, (user) => {
 	renderImageLibrary();
 	applySettings({ ...DEFAULTS, ...guestTimeSettings() });
 	applyCounters([]);
+	applyArchive([]);
+	setArchiveState("Conectando...", "connecting");
 });
 
 subscribeToGeneralConfig();
