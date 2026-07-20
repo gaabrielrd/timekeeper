@@ -275,22 +275,7 @@ service cloud.firestore {
     }
 
     function isValidFixedCounter(counter) {
-      return counter.keys().hasOnly([
-          'id',
-          'name',
-          'type',
-          'startAtMs',
-          'endAtMs',
-          'color',
-          'createdAt',
-          'imageId',
-          'imageOpacity',
-          'overlayOpacity',
-          'checklist',
-          'group',
-          'hidden'
-        ])
-        && counter.startAtMs is int
+      return counter.startAtMs is int
         && counter.endAtMs is int
         && counter.startAtMs >= 0
         && counter.endAtMs > counter.startAtMs;
@@ -304,23 +289,7 @@ service cloud.firestore {
     }
 
     function isValidRecurringCounter(counter) {
-      return counter.keys().hasOnly([
-          'id',
-          'name',
-          'type',
-          'startTime',
-          'endTime',
-          'daysOfWeek',
-          'color',
-          'createdAt',
-          'imageId',
-          'imageOpacity',
-          'overlayOpacity',
-          'checklist',
-          'group',
-          'hidden'
-        ])
-        && counter.startTime.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')
+      return counter.startTime.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')
         && counter.endTime.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')
         && hasValidDays(counter.daysOfWeek);
     }

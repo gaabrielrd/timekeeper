@@ -2018,36 +2018,13 @@ async function saveSettings(partialSettings) {
 async function saveCounters(counters) {
 	if (!currentUser) return false;
 	setCounterState("Salvando...", "saving");
-	const sanitized = counters.map((c) => {
-		const clone = { ...c };
-		if (Array.isArray(clone.checklist)) {
-			const items = clone.checklist
-				.map((item) => {
-					if (!item || typeof item !== "object") return null;
-					const text = String(item.text || "").trim().slice(0, 30);
-					if (!text) return null;
-					return {
-						id: String(item.id || createCounterId()).slice(0, 100),
-						text,
-						done: Boolean(item.done),
-					};
-				})
-				.filter(Boolean);
-			if (items.length > 0) {
-				clone.checklist = items;
-			} else {
-				delete clone.checklist;
-			}
-		} else {
-			delete clone.checklist;
-		}
-		return clone;
-	});
+	const sanitized = normalizeCounters(counters);
 	try {
 		await setDoc(
 			countersReference(currentUser.uid),
 			{ items: sanitized.slice(0, getMaxCounters()), updatedAt: serverTimestamp() },
 		);
+		userSettings.customCounters = sanitized;
 		setCounterState("Ao vivo", "live");
 		return true;
 	} catch (error) {
