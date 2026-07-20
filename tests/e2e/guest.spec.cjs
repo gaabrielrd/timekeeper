@@ -28,7 +28,6 @@ test("visitante acompanha contadores e persiste o expediente", async ({ page }) 
 
 test("modo de foco restaura o contador e fecha por Escape sem overflow", async (
 	{ page },
-	testInfo,
 ) => {
 	await page.emulateMedia({ reducedMotion: "reduce" });
 	await page.evaluate(() => {
@@ -37,9 +36,14 @@ test("modo de foco restaura o contador e fecha por Escape sem overflow", async (
 	const focusTrigger = page.getByRole("button", {
 		name: "Focar contador Expediente",
 	});
-	if (testInfo.project.name === "chromium") {
-		await expect(focusTrigger).toBeHidden();
+	const supportsHover = await page.evaluate(() =>
+		matchMedia("(hover: hover) and (pointer: fine)").matches,
+	);
+	if (supportsHover) {
+		await page.mouse.move(0, 0);
+		await expect(focusTrigger).toHaveCSS("opacity", "0");
 		await page.locator('[data-focus-id="standard:workday"]').hover();
+		await expect(focusTrigger).toHaveCSS("opacity", "1");
 	}
 	await expect(focusTrigger).toBeVisible();
 	await focusTrigger.click();
@@ -78,6 +82,37 @@ test("modo de foco restaura o contador e fecha por Escape sem overflow", async (
 			page.evaluate(() => sessionStorage.getItem("timekeeper:focus-counter")),
 		)
 		.toBeNull();
+});
+
+test("modo de foco preserva imagem e opacidades do contador pessoal", async ({
+	page,
+}) => {
+	await page.evaluate(() => {
+		const panel = document.createElement("article");
+		panel.className = "a-panel user-panel";
+		panel.dataset.focusId = "e2e:media";
+		panel.innerHTML = `
+			<div class="counter-card-media" aria-hidden="true">
+				<div class="counter-card-image" style="background-image: url(data:image/gif;base64,R0lGODlhAQABAAAAACw=); opacity: 0.42"></div>
+				<div class="counter-card-overlay" style="opacity: 0.68"></div>
+			</div>
+			<h2 class="panel-title">Contador com imagem</h2>
+			<p class="panel-pre">Ainda faltam</p>
+			<p class="panel-main">2 horas</p>
+			<p class="panel-post">para concluir.</p>
+		`;
+		document.body.append(panel);
+		window.TimekeeperFocus.open("e2e:media");
+	});
+
+	await expect(page.locator("#focus-mode")).toHaveClass(/has-counter-media/);
+	await expect(page.locator("#focus-mode-media")).toBeVisible();
+	await expect(page.locator("#focus-mode-image")).toHaveCSS("opacity", "0.42");
+	await expect(page.locator("#focus-mode-overlay")).toHaveCSS("opacity", "0.68");
+	await expect(page.locator("#focus-mode-image")).toHaveCSS(
+		"background-image",
+		/url\("data:image\/gif;base64,R0lGODlhAQABAAAAACw="\)/,
+	);
 });
 
 test("layout não cria overflow horizontal", async ({ page }, testInfo) => {

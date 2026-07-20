@@ -33,11 +33,11 @@ pessoais e personalização visual.
 
 ### Limite de contadores
 
-O limite é cinco e aparece em três camadas:
+O limite é de 5 contadores para contas gratuitas (Free) e até 15 contadores para contas Premium. O limite aparece em três camadas:
 
-- `MAX_COUNTERS` em `public/src/firebase.js`;
+- `MAX_COUNTERS` (calculado com base em `userTier`) em `public/src/firebase.js`;
 - texto e contador visual em `public/index.html`;
-- limites `.size() <= 5` em `firestore.rules`.
+- função `getMaxCounters(uid)` em `firestore.rules`.
 
 Qualquer alteração exige atualizar e testar as três.
 

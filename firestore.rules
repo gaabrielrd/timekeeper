@@ -154,7 +154,11 @@ service cloud.firestore {
         && (!('notificationSources' in data)
           || hasValidNotificationSources(data.notificationSources))
         && (!('notificationQuietHours' in data)
-          || hasValidNotificationQuietHours(data.notificationQuietHours));
+          || hasValidNotificationQuietHours(data.notificationQuietHours))
+        && (!('counterGroups' in data)
+          || (data.counterGroups is list && data.counterGroups.size() <= 10))
+        && (!('hiddenCounterGroups' in data)
+          || (data.hiddenCounterGroups is list && data.hiddenCounterGroups.size() <= 10));
     }
 
     function hasValidProfileFields(data) {
@@ -163,6 +167,14 @@ service cloud.firestore {
           'email',
           'photoURL',
           'isAdmin',
+          'tier',
+          'stripeCustomerId',
+          'subscriptionStatus',
+          'currentPeriodEnd',
+          'cancelAtPeriodEnd',
+          'aiGenerationsTotal',
+          'aiGenerationsMonth',
+          'aiGenerationsMonthCount',
           'updatedAt',
           'endHour',
           'endMinutes',
@@ -183,6 +195,8 @@ service cloud.firestore {
           'notificationLeadMinutes',
           'notificationSources',
           'notificationQuietHours',
+          'counterGroups',
+          'hiddenCounterGroups',
           'customCounters'
         ])
         && (!('displayName' in data)
@@ -192,6 +206,20 @@ service cloud.firestore {
         && (!('photoURL' in data)
           || (data.photoURL is string && data.photoURL.size() <= 2048))
         && (!('isAdmin' in data) || data.isAdmin is bool)
+        && (!('tier' in data) || data.tier in ['free', 'premium'])
+        && (!('stripeCustomerId' in data)
+          || (data.stripeCustomerId is string && data.stripeCustomerId.size() <= 100))
+        && (!('subscriptionStatus' in data)
+          || (data.subscriptionStatus is string && data.subscriptionStatus.size() <= 50))
+        && (!('currentPeriodEnd' in data)
+          || (data.currentPeriodEnd is string && data.currentPeriodEnd.size() <= 50))
+        && (!('cancelAtPeriodEnd' in data) || data.cancelAtPeriodEnd is bool)
+        && (!('aiGenerationsTotal' in data)
+          || (data.aiGenerationsTotal is int && data.aiGenerationsTotal >= 0))
+        && (!('aiGenerationsMonth' in data)
+          || (data.aiGenerationsMonth is string && data.aiGenerationsMonth.matches('^[0-9]{4}-[0-9]{2}$')))
+        && (!('aiGenerationsMonthCount' in data)
+          || (data.aiGenerationsMonthCount is int && data.aiGenerationsMonthCount >= 0))
         && (!('customCounters' in data)
           || (data.customCounters is list && data.customCounters.size() <= 5))
         && hasValidSettingsFields(data)
@@ -236,6 +264,11 @@ service cloud.firestore {
             && counter.overlayOpacity is number
             && counter.overlayOpacity >= 0
             && counter.overlayOpacity <= 100))
+        && (!('group' in counter)
+          || counter.group == null
+          || (counter.group is string && counter.group.matches('^.{1,30}$')))
+        && (!('hidden' in counter)
+          || counter.hidden is bool)
         && (!('checklist' in counter)
           || counter.checklist == null
           || isValidChecklist(counter.checklist));
@@ -253,7 +286,9 @@ service cloud.firestore {
           'imageId',
           'imageOpacity',
           'overlayOpacity',
-          'checklist'
+          'checklist',
+          'group',
+          'hidden'
         ])
         && counter.startAtMs is int
         && counter.endAtMs is int
@@ -281,7 +316,9 @@ service cloud.firestore {
           'imageId',
           'imageOpacity',
           'overlayOpacity',
-          'checklist'
+          'checklist',
+          'group',
+          'hidden'
         ])
         && counter.startTime.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')
         && counter.endTime.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')
@@ -300,14 +337,34 @@ service cloud.firestore {
       return items.size() <= index ? true : isValidCounter(items[index]);
     }
 
-    function hasValidCounterItems(items) {
+    function isPremiumUser(userId) {
+      return exists(/databases/$(database)/documents/users/$(userId))
+        && ('tier' in get(/databases/$(database)/documents/users/$(userId)).data)
+        && get(/databases/$(database)/documents/users/$(userId)).data.tier == 'premium';
+    }
+
+    function getMaxCounters(userId) {
+      return isPremiumUser(userId) ? 15 : 5;
+    }
+
+    function hasValidCounterItems(userId, items) {
       return items is list
-        && items.size() <= 5
+        && items.size() <= getMaxCounters(userId)
         && isValidCounterAt(items, 0)
         && isValidCounterAt(items, 1)
         && isValidCounterAt(items, 2)
         && isValidCounterAt(items, 3)
-        && isValidCounterAt(items, 4);
+        && isValidCounterAt(items, 4)
+        && isValidCounterAt(items, 5)
+        && isValidCounterAt(items, 6)
+        && isValidCounterAt(items, 7)
+        && isValidCounterAt(items, 8)
+        && isValidCounterAt(items, 9)
+        && isValidCounterAt(items, 10)
+        && isValidCounterAt(items, 11)
+        && isValidCounterAt(items, 12)
+        && isValidCounterAt(items, 13)
+        && isValidCounterAt(items, 14);
     }
 
     function isValidSettingsDocument(data) {
@@ -331,15 +388,17 @@ service cloud.firestore {
           'notificationLeadMinutes',
           'notificationSources',
           'notificationQuietHours',
+          'counterGroups',
+          'hiddenCounterGroups',
           'updatedAt'
         ])
         && hasValidSettingsFields(data)
         && hasValidUpdatedAt(data);
     }
 
-    function isValidCountersDocument(data) {
+    function isValidCountersDocument(userId, data) {
       return data.keys().hasOnly(['items', 'updatedAt'])
-        && hasValidCounterItems(data.items)
+        && hasValidCounterItems(userId, data.items)
         && hasValidUpdatedAt(data);
     }
 
@@ -477,10 +536,28 @@ service cloud.firestore {
       allow read, delete: if isGoogleOwner(userId);
       allow create: if isGoogleOwner(userId)
         && hasValidProfileFields(request.resource.data)
-        && !('isAdmin' in request.resource.data);
+        && !('isAdmin' in request.resource.data)
+        && (!('tier' in request.resource.data) || request.resource.data.tier == 'free')
+        && !('stripeCustomerId' in request.resource.data)
+        && !('subscriptionStatus' in request.resource.data)
+        && !('currentPeriodEnd' in request.resource.data)
+        && !('cancelAtPeriodEnd' in request.resource.data)
+        && !('aiGenerationsTotal' in request.resource.data)
+        && !('aiGenerationsMonth' in request.resource.data)
+        && !('aiGenerationsMonthCount' in request.resource.data);
       allow update: if isGoogleOwner(userId)
         && hasValidProfileFields(request.resource.data)
-        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isAdmin']);
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'isAdmin',
+          'tier',
+          'stripeCustomerId',
+          'subscriptionStatus',
+          'currentPeriodEnd',
+          'cancelAtPeriodEnd',
+          'aiGenerationsTotal',
+          'aiGenerationsMonth',
+          'aiGenerationsMonthCount'
+        ]);
 
       match /data/settings {
         allow read, delete: if isGoogleOwner(userId);
@@ -491,7 +568,7 @@ service cloud.firestore {
       match /data/counters {
         allow read, delete: if isGoogleOwner(userId);
         allow create, update: if isGoogleOwner(userId)
-          && isValidCountersDocument(request.resource.data);
+          && isValidCountersDocument(userId, request.resource.data);
       }
 
       match /data/archive {

@@ -137,10 +137,18 @@ fim e salvar permanecem na mesma linha; nas datas, campo, salvar e cancelar segu
 o mesmo alinhamento. O conteúdo rolável permanece dentro do modal em telas
 pequenas.
 
+Confirmações de ações destrutivas ou irreversíveis usam um `<dialog>` compacto
+compartilhado, com título e ação contextual. Cancelamento por botão ou `Esc` não
+executa a operação, o foco retorna ao acionador e ações destrutivas recebem destaque
+vermelho; arquivar mantém a cor principal por ser uma ação reversível.
+
 Imagens pessoais usam `cover` para ocupar todo o card. A camada de imagem e a
 sobreposição na cor da superfície têm opacidades independentes; conteúdo temporal e
 barra de progresso permanecem acima de ambas. O botão de remoção aparece no hover ou
-foco e fica sempre disponível em telas de toque.
+foco e fica sempre disponível em telas de toque. No Modo de Foco, as mesmas camadas
+e opacidades ocupam a tela inteira atrás do conteúdo. Sem imagem pessoal, a
+superfície mais translúcida e com menos desfoque deixa o fundo animado da conta mais
+presente, mantendo sombras de texto para contraste.
 
 ## Fundos animados
 

@@ -33,6 +33,7 @@ sem interromper a experiência de visitantes ou a sincronização atual pelo Fir
 | 8 | Arquivo & Conquistas | Fases 0 e 2 | Histórico de contadores fixos arquivados manualmente em `/data/archive` |
 | 9 | Calendário Mensal | Fases 0, 2 e 4 | Grade visual de calendário para ocorrências da Timeline |
 | 10 | Clima Dinâmico | Fases 0, 2 e 3 | Efeitos climáticos (chuva, sol, noite) nos cards de previsão |
+| 11 | Plano Premium & Monetização | Fases 0, 2 e 5B | Cotas de IA, 15 contadores, grupos, visibilidade e Stripe Billing |
 
 ## Status da execução
 
@@ -48,6 +49,7 @@ sem interromper a experiência de visitantes ou a sincronização atual pelo Fir
 - [x] Fase 8 — histórico e arquivo de contadores (conquistas)
 - [x] Fase 9 — visualização em grade de calendário
 - [x] Fase 10 — clima dinâmico nos cards
+- [ ] Fase 11 — plano premium & monetização (em desenvolvimento)
 
 As marcações acima representam implementação, documentação e gates automatizados
 concluídos. A validação manual em navegadores e dispositivos reais permanece no
@@ -399,6 +401,23 @@ Aumentar a excelência visual dos widgets de clima, estilizando dinamicamente os
 - Respeita o `prefers-reduced-motion` desativando as micropartículas de forma estrita.
 - Os cards mantêm o contraste de texto e a visibilidade dos controles de edição/exclusão sob qualquer efeito climático.
 - A condição usa somente coordenadas já presentes na URL Forecast7 e não adiciona campos persistidos ou chaves privadas.
+
+## Fase 11 — Plano Premium, Cotas de IA & Monetização
+
+### Objetivo
+Introduzir o Plano Premium no Timekeeper, expandindo capacidades para usuários pagantes (até 15 contadores, 40 imagens IA/mês, agrupamento de contadores e visibilidade individual) mantendo o Plano Free funcional com limites claros (5 contadores, 8 gerações IA vitalícias), sincronizado via Stripe Billing em BRL.
+
+### Escopo MVP
+- **Cotas de IA**: Usuários Free logados possuem 8 gerações de IA no total; usuários Premium possuem 40 gerações por mês com renovação automática.
+- **Limites & Grupos de Contadores**: Usuários Premium podem criar até 15 contadores e organizá-los em grupos/tags customizados.
+- **Visibilidade Individual**: Usuários Premium podem marcar contadores como ocultos da dashboard sem excluí-los.
+- **Stripe Billing Integration**: Integração com Stripe Checkout e Customer Portal em BRL via Cloud Functions Webhook.
+
+### Critérios de aceite
+- O uso básico sem conta continua funcional sem alterações.
+- Regras do Firestore (`firestore.rules`) garantem os limites de 5 e 15 contadores baseados no `tier` validado no servidor.
+- O campo `tier` só pode ser alterado por administradores ou webhooks autenticados do Stripe (Cloud Functions).
+- Todos os testes de regras e contratos continuam passando.
 
 ## Testes transversais
 

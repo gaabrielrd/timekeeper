@@ -101,6 +101,15 @@
 			aria-labelledby="focus-mode-title"
 			inert
 		>
+			<div
+				id="focus-mode-media"
+				class="focus-mode-media"
+				aria-hidden="true"
+				hidden
+			>
+				<div id="focus-mode-image" class="focus-mode-image"></div>
+				<div id="focus-mode-overlay" class="focus-mode-overlay"></div>
+			</div>
 			<button
 				id="focus-mode-close"
 				class="focus-mode-close"
@@ -122,7 +131,11 @@
 					carregando...
 				</p>
 				<p id="focus-mode-post" class="focus-mode-post"></p>
-				<div id="focus-mode-checklist" class="focus-mode-checklist" hidden></div>
+				<div
+					id="focus-mode-checklist"
+					class="focus-mode-checklist"
+					hidden
+				></div>
 				<div
 					id="focus-mode-progress"
 					class="focus-mode-progress"
@@ -234,7 +247,10 @@
 				aria-label="Contadores"
 			>
 				<div id="top-panels">
-					<article class="a-panel featured" data-focus-id="standard:workday">
+					<article
+						class="a-panel featured"
+						data-focus-id="standard:workday"
+					>
 						<div class="panel-top">
 							<span class="panel-index">01</span>
 							<h2 class="panel-title">Expediente</h2>
@@ -245,7 +261,9 @@
 								aria-label="Focar contador Expediente"
 								title="Modo de foco"
 							>
-								<i class="material-icons" aria-hidden="true">center_focus_strong</i>
+								<i class="material-icons" aria-hidden="true"
+									>center_focus_strong</i
+								>
 							</button>
 						</div>
 						<p class="panel-pre">Ainda faltam</p>
@@ -268,7 +286,9 @@
 								aria-label="Focar contador Pagamento"
 								title="Modo de foco"
 							>
-								<i class="material-icons" aria-hidden="true">center_focus_strong</i>
+								<i class="material-icons" aria-hidden="true"
+									>center_focus_strong</i
+								>
 							</button>
 						</div>
 						<p class="panel-pre">Ainda faltam</p>
@@ -289,7 +309,9 @@
 								aria-label="Focar contador Feriado"
 								title="Modo de foco"
 							>
-								<i class="material-icons" aria-hidden="true">center_focus_strong</i>
+								<i class="material-icons" aria-hidden="true"
+									>center_focus_strong</i
+								>
 							</button>
 						</div>
 						<p class="panel-pre">Ainda faltam</p>
@@ -321,6 +343,23 @@
 							data-state="connecting"
 							>Conectando...</span
 						>
+					</div>
+					<div
+						id="counter-filter-toolbar"
+						class="counter-filter-toolbar"
+						hidden
+					>
+						<div
+							id="counter-filter-group-chips"
+							class="counter-group-chips"
+						></div>
+						<label class="toggle-hidden-counters-option">
+							<input
+								id="show-hidden-counters-toggle"
+								type="checkbox"
+							/>
+							<span>Exibir ocultos</span>
+						</label>
 					</div>
 					<div id="custom-panels" class="custom-panels"></div>
 				</div>
@@ -443,14 +482,25 @@
 						<span id="sidebar-email"></span>
 					</div>
 				</div>
-				<button
-					id="sidebar-close"
-					class="icon-button"
-					type="button"
-					aria-label="Fechar menu"
-				>
-					<i class="material-icons">close</i>
-				</button>
+				<div class="sidebar-header-actions">
+					<button
+						id="sidebar-upgrade-icon"
+						class="icon-button upgrade-icon-button"
+						type="button"
+						aria-label="Plano Premium"
+						title="Plano Premium"
+					>
+						<i class="material-icons">star</i>
+					</button>
+					<button
+						id="sidebar-close"
+						class="icon-button"
+						type="button"
+						aria-label="Fechar menu"
+					>
+						<i class="material-icons">close</i>
+					</button>
+				</div>
 			</header>
 
 			<div class="sidebar-scroll">
@@ -501,9 +551,16 @@
 				>
 					<div class="settings-heading">
 						<div>
-							<p class="section-kicker">Até cinco</p>
+							<p id="counter-kicker" class="section-kicker">
+								Até cinco
+							</p>
 							<h2 id="counter-management-title">
 								Meus contadores
+								<span
+									id="user-tier-badge"
+									class="user-tier-badge"
+									>Free</span
+								>
 							</h2>
 						</div>
 						<div class="counter-heading-meta">
@@ -526,7 +583,7 @@
 					></div>
 					<button
 						id="open-counter-modal"
-						class="primary-button"
+						class="primary-button confirmation-dialog-confirm"
 						type="button"
 					>
 						<i class="material-icons" aria-hidden="true">add</i>
@@ -598,8 +655,7 @@
 						aria-label="Ordem e visibilidade das seções"
 					></div>
 					<p class="setting-help">
-						Use as setas para organizar as seções. Os contadores
-						padrão permanecem visíveis.
+						Use as setas para organizar as seções e grupos.
 					</p>
 
 					<div class="appearance-divider"></div>
@@ -625,19 +681,11 @@
 							<select id="background-style" class="settings-select" disabled>
 								<option value="lava">Lava lamp</option>
 								<option value="float">Blobs flutuantes</option>
-								<option value="glass">
-									Correntes de vidro
-								</option>
-								<option value="rings">
-									Anéis cronológicos
-								</option>
+								<option value="glass">Correntes de vidro</option>
+								<option value="rings">Anéis cronológicos</option>
 								<option value="aurora">Aurora orbital</option>
-								<option value="topography">
-									Mapa topográfico
-								</option>
-								<option value="constellation">
-									Constelação dinâmica
-								</option>
+								<option value="topography">Mapa topográfico</option>
+								<option value="constellation">Constelação dinâmica</option>
 							</select>
 						</label>
 						<p id="background-description" class="setting-help">
@@ -958,7 +1006,100 @@
 					></p>
 				</section>
 
+				<section
+					class="settings-section subscription-section"
+					aria-labelledby="subscription-section-title"
+				>
+					<div class="settings-heading">
+						<div>
+							<p class="section-kicker">Plano & Cobrança</p>
+							<h2 id="subscription-section-title">
+								Minha Assinatura
+							</h2>
+						</div>
+						<span
+							id="subscription-tier-badge"
+							class="user-tier-badge tier-free"
+							>Free</span
+						>
+					</div>
+
+					<div
+						id="subscription-details-card"
+						class="subscription-details-card"
+					>
+						<div class="subscription-info-row">
+							<span class="info-label">Status</span>
+							<strong
+								id="subscription-status-text"
+								class="info-value"
+								>Plano Gratuito</strong
+							>
+						</div>
+						<div class="subscription-info-row">
+							<span class="info-label">Valor</span>
+							<strong
+								id="subscription-price-text"
+								class="info-value"
+								>R$ 0,00</strong
+							>
+						</div>
+						<div
+							id="subscription-renews-row"
+							class="subscription-info-row"
+							hidden
+						>
+							<span
+								id="subscription-renews-label"
+								class="info-label"
+								>Renovação</span
+							>
+							<strong
+								id="subscription-renews-date"
+								class="info-value"
+								>-</strong
+							>
+						</div>
+					</div>
+
+					<div
+						id="excess-counters-warning"
+						class="excess-warning-banner"
+						hidden
+					>
+						<i class="material-icons" aria-hidden="true">warning</i>
+						<div>
+							<strong>Recursos pausados</strong>
+							<p id="excess-counters-text">
+								Você possui contadores excedentes. Arquive ou
+								exclua até ter no máximo 5 contadores para
+								reativar edições.
+							</p>
+						</div>
+					</div>
+
+					<button
+						id="manage-subscription-button"
+						class="secondary-button manage-sub-button"
+						type="button"
+						hidden
+					>
+						<i class="material-icons" aria-hidden="true"
+							>credit_card</i
+						>
+						<span>Gerenciar / Cancelar assinatura</span>
+					</button>
+				</section>
+
 				<footer class="sidebar-footer">
+					<button
+						id="open-upgrade-dialog"
+						class="secondary-button upgrade-trigger-button"
+						type="button"
+					>
+						<i class="material-icons" aria-hidden="true">star</i>
+						<span>Obter Plano Premium</span>
+					</button>
 					<button
 						id="open-admin-modal"
 						class="secondary-button admin-entry-button"
@@ -970,6 +1111,7 @@
 						>
 						Configuração geral
 					</button>
+
 					<button
 						id="sign-out-button"
 						class="text-button"
@@ -991,6 +1133,41 @@
 				</footer>
 			</div>
 		</aside>
+
+		<dialog
+			id="confirmation-dialog"
+			class="counter-dialog confirmation-dialog"
+			aria-labelledby="confirmation-dialog-title"
+			aria-describedby="confirmation-dialog-message"
+		>
+			<form method="dialog" class="confirmation-dialog-shell">
+				<div class="confirmation-dialog-icon" aria-hidden="true">
+					<i class="material-icons">help_outline</i>
+				</div>
+				<div>
+					<p class="section-kicker">Confirmação</p>
+					<h2 id="confirmation-dialog-title">Confirmar ação</h2>
+					<p id="confirmation-dialog-message"></p>
+				</div>
+				<div class="modal-actions">
+					<button
+						class="secondary-button"
+						type="submit"
+						value="cancel"
+					>
+						Cancelar
+					</button>
+					<button
+						id="confirmation-dialog-confirm"
+						class="primary-button"
+						type="submit"
+						value="confirm"
+					>
+						Confirmar
+					</button>
+				</div>
+			</form>
+		</dialog>
 
 		<dialog
 			id="counter-dialog"
@@ -1158,6 +1335,18 @@
 						</label>
 					</div>
 				</fieldset>
+				<div class="counter-organization-card">
+					<div class="card-section-header">
+						<span class="card-section-title">Grupo / Categoria</span>
+						<span class="premium-badge-tag">Premium</span>
+					</div>
+					<div id="counter-group-chips" class="counter-group-chips"></div>
+					<input
+						id="counter-group"
+						name="group"
+						type="hidden"
+					/>
+				</div>
 				<label class="field-label">
 					Tipo
 					<select id="counter-type" name="type" class="field-control">
@@ -1261,15 +1450,22 @@
 						>
 					</div>
 				</fieldset>
-				<fieldset id="counter-checklist-fields" class="counter-checklist-fields">
+				<fieldset
+					id="counter-checklist-fields"
+					class="counter-checklist-fields"
+				>
 					<legend>Subtarefas (até 3)</legend>
-					<div id="counter-checklist-inputs" class="counter-checklist-inputs"></div>
+					<div
+						id="counter-checklist-inputs"
+						class="counter-checklist-inputs"
+					></div>
 					<button
 						id="add-checklist-item"
 						class="secondary-button add-checklist-btn"
 						type="button"
 					>
-						<i class="material-icons" aria-hidden="true">add</i> Adicionar subtarefa
+						<i class="material-icons" aria-hidden="true">add</i>
+						Adicionar subtarefa
 					</button>
 				</fieldset>
 				<p
@@ -1294,6 +1490,115 @@
 					</button>
 				</div>
 			</form>
+		</dialog>
+
+		<dialog
+			id="upgrade-dialog"
+			class="counter-dialog upgrade-dialog"
+			aria-labelledby="upgrade-dialog-title"
+		>
+			<div class="modal-heading">
+				<div>
+					<p class="section-kicker premium-kicker">
+						<i class="material-icons" aria-hidden="true">star</i>
+						PLANO PREMIUM
+					</p>
+					<h2 id="upgrade-dialog-title">Evolua seu Timekeeper</h2>
+				</div>
+				<button
+					id="upgrade-dialog-close"
+					class="icon-button"
+					type="button"
+					aria-label="Fechar"
+				>
+					<i class="material-icons">close</i>
+				</button>
+			</div>
+			<div class="upgrade-modal-content">
+				<p class="upgrade-hero-text">
+					Aproveite todo o potencial do Timekeeper com recursos
+					avançados de produtividade, geração com IA e personalização
+					visual.
+				</p>
+				<ul class="premium-benefits-list">
+					<li>
+						<i
+							class="material-icons benefit-icon"
+							aria-hidden="true"
+							>check_circle</i
+						>
+						<span
+							><strong>Até 15 contadores</strong> simultâneos
+							<span class="benefit-subtext"
+								>(vs 5 no plano Free)</span
+							></span
+						>
+					</li>
+					<li>
+						<i
+							class="material-icons benefit-icon"
+							aria-hidden="true"
+							>check_circle</i
+						>
+						<span
+							><strong
+								>40 gerações de imagem com IA por mês</strong
+							>
+							<span class="benefit-subtext"
+								>(renovação mensal)</span
+							></span
+						>
+					</li>
+					<li>
+						<i
+							class="material-icons benefit-icon"
+							aria-hidden="true"
+							>check_circle</i
+						>
+						<span
+							><strong>Organização em Grupos & Categorias</strong>
+							personalizáveis</span
+						>
+					</li>
+					<li>
+						<i
+							class="material-icons benefit-icon"
+							aria-hidden="true"
+							>check_circle</i
+						>
+						<span
+							><strong>Controle de Visibilidade</strong>
+							<span class="benefit-subtext"
+								>(exiba ou oculte contadores
+								individualmente)</span
+							></span
+						>
+					</li>
+					<li>
+						<i
+							class="material-icons benefit-icon"
+							aria-hidden="true"
+							>check_circle</i
+						>
+						<span
+							><strong>Slots de biblioteca expandidos</strong>
+							para imagens de fundo</span
+						>
+					</li>
+				</ul>
+				<div
+					id="stripe-checkout-container"
+					class="stripe-checkout-container"
+				>
+					<button
+						id="start-stripe-checkout"
+						class="primary-button upgrade-action-button"
+						type="button"
+					>
+						<span>Assinar Timekeeper Premium (R$ 4,90/mês)</span>
+					</button>
+				</div>
+			</div>
 		</dialog>
 		<dialog
 			id="archive-dialog"
@@ -1322,7 +1627,9 @@
 						data-state="connecting"
 						>Conectando...</span
 					>
-					<span id="archive-count" class="counter-count">0 / 100</span>
+					<span id="archive-count" class="counter-count"
+						>0 / 100</span
+					>
 				</div>
 				<p id="archive-empty" class="archive-empty">
 					Nenhum contador arquivado.
@@ -1423,6 +1730,42 @@
 					role="tabpanel"
 					hidden
 				>
+					<div
+						id="ai-quota-card"
+						class="ai-quota-card"
+						aria-live="polite"
+					>
+						<div class="ai-quota-header">
+							<div class="ai-quota-title-group">
+								<strong>Cota de geração com IA</strong>
+							</div>
+							<span
+								id="ai-quota-badge"
+								class="user-tier-badge tier-free"
+								>Free</span
+							>
+						</div>
+						<div class="ai-quota-body">
+							<div class="ai-quota-progress-info">
+								<span id="ai-quota-usage-text"
+									>0 de 8 geradas</span
+								>
+								<span id="ai-quota-remaining-text"
+									>8 disponíveis</span
+								>
+							</div>
+							<div class="ai-quota-progress-track">
+								<span
+									id="ai-quota-progress-bar"
+									style="width: 0%"
+								></span>
+							</div>
+							<p id="ai-quota-reset-text" class="ai-quota-hint">
+								Plano Free: limite de 8 imagens no total.
+							</p>
+						</div>
+					</div>
+
 					<div class="ai-generator-form">
 						<div class="ai-field">
 							<span class="ai-label">Ideias rápidas</span>

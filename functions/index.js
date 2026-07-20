@@ -4,7 +4,7 @@ const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestor
 const { getMessaging } = require("firebase-admin/messaging");
 const logger = require("firebase-functions/logger");
 const { setGlobalOptions } = require("firebase-functions/v2");
-const { HttpsError, onCall } = require("firebase-functions/v2/https");
+const { HttpsError, onCall, onRequest } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const {
 	DELIVERY_WINDOW_MS,
@@ -13,6 +13,8 @@ const {
 	notificationJobId,
 	validTimeZone,
 } = require("./src/push-domain.js");
+const { calculateAiQuota } = require("./src/ai-generator.js");
+const { parseStripeEvent, extractSubscriptionDetails } = require("./src/stripe-webhook.js");
 
 initializeApp();
 setGlobalOptions({ region: "southamerica-east1" });
@@ -427,5 +429,224 @@ exports.dispatchPushNotifications = onSchedule(
 			durationMs: Date.now() - startedAt,
 			totals,
 		});
+	},
+);
+
+exports.getAiQuota = onCall(
+	{ invoker: "public", cors: true, maxInstances: 20, timeoutSeconds: 30 },
+	async (request) => {
+		const uid = requireGoogleUser(request);
+		const userSnapshot = await db.doc(`users/${uid}`).get();
+		const userDocData = userSnapshot.exists ? userSnapshot.data() : {};
+		return calculateAiQuota(userDocData);
+	},
+);
+
+exports.stripeWebhook = onRequest(
+	{ invoker: "public", maxInstances: 10, timeoutSeconds: 30 },
+	async (req, res) => {
+		if (req.method !== "POST") {
+			res.status(405).send("Method Not Allowed");
+			return;
+		}
+
+		try {
+			const event = parseStripeEvent(req.body);
+			const details = extractSubscriptionDetails(event);
+
+			if (details && details.uid) {
+				const userRef = db.doc(`users/${details.uid}`);
+				await userRef.set(
+					{
+						tier: details.tier,
+						...(details.customerId ? { stripeCustomerId: details.customerId } : {}),
+						...(details.status ? { subscriptionStatus: details.status } : {}),
+						...(details.currentPeriodEnd ? { currentPeriodEnd: details.currentPeriodEnd } : {}),
+						cancelAtPeriodEnd: details.cancelAtPeriodEnd === true,
+						updatedAt: FieldValue.serverTimestamp(),
+					},
+					{ merge: true },
+				);
+				logger.info(`Assinatura Stripe atualizada para o usuário ${details.uid}: ${details.tier}`);
+			}
+
+			res.status(200).json({ received: true });
+		} catch (error) {
+			logger.error("Erro no processamento do Stripe Webhook", error);
+			res.status(400).send("Webhook Error");
+		}
+	},
+);
+
+exports.createStripeCheckoutSession = onCall(
+	{
+		invoker: "public",
+		secrets: ["STRIPE_SECRET_KEY"],
+		cors: true,
+		maxInstances: 20,
+		timeoutSeconds: 30,
+	},
+	async (request) => {
+		const uid = requireGoogleUser(request);
+		const stripeSecret = process.env.STRIPE_SECRET_KEY || process.env.STRIPE_KEY;
+		if (!stripeSecret) {
+			throw new HttpsError(
+				"failed-precondition",
+				"Chave secreta do Stripe não configurada no ambiente das Functions.",
+			);
+		}
+
+		const origin =
+			request.rawRequest?.headers?.origin || "https://timekeeper.roda.dev";
+		const Stripe = require("stripe");
+		const stripe = Stripe(stripeSecret);
+
+		try {
+			const session = await stripe.checkout.sessions.create({
+				mode: "subscription",
+				payment_method_types: ["card"],
+				client_reference_id: uid,
+				metadata: { uid },
+				subscription_data: {
+					metadata: { uid },
+				},
+				line_items: [
+					{
+						price_data: {
+							currency: "brl",
+							product_data: {
+								name: "Timekeeper Premium",
+								description:
+									"15 contadores, 40 imagens IA/mês, grupos e controle de visibilidade",
+							},
+							unit_amount: 490,
+							recurring: { interval: "month" },
+						},
+						quantity: 1,
+					},
+				],
+				success_url: `${origin}/?stripe_success=true`,
+				cancel_url: `${origin}/?stripe_cancel=true`,
+			});
+
+			return { url: session.url, sessionId: session.id };
+		} catch (error) {
+			logger.error("Erro ao criar sessão do Stripe Checkout", error);
+			throw new HttpsError(
+				"internal",
+				error.message || "Erro ao iniciar a sessão do Stripe Checkout.",
+			);
+		}
+	},
+);
+
+exports.confirmStripeCheckout = onCall(
+	{
+		invoker: "public",
+		secrets: ["STRIPE_SECRET_KEY"],
+		cors: true,
+		maxInstances: 20,
+		timeoutSeconds: 30,
+	},
+	async (request) => {
+		const uid = requireGoogleUser(request);
+		const stripeSecret = process.env.STRIPE_SECRET_KEY || process.env.STRIPE_KEY;
+		if (!stripeSecret) {
+			throw new HttpsError(
+				"failed-precondition",
+				"Chave secreta do Stripe não configurada nas Functions.",
+			);
+		}
+
+		const Stripe = require("stripe");
+		const stripe = Stripe(stripeSecret);
+
+		try {
+			const sessions = await stripe.checkout.sessions.list({
+				limit: 10,
+			});
+
+			const userSession = sessions.data.find(
+				(s) =>
+					(s.client_reference_id === uid || s.metadata?.uid === uid) &&
+					s.payment_status === "paid",
+			);
+
+			if (userSession) {
+				const userRef = db.doc(`users/${uid}`);
+				await userRef.set(
+					{
+						tier: "premium",
+						...(userSession.customer
+							? { stripeCustomerId: userSession.customer }
+							: {}),
+						subscriptionStatus: "active",
+						updatedAt: FieldValue.serverTimestamp(),
+					},
+					{ merge: true },
+				);
+				logger.info(`Assinatura confirmada manualmente via API para o usuário ${uid}`);
+				return { success: true, tier: "premium" };
+			}
+
+			return {
+				success: false,
+				message: "Nenhuma sessão de pagamento confirmada recentemente.",
+			};
+		} catch (error) {
+			logger.error("Erro ao confirmar pagamento no Stripe", error);
+			throw new HttpsError(
+				"internal",
+				error.message || "Erro ao verificar confirmação de pagamento.",
+			);
+		}
+	},
+);
+
+exports.createStripePortalSession = onCall(
+	{
+		invoker: "public",
+		secrets: ["STRIPE_SECRET_KEY"],
+		cors: true,
+		maxInstances: 20,
+		timeoutSeconds: 30,
+	},
+	async (request) => {
+		const uid = requireGoogleUser(request);
+		const stripeSecret = process.env.STRIPE_SECRET_KEY || process.env.STRIPE_KEY;
+		if (!stripeSecret) {
+			throw new HttpsError(
+				"failed-precondition",
+				"Chave secreta do Stripe não configurada no ambiente das Functions.",
+			);
+		}
+
+		const userSnapshot = await db.doc(`users/${uid}`).get();
+		const customerId = userSnapshot.data()?.stripeCustomerId;
+		if (!customerId) {
+			throw new HttpsError(
+				"failed-precondition",
+				"Nenhuma assinatura ativa encontrada para esta conta.",
+			);
+		}
+
+		const origin =
+			request.rawRequest?.headers?.origin || "https://timekeeper.roda.dev";
+		const Stripe = require("stripe");
+		const stripe = Stripe(stripeSecret);
+
+		try {
+			const session = await stripe.billingPortal.sessions.create({
+				customer: customerId,
+				return_url: origin,
+			});
+			return { url: session.url };
+		} catch (error) {
+			logger.error("Erro ao criar sessão do Stripe Portal", error);
+			throw new HttpsError(
+				"internal",
+				error.message || "Erro ao abrir o gerenciador de assinatura do Stripe.",
+			);
+		}
 	},
 );

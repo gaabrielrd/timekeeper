@@ -36,6 +36,9 @@
 			pre: root.document.querySelector("#focus-mode-pre"),
 			main: root.document.querySelector("#focus-mode-main"),
 			post: root.document.querySelector("#focus-mode-post"),
+			media: root.document.querySelector("#focus-mode-media"),
+			image: root.document.querySelector("#focus-mode-image"),
+			overlay: root.document.querySelector("#focus-mode-overlay"),
 			checklist: root.document.querySelector("#focus-mode-checklist"),
 			progress: root.document.querySelector("#focus-mode-progress"),
 		};
@@ -51,6 +54,31 @@
 		target.replaceChildren(
 			...Array.from(source?.childNodes || [], (node) => node.cloneNode(true)),
 		);
+	}
+
+	function syncFocusedMedia(source, elements) {
+		const sourceImage = source.querySelector(
+			".counter-card-media .counter-card-image",
+		);
+		const sourceOverlay = source.querySelector(
+			".counter-card-media .counter-card-overlay",
+		);
+		const hasMedia = Boolean(
+			sourceImage?.style.backgroundImage && sourceOverlay,
+		);
+		elements.view.classList.toggle("has-counter-media", hasMedia);
+		if (!elements.media || !elements.image || !elements.overlay) return;
+		if (!hasMedia) {
+			elements.media.hidden = true;
+			elements.image.style.removeProperty("background-image");
+			elements.image.style.removeProperty("opacity");
+			elements.overlay.style.removeProperty("opacity");
+			return;
+		}
+		elements.image.style.backgroundImage = sourceImage.style.backgroundImage;
+		elements.image.style.opacity = sourceImage.style.opacity;
+		elements.overlay.style.opacity = sourceOverlay.style.opacity;
+		elements.media.hidden = false;
 	}
 
 	function syncFocusedCounter() {
@@ -74,6 +102,7 @@
 		elements.pre.textContent = sourcePre.textContent;
 		cloneChildren(sourceMain, elements.main);
 		elements.post.textContent = sourcePost.textContent;
+		syncFocusedMedia(source, elements);
 		if (sourceChecklist) {
 			cloneChildren(sourceChecklist, elements.checklist);
 			elements.checklist.hidden = false;

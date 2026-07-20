@@ -92,7 +92,9 @@ card selecionado a cada segundo, enquanto os runtimes existentes continuam sendo
 fonte dos cálculos e das barras. A preferência usa `sessionStorage`; durante um
 reload, um `MutationObserver` aguarda o snapshot que recria um contador pessoal e
 abandona com timeout se o ID não existir mais. O fundo ambiente permanece montado,
-evitando reinício das animações na entrada e na saída.
+evitando reinício das animações na entrada e na saída. Em contadores pessoais, a
+sincronização também espelha a imagem e as opacidades de imagem/overlay diretamente
+das camadas renderizadas pelo cliente.
 
 ### Aplicação autenticada — `public/src/firebase.js`
 

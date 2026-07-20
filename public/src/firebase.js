@@ -16,6 +16,7 @@ import {
 	doc,
 	getDoc,
 	getFirestore,
+	initializeFirestore,
 	onSnapshot,
 	runTransaction,
 	serverTimestamp,
@@ -79,6 +80,8 @@ const pushConfigured =
 	pushConfig.recaptchaEnterpriseSiteKey.length > 10;
 let pushFunctions = null;
 let appCheckInitialized = false;
+/** Sentinel used in counterGroups to track the "ungrouped" row position. */
+const OUTROS_KEY = "__outros__";
 
 function ensureAppCheck() {
 	if (appCheckInitialized) return;
@@ -160,6 +163,8 @@ const DEFAULTS = {
 	hiddenDashboardSections: [],
 	weatherWidgets: window.TimekeeperWeather.cloneDefaults(),
 	...window.TimekeeperNotifications.normalizePreferences(),
+	counterGroups: [],
+	hiddenCounterGroups: [],
 	customCounters: [],
 };
 const DASHBOARD_LAYOUTS = new Set(["focus", "balanced", "compact"]);
@@ -234,7 +239,10 @@ function cacheDashboardPreferences(preferences) {
 }
 
 applyDashboardPreferences(cachedDashboardPreferences());
-const MAX_COUNTERS = 5;
+let userTier = "free";
+function getMaxCounters() {
+	return userTier === "premium" ? 15 : 5;
+}
 const MAX_ARCHIVED_COUNTERS = 100;
 const MAX_IMAGES = 10;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -247,7 +255,9 @@ const ALLOWED_IMAGE_TYPES = new Set([
 	"image/avif",
 ]);
 const auth = getAuth(app);
-const db = getFirestore(app);
+const db = initializeFirestore(app, {
+	experimentalAutoDetectLongPolling: true,
+});
 const storage = getStorage(app);
 if (useLocalEmulators) {
 	connectAuthEmulator(auth, "http://127.0.0.1:9099", {
@@ -272,11 +282,21 @@ const elements = {
 	sidebar: document.querySelector("#account-sidebar"),
 	sidebarBackdrop: document.querySelector("#sidebar-backdrop"),
 	sidebarClose: document.querySelector("#sidebar-close"),
+	sidebarUpgradeIcon: document.querySelector("#sidebar-upgrade-icon"),
 	sidebarAvatar: document.querySelector("#sidebar-avatar"),
 	sidebarName: document.querySelector("#sidebar-name"),
 	sidebarEmail: document.querySelector("#sidebar-email"),
 	signOutButton: document.querySelector("#sign-out-button"),
 	deleteAccountButton: document.querySelector("#delete-account-button"),
+	subscriptionTierBadge: document.querySelector("#subscription-tier-badge"),
+	subscriptionStatusText: document.querySelector("#subscription-status-text"),
+	subscriptionPriceText: document.querySelector("#subscription-price-text"),
+	subscriptionRenewsRow: document.querySelector("#subscription-renews-row"),
+	subscriptionRenewsLabel: document.querySelector("#subscription-renews-label"),
+	subscriptionRenewsDate: document.querySelector("#subscription-renews-date"),
+	manageSubscriptionButton: document.querySelector("#manage-subscription-button"),
+	excessCountersWarning: document.querySelector("#excess-counters-warning"),
+	excessCountersText: document.querySelector("#excess-counters-text"),
 	hour: document.querySelector("#config-hora"),
 	minutes: document.querySelector("#config-minutos"),
 	accentPrimary: document.querySelector("#accent-primary"),
@@ -324,6 +344,14 @@ const elements = {
 	timelineViewOptions: document.querySelectorAll("[data-timeline-view]"),
 	constellationCanvas: document.querySelector("#constellation-canvas"),
 	settingsState: document.querySelector("#settings-state"),
+	confirmationDialog: document.querySelector("#confirmation-dialog"),
+	confirmationDialogTitle: document.querySelector("#confirmation-dialog-title"),
+	confirmationDialogMessage: document.querySelector(
+		"#confirmation-dialog-message",
+	),
+	confirmationDialogConfirm: document.querySelector(
+		"#confirmation-dialog-confirm",
+	),
 	counterForm: document.querySelector("#counter-form"),
 	counterDialog: document.querySelector("#counter-dialog"),
 	counterDialogKicker: document.querySelector("#counter-dialog-kicker"),
@@ -351,6 +379,17 @@ const elements = {
 	archiveDialogClose: document.querySelector("#archive-dialog-close"),
 	counterMessage: document.querySelector("#counter-message"),
 	counterSubmit: document.querySelector("#counter-submit"),
+	counterKicker: document.querySelector("#counter-kicker"),
+	userTierBadge: document.querySelector("#user-tier-badge"),
+	openUpgradeDialog: document.querySelector("#open-upgrade-dialog"),
+	upgradeDialog: document.querySelector("#upgrade-dialog"),
+	upgradeDialogClose: document.querySelector("#upgrade-dialog-close"),
+	startStripeCheckout: document.querySelector("#start-stripe-checkout"),
+	counterGroup: document.querySelector("#counter-group"),
+	counterHidden: document.querySelector("#counter-hidden"),
+	counterFilterToolbar: document.querySelector("#counter-filter-toolbar"),
+	counterGroupChips: document.querySelector("#counter-group-chips"),
+	showHiddenCountersToggle: document.querySelector("#show-hidden-counters-toggle"),
 	counterChecklistInputs: document.querySelector("#counter-checklist-inputs"),
 	addChecklistItem: document.querySelector("#add-checklist-item"),
 	counterColorEnabled: document.querySelector("#counter-color-enabled"),
@@ -399,6 +438,14 @@ const elements = {
 	aiGenerateBtn: document.querySelector("#ai-generate-btn"),
 	aiLoading: document.querySelector("#ai-loading"),
 	aiLoadingText: document.querySelector("#ai-loading-text"),
+	aiQuotaBadge: document.querySelector("#ai-quota-badge"),
+	aiQuotaUsageText: document.querySelector("#ai-quota-usage-text"),
+	aiQuotaRemainingText: document.querySelector("#ai-quota-remaining-text"),
+	aiQuotaProgressBar: document.querySelector("#ai-quota-progress-bar"),
+	aiQuotaResetText: document.querySelector("#ai-quota-reset-text"),
+	counterGroupChips: document.querySelector("#counter-group-chips"),
+	counterGroupControls: document.querySelector("#counter-group-controls"),
+	counterGroupOrderList: document.querySelector("#counter-group-order-list"),
 	openAdminModal: document.querySelector("#open-admin-modal"),
 	adminDialog: document.querySelector("#admin-dialog"),
 	adminDialogClose: document.querySelector("#admin-dialog-close"),
@@ -512,6 +559,28 @@ function showToast(message) {
 		() => elements.toast.classList.remove("is-visible"),
 		3200,
 	);
+}
+
+function confirmAction({
+	title = "Confirmar ação",
+	message,
+	confirmLabel = "Confirmar",
+	danger = true,
+}) {
+	elements.confirmationDialogTitle.textContent = title;
+	elements.confirmationDialogMessage.textContent = message;
+	elements.confirmationDialogConfirm.textContent = confirmLabel;
+	elements.confirmationDialogConfirm.classList.toggle("is-danger", danger);
+	elements.confirmationDialog.returnValue = "cancel";
+	elements.confirmationDialog.showModal();
+
+	return new Promise((resolve) => {
+		elements.confirmationDialog.addEventListener(
+			"close",
+			() => resolve(elements.confirmationDialog.returnValue === "confirm"),
+			{ once: true },
+		);
+	});
 }
 
 function setSaveState(label, isSaving = false) {
@@ -1259,7 +1328,14 @@ async function deleteLibraryImage(image) {
 	const suffix = affectedCounters
 		? ` Ela será removida de ${affectedCounters} ${affectedCounters === 1 ? "contador" : "contadores"}.`
 		: "";
-	if (!window.confirm(`Excluir “${image.name}” da biblioteca?${suffix}`)) return;
+	if (
+		!(await confirmAction({
+			title: "Excluir imagem?",
+			message: `“${image.name}” será excluída da biblioteca.${suffix}`,
+			confirmLabel: "Excluir imagem",
+		}))
+	)
+		return;
 
 	const ownerId = currentUser.uid;
 	const nextImages = userImages.filter((item) => item.id !== image.id);
@@ -1719,7 +1795,14 @@ function adminActionButton(icon, label, handler) {
 
 async function deleteAdminDate(item) {
 	if (!currentUserIsAdmin) return;
-	if (!window.confirm(`Remover a data ${formatAdminDate(item.dateTime)}?`)) return;
+	if (
+		!(await confirmAction({
+			title: "Remover data?",
+			message: `${formatAdminDate(item.dateTime)} será removida da configuração geral.`,
+			confirmLabel: "Remover data",
+		}))
+	)
+		return;
 	try {
 		await deleteDoc(generalConfigReference(item.id));
 		showToast("Data removida.");
@@ -1963,7 +2046,7 @@ async function saveCounters(counters) {
 	try {
 		await setDoc(
 			countersReference(currentUser.uid),
-			{ items: sanitized.slice(0, MAX_COUNTERS), updatedAt: serverTimestamp() },
+			{ items: sanitized.slice(0, getMaxCounters()), updatedAt: serverTimestamp() },
 		);
 		setCounterState("Ao vivo", "live");
 		return true;
@@ -2190,6 +2273,23 @@ function formatDateRange(counter) {
 	return `${formatter.format(new Date(counter.startAtMs))} → ${formatter.format(new Date(counter.endAtMs))}`;
 }
 
+async function toggleCounterVisibility(counter) {
+	if (userTier !== "premium") {
+		showToast("🔒 Ocultar contadores da dashboard é um recurso do plano Premium.");
+		return;
+	}
+	const nextCounters = userSettings.customCounters.map((c) =>
+		c.id === counter.id ? { ...c, hidden: !c.hidden } : c,
+	);
+	applyCounters(nextCounters);
+	try {
+		await saveCounters(nextCounters);
+	} catch (error) {
+		console.error("Falha ao atualizar visibilidade do contador.", error);
+		showToast("Não foi possível salvar a visibilidade do contador.");
+	}
+}
+
 function renderCounterList(counters) {
 	elements.counterList.replaceChildren();
 	counters.forEach((counter, index) => {
@@ -2223,7 +2323,19 @@ function renderCounterList(counters) {
 			return button;
 		};
 
+		const isHidden = Boolean(counter.hidden);
+		const toggleVisibility = actionButton(
+			isHidden ? "visibility_off" : "visibility",
+			userTier === "premium"
+				? (isHidden ? `Exibir ${counter.name} na dashboard` : `Ocultar ${counter.name} da dashboard`)
+				: "🔒 Ocultar contador (Recurso Premium)",
+			() => toggleCounterVisibility(counter),
+			userTier !== "premium",
+		);
+		if (isHidden) toggleVisibility.classList.add("counter-is-hidden");
+
 		actions.append(
+			toggleVisibility,
 			actionButton(
 				"arrow_upward",
 				`Mover ${counter.name} para cima`,
@@ -2331,195 +2443,102 @@ function updateCustomVisibility(counters = userSettings.customCounters) {
 }
 
 function renderCustomCounters(counters) {
-	const currentPanels = Array.from(elements.customPanels.children);
-	const currentIds = currentPanels.map((panel) => panel.dataset.id);
-	const newIds = counters.map((c) => c.id);
-
-	const isStructureSame =
-		currentIds.length === newIds.length &&
-		currentIds.every((id, index) => id === newIds[index]);
-
-	if (isStructureSame) {
-		counters.forEach((counter, index) => {
-			const panel = currentPanels[index];
-
-			// 1. Sync title
-			const title = panel.querySelector(".panel-title");
-			if (title && title.textContent !== counter.name) {
-				title.textContent = counter.name;
-			}
-			const focusButton = panel.querySelector(".focus-mode-trigger");
-			focusButton?.setAttribute("aria-label", `Focar contador ${counter.name}`);
-			const archiveButton = panel.querySelector(".counter-card-archive");
-			archiveButton?.setAttribute(
-				"aria-label",
-				`Arquivar contador ${counter.name}`,
-			);
-			if (archiveButton) archiveButton.title = `Arquivar ${counter.name}`;
-
-			// 2. Sync color variables
-			const color = counter.color || userSettings.accentPrimary;
-			panel.style.setProperty("--counter-color", counter.color || "var(--accent)");
-			const pbState = customProgressBars.find((item) => item.counter.id === counter.id);
-			if (pbState) {
-				pbState.counter = counter;
-				if (pbState.bar) {
-					pbState.bar.path.setAttribute("stroke", color);
-				}
-			}
-
-			// 3. Sync media / background images
-			let media = panel.querySelector(".counter-card-media");
-			const imageUrl = counter.imageId ? imageUrls.get(counter.imageId) : "";
-			if (imageUrl) {
-				if (!media) {
-					media = document.createElement("div");
-					media.className = "counter-card-media";
-					media.setAttribute("aria-hidden", "true");
-					const image = document.createElement("div");
-					image.className = "counter-card-image";
-					const overlay = document.createElement("div");
-					overlay.className = "counter-card-overlay";
-					media.append(image, overlay);
-					panel.prepend(media);
-				}
-				const image = media.querySelector(".counter-card-image");
-				if (image) {
-					image.style.backgroundImage = `url(${JSON.stringify(imageUrl)})`;
-					image.style.opacity = String(counter.imageOpacity / 100);
-				}
-				const overlay = media.querySelector(".counter-card-overlay");
-				if (overlay) {
-					overlay.style.opacity = String(counter.overlayOpacity / 100);
-				}
-			} else {
-				if (media) media.remove();
-			}
-
-			// 4. Sync remove image button
-			const top = panel.querySelector(".panel-top");
-			if (top) {
-				let removeImage = top.querySelector(".counter-card-image-remove");
-				if (counter.imageId) {
-					if (!removeImage) {
-						removeImage = document.createElement("button");
-						removeImage.type = "button";
-						removeImage.className = "counter-card-image-remove";
-						removeImage.title = `Remover imagem de ${counter.name}`;
-						removeImage.setAttribute(
-							"aria-label",
-							`Remover imagem do contador ${counter.name}`,
-						);
-						removeImage.innerHTML = '<i class="material-icons" aria-hidden="true">close</i>';
-						removeImage.addEventListener("click", () => removeImageFromCounter(counter));
-						top.append(removeImage);
-					} else {
-						removeImage.title = `Remover imagem de ${counter.name}`;
-						removeImage.setAttribute(
-							"aria-label",
-							`Remover imagem do contador ${counter.name}`,
-						);
-					}
-				} else {
-					if (removeImage) removeImage.remove();
-				}
-			}
-
-			// 5. Sync checklist in place
-			let checklistContainer = panel.querySelector(".counter-card-checklist");
-			const items = Array.isArray(counter.checklist) ? counter.checklist : [];
-
-			if (items.length === 0) {
-				if (checklistContainer) {
-					checklistContainer.remove();
-				}
-			} else {
-				if (!checklistContainer) {
-					checklistContainer = document.createElement("div");
-					checklistContainer.className = "counter-card-checklist";
-					const progress = panel.querySelector(".progress-bar");
-					panel.insertBefore(checklistContainer, progress);
-				}
-
-				const checkboxRows = Array.from(checklistContainer.querySelectorAll(".checklist-item-row"));
-
-				if (checkboxRows.length === items.length) {
-					items.forEach((item, itemIdx) => {
-						const row = checkboxRows[itemIdx];
-						const checkbox = row.querySelector('input[type="checkbox"]');
-						const span = row.querySelector("span");
-
-						if (checkbox && checkbox.checked !== item.done) {
-							checkbox.checked = item.done;
-						}
-						if (span && span.textContent !== item.text) {
-							span.textContent = item.text;
-						}
-					});
-				} else {
-					checklistContainer.replaceChildren();
-					items.forEach((item) => {
-						const label = document.createElement("label");
-						label.className = "checklist-item-row";
-
-						const checkbox = document.createElement("input");
-						checkbox.type = "checkbox";
-						checkbox.checked = item.done;
-						checkbox.addEventListener("change", async () => {
-							checkbox.disabled = true;
-							const isChecked = checkbox.checked;
-							const nextCounters = userSettings.customCounters.map((c) => {
-								if (c.id !== counter.id) return c;
-								const nextChecklist = (c.checklist || []).map((t) => {
-									if (t.id !== item.id) return t;
-									return { ...t, done: isChecked };
-								});
-								return { ...c, checklist: nextChecklist };
-							});
-							if (!(await saveCounters(nextCounters))) {
-								checkbox.checked = !isChecked;
-							}
-							checkbox.disabled = false;
-						});
-
-						const textSpan = document.createElement("span");
-						textSpan.textContent = item.text;
-
-						label.append(checkbox, textSpan);
-						checklistContainer.append(label);
-					});
-				}
-			}
-		});
-
-		renderCounterList(counters);
-		elements.counterCount.textContent = `${counters.length} / ${MAX_COUNTERS}`;
-		const isFull = counters.length >= MAX_COUNTERS;
-		elements.openCounterModal.disabled = isFull || !countersReady;
-		elements.openCounterModalLabel.textContent = isFull
-			? "Limite atingido"
-			: "Novo contador";
-		updateCustomVisibility(counters);
-		if (!editingCounterId) {
-			elements.counterSubmit.disabled = isFull;
-			elements.counterSubmit.textContent = isFull
-				? "Limite atingido"
-				: "Criar contador";
-		}
-		return;
-	}
-
 	customProgressBars.forEach(({ bar }) => bar.destroy());
 	customProgressBars = [];
 	elements.customPanels.replaceChildren();
-	elements.customPanels.dataset.count = String(counters.length);
-	counters.forEach((counter, index) => {
-		elements.customPanels.append(createCustomPanel(counter, index));
-	});
+
+	const visibleCounters = counters.filter(
+		(c) => userTier !== "premium" || !c.hidden,
+	);
+	const rawGroups = userSettings.counterGroups || [];
+	const namedGroups = rawGroups.filter((g) => g !== OUTROS_KEY);
+	// Effective render order: OUTROS_KEY marks position of the ungrouped row.
+	// If not present, ungrouped always comes first (backward compat).
+	const effectiveOrder =
+		namedGroups.length > 0
+			? rawGroups.includes(OUTROS_KEY)
+				? rawGroups
+				: [OUTROS_KEY, ...namedGroups]
+			: [];
+
+	if (effectiveOrder.length > 0 && visibleCounters.length > 0) {
+		const ungrouped = visibleCounters.filter(
+			(c) => !c.group || !namedGroups.includes(c.group),
+		);
+		const groupedMap = new Map(namedGroups.map((g) => [g, []]));
+		visibleCounters.forEach((c) => {
+			if (c.group && groupedMap.has(c.group)) {
+				groupedMap.get(c.group).push(c);
+			}
+		});
+
+		let renderedCount = 0;
+		const hiddenGroups = new Set(userSettings.hiddenCounterGroups || []);
+
+		effectiveOrder.forEach((entry) => {
+			if (userTier === "premium" && hiddenGroups.has(entry)) return;
+			if (entry === OUTROS_KEY) {
+				if (ungrouped.length === 0) return;
+				const groupRow = document.createElement("div");
+				groupRow.className = "custom-counter-group-row";
+				const header = document.createElement("div");
+				header.className = "group-row-header";
+				header.innerHTML = `
+					<div class="group-row-title-wrap">
+						<span class="group-row-badge group-row-default">
+							<i class="material-icons" style="font-size: 14px;" aria-hidden="true">label_outline</i>
+							Outros Contadores
+						</span>
+					</div>
+					<span class="group-row-count">${ungrouped.length} contador(es)</span>
+				`;
+				const grid = document.createElement("div");
+				grid.className = "custom-panels-grid";
+				grid.dataset.count = String(ungrouped.length);
+				ungrouped.forEach((counter) => {
+					grid.append(createCustomPanel(counter, renderedCount++));
+				});
+				groupRow.append(header, grid);
+				elements.customPanels.append(groupRow);
+			} else {
+				const groupCounters = groupedMap.get(entry) || [];
+				if (groupCounters.length === 0) return;
+				const groupRow = document.createElement("div");
+				groupRow.className = "custom-counter-group-row";
+				groupRow.dataset.group = entry;
+				const header = document.createElement("div");
+				header.className = "group-row-header";
+				header.innerHTML = `
+					<div class="group-row-title-wrap">
+						<span class="group-row-badge">
+							<i class="material-icons" style="font-size: 14px;" aria-hidden="true">folder</i>
+							${entry}
+						</span>
+					</div>
+					<span class="group-row-count">${groupCounters.length} contador(es)</span>
+				`;
+				const grid = document.createElement("div");
+				grid.className = "custom-panels-grid";
+				grid.dataset.count = String(groupCounters.length);
+				groupCounters.forEach((counter) => {
+					grid.append(createCustomPanel(counter, renderedCount++));
+				});
+				groupRow.append(header, grid);
+				elements.customPanels.append(groupRow);
+			}
+		});
+
+		elements.customPanels.dataset.count = String(renderedCount);
+	} else {
+		elements.customPanels.dataset.count = String(visibleCounters.length);
+		visibleCounters.forEach((counter, index) => {
+			elements.customPanels.append(createCustomPanel(counter, index));
+		});
+	}
 	updateCustomCounters();
 	renderCounterList(counters);
-	elements.counterCount.textContent = `${counters.length} / ${MAX_COUNTERS}`;
-	const isFull = counters.length >= MAX_COUNTERS;
+	elements.counterCount.textContent = `${counters.length} / ${getMaxCounters()}`;
+	const isFull = counters.length >= getMaxCounters();
 	elements.openCounterModal.disabled = isFull || !countersReady;
 	elements.openCounterModalLabel.textContent = isFull
 		? "Limite atingido"
@@ -2569,6 +2588,68 @@ async function persistDashboardPreferences(preferences) {
 	}
 }
 
+async function toggleGroupVisibility(groupName) {
+	const hidden = new Set(userSettings.hiddenCounterGroups || []);
+	if (hidden.has(groupName)) {
+		hidden.delete(groupName);
+	} else {
+		hidden.add(groupName);
+	}
+	const nextHidden = [...hidden];
+	userSettings.hiddenCounterGroups = nextHidden;
+	renderDashboardSectionControls();
+	renderCustomCounters(userSettings.customCounters);
+	await saveSettings({ hiddenCounterGroups: nextHidden });
+}
+
+function buildGroupOrderSubmenu(groups) {
+	const effectiveOrder = groups.includes(OUTROS_KEY)
+		? groups
+		: [OUTROS_KEY, ...groups.filter((g) => g !== OUTROS_KEY)];
+	const hiddenSet = new Set(userSettings.hiddenCounterGroups || []);
+	const submenu = document.createElement("div");
+	submenu.className = "group-order-submenu";
+	effectiveOrder.forEach((entry, index) => {
+		const item = document.createElement("div");
+		item.className = "group-order-item";
+
+		const toggle = document.createElement("label");
+		toggle.className = "dashboard-section-toggle";
+
+		const checkbox = document.createElement("input");
+		checkbox.type = "checkbox";
+		checkbox.checked = !hiddenSet.has(entry);
+		const displayTitle = entry === OUTROS_KEY ? "Outros (Não agrupados)" : entry;
+		checkbox.setAttribute("aria-label", `Exibir grupo ${displayTitle}`);
+		checkbox.addEventListener("change", () => toggleGroupVisibility(entry));
+
+		const label = document.createElement("span");
+		label.className = "group-order-item-label";
+		if (entry === OUTROS_KEY) {
+			label.innerHTML =
+				'<i class="material-icons" style="font-size:14px" aria-hidden="true">label_outline</i> Outros (Não agrupados)';
+		} else {
+			label.innerHTML = `<i class="material-icons" style="font-size:14px" aria-hidden="true">folder</i> ${entry}`;
+		}
+		toggle.append(checkbox, label);
+
+		const acts = document.createElement("div");
+		acts.className = "dashboard-section-actions";
+		const upBtn = iconButton("arrow_upward", `Mover ${entry === OUTROS_KEY ? "Outros" : entry} para cima`, () =>
+			reorderCounterGroup(index, -1),
+		);
+		upBtn.disabled = index === 0;
+		const downBtn = iconButton("arrow_downward", `Mover ${entry === OUTROS_KEY ? "Outros" : entry} para baixo`, () =>
+			reorderCounterGroup(index, 1),
+		);
+		downBtn.disabled = index === effectiveOrder.length - 1;
+		acts.append(upBtn, downBtn);
+		item.append(toggle, acts);
+		submenu.append(item);
+	});
+	return submenu;
+}
+
 function renderDashboardSectionControls(data = userSettings) {
 	if (!elements.dashboardLayout || !elements.dashboardSectionControls) return;
 	const preferences = normalizeDashboardPreferences(data);
@@ -2581,6 +2662,10 @@ function renderDashboardSectionControls(data = userSettings) {
 		const row = document.createElement("div");
 		row.className = "dashboard-section-control";
 		row.dataset.dashboardSectionControl = sectionId;
+
+		// Inner line: toggle + arrows
+		const mainLine = document.createElement("div");
+		mainLine.className = "dashboard-section-main-line";
 
 		const toggle = document.createElement("label");
 		toggle.className = "dashboard-section-toggle";
@@ -2629,7 +2714,19 @@ function renderDashboardSectionControls(data = userSettings) {
 			button.disabled = !availableOrder[index + direction];
 			actions.append(button);
 		}
-		row.append(toggle, actions);
+		mainLine.append(toggle, actions);
+		row.append(mainLine);
+
+		// Group order submenu nested under "Meus contadores"
+		if (sectionId === "custom" && userTier === "premium") {
+			const namedGroups = (userSettings.counterGroups || []).filter(
+				(g) => g !== OUTROS_KEY,
+			);
+			if (namedGroups.length > 0) {
+				row.append(buildGroupOrderSubmenu(userSettings.counterGroups || []));
+			}
+		}
+
 		elements.dashboardSectionControls.append(row);
 	});
 }
@@ -2725,8 +2822,15 @@ function renderWeatherWidgetList() {
 			move.disabled = index + direction < 0 || index + direction >= widgets.length;
 			actions.append(move);
 		}
-		const remove = iconButton("delete", `Remover ${widget.label1}`, () => {
-			if (!window.confirm(`Remover a previsão de ${widget.label1}?`)) return;
+		const remove = iconButton("delete", `Remover ${widget.label1}`, async () => {
+			if (
+				!(await confirmAction({
+					title: "Remover previsão?",
+					message: `O widget de ${widget.label1} será removido da dashboard.`,
+					confirmLabel: "Remover previsão",
+				}))
+			)
+				return;
 			persistWeatherWidgets(widgets.filter((item) => item.id !== widget.id));
 		});
 		remove.classList.add("delete-counter");
@@ -3999,6 +4103,14 @@ function applySettings(data) {
 		...data,
 		customCounters: currentCounters,
 	};
+	userSettings.counterGroups = (Array.isArray(data.counterGroups) ? data.counterGroups : [])
+		.map((g) => String(g || "").trim().slice(0, 30))
+		.filter(Boolean)
+		.slice(0, 10);
+	userSettings.hiddenCounterGroups = (Array.isArray(data.hiddenCounterGroups) ? data.hiddenCounterGroups : [])
+		.map((g) => String(g || "").trim().slice(0, 30))
+		.filter(Boolean)
+		.slice(0, 10);
 	userSettings.weatherWidgets = window.TimekeeperWeather.normalizeWidgets(
 		data.weatherWidgets,
 	);
@@ -4012,6 +4124,7 @@ function applySettings(data) {
 	Object.assign(userSettings, applyDashboardPreferences(userSettings));
 	if (currentUser) cacheDashboardPreferences(userSettings);
 	renderDashboardSectionControls(userSettings);
+
 	renderWeatherWidgetList();
 	renderWeatherWidgets();
 	syncNotificationUi();
@@ -4076,6 +4189,12 @@ function normalizeCounter(counter) {
 			normalized.checklist = items;
 		}
 	}
+	if (typeof counter.group === "string" && counter.group.trim()) {
+		normalized.group = counter.group.trim().slice(0, 30);
+	}
+	if (counter.hidden === true) {
+		normalized.hidden = true;
+	}
 	if (type === "recurring") {
 		const startTime = String(counter.startTime || "");
 		const endTime = String(counter.endTime || "");
@@ -4125,7 +4244,7 @@ function normalizeCounter(counter) {
 
 function normalizeCounters(counters) {
 	return (Array.isArray(counters) ? counters : [])
-		.slice(0, MAX_COUNTERS)
+		.slice(0, getMaxCounters())
 		.map(normalizeCounter)
 		.filter(Boolean);
 }
@@ -4153,6 +4272,7 @@ function applyCounters(counters) {
 	userSettings.customCounters = normalizeCounters(counters);
 	renderCustomCounters(userSettings.customCounters);
 	renderTimeline();
+	updateDowngradeRestrictions();
 }
 
 function applyArchive(counters) {
@@ -4175,6 +4295,9 @@ function unsubscribeUserData() {
 	unsubscribeProfile = null;
 	countersReady = false;
 	archiveReady = false;
+	userTier = "free";
+	if (elements.openUpgradeDialog) elements.openUpgradeDialog.hidden = false;
+	if (elements.sidebarUpgradeIcon) elements.sidebarUpgradeIcon.hidden = false;
 	elements.openCounterModal.disabled = true;
 	setAdminAccess(false);
 	imageLoadVersion += 1;
@@ -4271,6 +4394,8 @@ async function ensureUserData(user) {
 				...dashboardPreferences,
 				weatherWidgets,
 				...notificationPreferences,
+				counterGroups: Array.isArray(legacy.counterGroups) ? legacy.counterGroups : [],
+				hiddenCounterGroups: Array.isArray(legacy.hiddenCounterGroups) ? legacy.hiddenCounterGroups : [],
 				updatedAt: serverTimestamp(),
 				});
 			},
@@ -4295,15 +4420,19 @@ async function ensureUserData(user) {
 		);
 	}
 	await accountDataOperation(`normalizar users/${user.uid}`, () =>
-		setDoc(profileReference, {
-			displayName: user.displayName || "",
-			email: user.email || "",
-			photoURL: user.photoURL || "",
-			...(typeof legacy.isAdmin === "boolean"
-				? { isAdmin: legacy.isAdmin }
-				: {}),
-			updatedAt: serverTimestamp(),
-		}),
+		setDoc(
+			profileReference,
+			{
+				displayName: user.displayName || "",
+				email: user.email || "",
+				photoURL: user.photoURL || "",
+				...(typeof legacy.isAdmin === "boolean"
+					? { isAdmin: legacy.isAdmin }
+					: {}),
+				updatedAt: serverTimestamp(),
+			},
+			{ merge: true },
+		),
 	);
 	if (imagesAvailable && !imagesSnapshot.exists()) {
 		try {
@@ -4348,9 +4477,70 @@ async function subscribeToUserData(user) {
 	setImageLibraryAvailability(imagesAvailable);
 	unsubscribeProfile = onSnapshot(
 		doc(db, "users", user.uid),
-		(snapshot) => setAdminAccess(snapshot.data()?.isAdmin === true),
+		(snapshot) => {
+			const data = snapshot.data() || {};
+			setAdminAccess(snapshot.data()?.isAdmin === true);
+			userTier = data.tier === "premium" ? "premium" : "free";
+			const isPremium = userTier === "premium";
+			const cancelAtPeriodEnd = data.cancelAtPeriodEnd === true;
+			const renewsAt = data.currentPeriodEnd ? new Date(data.currentPeriodEnd) : null;
+			const formattedDate =
+				renewsAt && !Number.isNaN(renewsAt.getTime())
+					? renewsAt.toLocaleDateString("pt-BR")
+					: null;
+
+			if (elements.userTierBadge) {
+				elements.userTierBadge.textContent = isPremium ? "★ Premium" : "Free";
+				elements.userTierBadge.className = `user-tier-badge ${isPremium ? "tier-premium" : "tier-free"}`;
+			}
+			if (elements.subscriptionTierBadge) {
+				elements.subscriptionTierBadge.textContent = isPremium ? "★ Premium" : "Free";
+				elements.subscriptionTierBadge.className = `user-tier-badge ${isPremium ? "tier-premium" : "tier-free"}`;
+			}
+			if (elements.subscriptionStatusText) {
+				if (isPremium) {
+					elements.subscriptionStatusText.textContent = cancelAtPeriodEnd
+						? `Cancelada (ativa até ${formattedDate || "fim do período"})`
+						: "Assinatura Ativa";
+				} else {
+					elements.subscriptionStatusText.textContent = "Plano Gratuito";
+				}
+			}
+			if (elements.subscriptionPriceText) {
+				elements.subscriptionPriceText.textContent = isPremium ? "R$ 4,90/mês" : "R$ 0,00";
+			}
+			if (elements.subscriptionRenewsRow) {
+				if (isPremium && formattedDate) {
+					elements.subscriptionRenewsRow.hidden = false;
+					if (elements.subscriptionRenewsLabel) {
+						elements.subscriptionRenewsLabel.textContent = cancelAtPeriodEnd
+							? "Expira em"
+							: "Próxima renovação";
+					}
+					if (elements.subscriptionRenewsDate) {
+						elements.subscriptionRenewsDate.textContent = formattedDate;
+					}
+				} else {
+					elements.subscriptionRenewsRow.hidden = true;
+				}
+			}
+			if (elements.manageSubscriptionButton) {
+				elements.manageSubscriptionButton.hidden = !data.stripeCustomerId;
+			}
+			if (elements.counterKicker) {
+				elements.counterKicker.textContent = isPremium ? "Até 15 contadores" : "Até cinco";
+			}
+			if (elements.openUpgradeDialog) {
+				elements.openUpgradeDialog.hidden = isPremium;
+			}
+			if (elements.sidebarUpgradeIcon) {
+				elements.sidebarUpgradeIcon.hidden = isPremium;
+			}
+			renderAiQuota(data);
+			updateDowngradeRestrictions();
+		},
 		(error) => {
-			console.error("Falha ao acompanhar perfil administrativo.", error);
+			console.error("Falha ao acompanhar perfil do usuário.", error);
 			setAdminAccess(false);
 		},
 	);
@@ -4414,7 +4604,14 @@ async function subscribeToUserData(user) {
 }
 
 async function deleteCounter(counter) {
-	if (!window.confirm(`Excluir o contador “${counter.name}”?`)) return;
+	if (
+		!(await confirmAction({
+			title: "Excluir contador?",
+			message: `“${counter.name}” será excluído dos seus contadores.`,
+			confirmLabel: "Excluir contador",
+		}))
+	)
+		return;
 	const previousCounters = userSettings.customCounters;
 	const nextCounters = userSettings.customCounters.filter(
 		(item) => item.id !== counter.id,
@@ -4433,7 +4630,15 @@ async function archiveCounter(counter) {
 		showToast("O histórico atingiu o limite de 100 conquistas.");
 		return;
 	}
-	if (!window.confirm(`Arquivar o contador “${counter.name}”?`)) return;
+	if (
+		!(await confirmAction({
+			title: "Arquivar contador?",
+			message: `“${counter.name}” será movido para Conquistas.`,
+			confirmLabel: "Arquivar contador",
+			danger: false,
+		}))
+	)
+		return;
 	const userId = currentUser.uid;
 	archiveReady = false;
 	setCounterState("Arquivando...", "saving");
@@ -4493,12 +4698,13 @@ async function archiveCounter(counter) {
 async function deleteArchivedCounter(counter) {
 	if (!currentUser || !archiveReady) return;
 	if (
-		!window.confirm(
-			`Excluir “${counter.name}” permanentemente do histórico?`,
-		)
-	) {
+		!(await confirmAction({
+			title: "Excluir conquista?",
+			message: `“${counter.name}” será excluído permanentemente do histórico.`,
+			confirmLabel: "Excluir conquista",
+		}))
+	)
 		return;
-	}
 	const userId = currentUser.uid;
 	archiveReady = false;
 	setArchiveState("Excluindo...", "saving");
@@ -4639,6 +4845,204 @@ function setCounterType(type) {
 	elements.recurringScheduleFields.disabled = !isRecurring;
 }
 
+function renderGroupChips(selectedGroup = "") {
+	const container = document.querySelector("#counter-group-chips") || elements.counterGroupChips;
+	if (!container) return;
+	container.replaceChildren();
+
+	const hiddenInput = document.querySelector("#counter-group") || elements.counterGroup;
+	if (hiddenInput) hiddenInput.value = selectedGroup;
+
+	const isPremium = userTier === "premium";
+
+	const noneChip = document.createElement("button");
+	noneChip.type = "button";
+	noneChip.className = `counter-group-chip ${!selectedGroup ? "active" : ""}`;
+	noneChip.textContent = "Nenhum";
+	noneChip.addEventListener("click", () => {
+		if (hiddenInput) hiddenInput.value = "";
+		renderGroupChips("");
+	});
+	container.append(noneChip);
+
+	const groups = (userSettings.counterGroups || []).filter((g) => g !== OUTROS_KEY);
+	groups.forEach((groupName, index) => {
+		const chip = document.createElement("div");
+		chip.className = `counter-group-chip ${selectedGroup === groupName ? "active" : ""}`;
+
+		if (isPremium && groups.length > 1) {
+			const moveLeft = document.createElement("button");
+			moveLeft.type = "button";
+			moveLeft.className = "counter-group-chip-btn";
+			moveLeft.disabled = index === 0;
+			moveLeft.title = `Mover "${groupName}" para a esquerda`;
+			moveLeft.innerHTML = '<i class="material-icons" style="font-size: 14px;">chevron_left</i>';
+			moveLeft.addEventListener("click", (e) => {
+				e.stopPropagation();
+				reorderCounterGroup(index, -1, selectedGroup);
+			});
+			chip.append(moveLeft);
+		}
+
+		const chipText = document.createElement("span");
+		chipText.textContent = groupName;
+		chipText.addEventListener("click", () => {
+			if (!isPremium) {
+				showToast("🔒 Grupos de contadores são um recurso Premium.");
+				return;
+			}
+			if (hiddenInput) hiddenInput.value = groupName;
+			renderGroupChips(groupName);
+		});
+		chip.append(chipText);
+
+		if (isPremium) {
+			if (groups.length > 1) {
+				const moveRight = document.createElement("button");
+				moveRight.type = "button";
+				moveRight.className = "counter-group-chip-btn";
+				moveRight.disabled = index === groups.length - 1;
+				moveRight.title = `Mover "${groupName}" para a direita`;
+				moveRight.innerHTML = '<i class="material-icons" style="font-size: 14px;">chevron_right</i>';
+				moveRight.addEventListener("click", (e) => {
+					e.stopPropagation();
+					reorderCounterGroup(index, 1, selectedGroup);
+				});
+				chip.append(moveRight);
+			}
+
+			const deleteBtn = document.createElement("button");
+			deleteBtn.type = "button";
+			deleteBtn.className = "counter-group-chip-delete";
+			deleteBtn.title = `Excluir grupo "${groupName}"`;
+			deleteBtn.setAttribute("aria-label", `Excluir grupo ${groupName}`);
+			deleteBtn.innerHTML = '<i class="material-icons" style="font-size: 14px;">close</i>';
+			deleteBtn.addEventListener("click", (e) => {
+				e.stopPropagation();
+				deleteCounterGroup(groupName);
+			});
+			chip.append(deleteBtn);
+		}
+
+		container.append(chip);
+	});
+
+	if (groups.length < 3 && isPremium) {
+		const addBtn = document.createElement("button");
+		addBtn.type = "button";
+		addBtn.className = "counter-group-add-btn";
+		addBtn.innerHTML = '<i class="material-icons" style="font-size: 14px;">add</i> Criar grupo';
+		addBtn.addEventListener("click", () => promptCreateCounterGroup());
+		container.append(addBtn);
+	}
+}
+
+async function promptCreateCounterGroup() {
+	if (userTier !== "premium") {
+		showToast("🔒 Criar grupos de contadores é um recurso do plano Premium.");
+		return;
+	}
+	const currentGroups = userSettings.counterGroups || [];
+	const namedGroups = currentGroups.filter((g) => g !== OUTROS_KEY);
+	if (namedGroups.length >= 3) {
+		showToast("Você pode criar no máximo 3 grupos no plano Premium.");
+		return;
+	}
+	const newName = prompt("Nome do novo grupo (até 30 caracteres):");
+	if (!newName) return;
+	const trimmed = newName.trim().slice(0, 30);
+	if (!trimmed) return;
+	if (namedGroups.includes(trimmed)) {
+		showToast("Este grupo já existe.");
+		return;
+	}
+	// Auto-insert OUTROS_KEY at start if not present (first group creation)
+	const nextGroups = currentGroups.includes(OUTROS_KEY)
+		? [...currentGroups, trimmed]
+		: [OUTROS_KEY, ...namedGroups, trimmed];
+	userSettings.counterGroups = nextGroups;
+	renderGroupChips(trimmed);
+	renderDashboardSectionControls();
+	renderCustomCounters(userSettings.customCounters);
+	await saveSettings({ counterGroups: nextGroups });
+}
+
+async function deleteCounterGroup(groupName) {
+	const currentGroups = userSettings.counterGroups || [];
+	let nextGroups = currentGroups.filter((g) => g !== groupName);
+	// If no named groups remain, remove OUTROS_KEY too (ordering is meaningless)
+	const remainingNamed = nextGroups.filter((g) => g !== OUTROS_KEY);
+	if (remainingNamed.length === 0) nextGroups = [];
+	userSettings.counterGroups = nextGroups;
+	const selected =
+		elements.counterGroup?.value === groupName ? "" : elements.counterGroup?.value || "";
+	renderGroupChips(selected);
+	renderDashboardSectionControls();
+	renderCustomCounters(userSettings.customCounters);
+	await saveSettings({ counterGroups: nextGroups });
+}
+
+function renderCounterGroupControls() {
+	if (!elements.counterGroupControls || !elements.counterGroupOrderList) return;
+	const groups = (userSettings.counterGroups || []).filter((g) => g !== OUTROS_KEY);
+	const isPremium = userTier === "premium";
+	elements.counterGroupControls.hidden = !isPremium || groups.length === 0;
+	if (!isPremium || groups.length === 0) return;
+
+	elements.counterGroupOrderList.replaceChildren();
+	groups.forEach((groupName, index) => {
+		const row = document.createElement("div");
+		row.className = "dashboard-section-item";
+
+		const copy = document.createElement("div");
+		copy.className = "dashboard-section-copy";
+		const title = document.createElement("strong");
+		title.textContent = groupName;
+		copy.append(title);
+
+		const actions = document.createElement("div");
+		actions.className = "dashboard-section-actions";
+
+		const upBtn = document.createElement("button");
+		upBtn.className = "counter-action";
+		upBtn.type = "button";
+		upBtn.disabled = index === 0;
+		upBtn.title = `Mover grupo ${groupName} para cima`;
+		upBtn.innerHTML = '<i class="material-icons" aria-hidden="true">arrow_upward</i>';
+		upBtn.addEventListener("click", () => reorderCounterGroup(index, -1));
+
+		const downBtn = document.createElement("button");
+		downBtn.className = "counter-action";
+		downBtn.type = "button";
+		downBtn.disabled = index === groups.length - 1;
+		downBtn.title = `Mover grupo ${groupName} para baixo`;
+		downBtn.innerHTML = '<i class="material-icons" aria-hidden="true">arrow_downward</i>';
+		downBtn.addEventListener("click", () => reorderCounterGroup(index, 1));
+
+		actions.append(upBtn, downBtn);
+		row.append(copy, actions);
+		elements.counterGroupOrderList.append(row);
+	});
+}
+
+async function reorderCounterGroup(index, delta, preserveSelection = "") {
+	const effectiveOrder = (userSettings.counterGroups || []).includes(OUTROS_KEY)
+		? [...(userSettings.counterGroups || [])]
+		: [OUTROS_KEY, ...(userSettings.counterGroups || []).filter((g) => g !== OUTROS_KEY)];
+	const targetIndex = index + delta;
+	if (targetIndex < 0 || targetIndex >= effectiveOrder.length) return;
+
+	const [moved] = effectiveOrder.splice(index, 1);
+	effectiveOrder.splice(targetIndex, 0, moved);
+	userSettings.counterGroups = effectiveOrder;
+
+	const selectedGroup = preserveSelection || elements.counterGroup?.value || "";
+	renderGroupChips(selectedGroup);
+	renderDashboardSectionControls();
+	renderCustomCounters(userSettings.customCounters);
+	await saveSettings({ counterGroups: effectiveOrder });
+}
+
 function openCounterDialog(counter = null) {
 	editingCounterId = counter?.id || null;
 	elements.counterForm.reset();
@@ -4683,11 +5087,153 @@ function openCounterDialog(counter = null) {
 	elements.counterOverlayOpacity.value = String(counter?.overlayOpacity ?? 55);
 	syncCounterOpacityOutputs();
 	setSelectedCounterImage(counter?.imageId || null);
+	renderGroupChips(counter?.group || "");
+	if (elements.counterHidden) {
+		elements.counterHidden.checked = Boolean(counter?.hidden);
+		elements.counterHidden.disabled = userTier !== "premium";
+	}
 	currentChecklist = counter?.checklist ? JSON.parse(JSON.stringify(counter.checklist)) : [];
 	renderChecklistInputs();
 	elements.counterDialog.showModal();
 	elements.counterForm.elements.name.focus();
 }
+
+function renderAiQuota(userData = {}) {
+	const tier = userData.tier === "premium" ? "premium" : "free";
+	const isPremium = tier === "premium";
+	const now = new Date();
+	const currentMonth = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+
+	let used = 0;
+	let limit = 8;
+	let hint = "Plano Free: limite de 8 imagens no total.";
+
+	if (isPremium) {
+		limit = 40;
+		const storedMonth = typeof userData.aiGenerationsMonth === "string" ? userData.aiGenerationsMonth : "";
+		used = storedMonth === currentMonth && typeof userData.aiGenerationsMonthCount === "number"
+			? userData.aiGenerationsMonthCount
+			: 0;
+		hint = "Plano Premium: 40 gerações/mês com renovação automática no 1º dia de cada mês.";
+	} else {
+		used = typeof userData.aiGenerationsTotal === "number" ? userData.aiGenerationsTotal : 0;
+		if (used >= limit) {
+			hint = "Limite vitalício do plano Free atingido. Assine o Premium para ter 40/mês!";
+		}
+	}
+
+	const remaining = Math.max(0, limit - used);
+	const percentage = Math.min(100, Math.round((used / limit) * 100));
+
+	if (elements.aiQuotaBadge) {
+		elements.aiQuotaBadge.textContent = isPremium ? "★ Premium" : "Free";
+		elements.aiQuotaBadge.className = `user-tier-badge ${isPremium ? "tier-premium" : "tier-free"}`;
+	}
+	if (elements.aiQuotaUsageText) {
+		elements.aiQuotaUsageText.textContent = `${used} de ${limit} geradas`;
+	}
+	if (elements.aiQuotaRemainingText) {
+		elements.aiQuotaRemainingText.textContent = `${remaining} disponível(is)`;
+	}
+	if (elements.aiQuotaProgressBar) {
+		elements.aiQuotaProgressBar.style.width = `${percentage}%`;
+	}
+	if (elements.aiQuotaResetText) {
+		elements.aiQuotaResetText.textContent = hint;
+	}
+}
+
+function updateDowngradeRestrictions() {
+	const counterCount = userSettings.customCounters.length;
+	const isOverCounterLimit = userTier === "free" && counterCount > 5;
+	if (elements.excessCountersWarning) {
+		if (isOverCounterLimit) {
+			elements.excessCountersWarning.hidden = false;
+			if (elements.excessCountersText) {
+				elements.excessCountersText.textContent = `Sua conta está no plano Free e possui ${counterCount} contadores (limite: 5). Edições e novos grupos estão pausados até você arquivar ou excluir ${counterCount - 5} contador(es).`;
+			}
+		} else {
+			elements.excessCountersWarning.hidden = true;
+		}
+	}
+}
+
+elements.manageSubscriptionButton?.addEventListener("click", async () => {
+	if (!currentUser) return;
+	elements.manageSubscriptionButton.disabled = true;
+	try {
+		ensureAppCheck();
+		const functionsInstance = getFunctions(app, pushConfig.functionsRegion || "southamerica-east1");
+		const createPortal = httpsCallable(functionsInstance, "createStripePortalSession");
+		const result = await createPortal();
+		if (result?.data?.url) {
+			window.location.href = result.data.url;
+		} else {
+			showToast("Não foi possível abrir o gerenciador de assinaturas.");
+		}
+	} catch (error) {
+		console.error("Falha ao abrir o Stripe Customer Portal:", error);
+		showToast(error.message || "Erro ao conectar ao gerenciador de assinaturas.");
+	} finally {
+		elements.manageSubscriptionButton.disabled = false;
+	}
+});
+
+elements.openUpgradeDialog?.addEventListener("click", () => {
+	elements.upgradeDialog?.showModal();
+});
+elements.sidebarUpgradeIcon?.addEventListener("click", () => {
+	elements.upgradeDialog?.showModal();
+});
+elements.upgradeDialogClose?.addEventListener("click", () => {
+	elements.upgradeDialog?.close();
+});
+elements.startStripeCheckout?.addEventListener("click", async () => {
+	if (!currentUser) {
+		showToast("Faça login com sua conta Google para assinar o Timekeeper Premium.");
+		return;
+	}
+	elements.startStripeCheckout.disabled = true;
+	elements.startStripeCheckout.textContent = "Carregando Checkout...";
+	try {
+		ensureAppCheck();
+		const functionsInstance = getFunctions(app, pushConfig.functionsRegion || "southamerica-east1");
+		const createCheckout = httpsCallable(functionsInstance, "createStripeCheckoutSession");
+		const result = await createCheckout();
+		if (result?.data?.url) {
+			window.location.href = result.data.url;
+		} else {
+			showToast("Não foi possível gerar a sessão do Stripe Checkout.");
+		}
+	} catch (error) {
+		console.error("Falha ao iniciar o Stripe Checkout:", error);
+		showToast(error.message || "Erro ao conectar com o servidor do Stripe.");
+	} finally {
+		elements.startStripeCheckout.disabled = false;
+		elements.startStripeCheckout.textContent = "Assinar Timekeeper Premium (R$ 4,90/mês)";
+	}
+});
+
+try {
+	const urlParams = new URLSearchParams(window.location.search);
+	if (urlParams.has("stripe_success")) {
+		showToast("🎉 Assinatura do Timekeeper Premium ativada com sucesso!");
+		window.history.replaceState({}, document.title, window.location.pathname);
+		(async () => {
+			try {
+				ensureAppCheck();
+				const functionsInstance = getFunctions(app, pushConfig.functionsRegion || "southamerica-east1");
+				const confirmCheckout = httpsCallable(functionsInstance, "confirmStripeCheckout");
+				await confirmCheckout();
+			} catch (err) {
+				console.error("Falha ao confirmar status da assinatura:", err);
+			}
+		})();
+	} else if (urlParams.has("stripe_cancel")) {
+		showToast("Operação de assinatura cancelada.");
+		window.history.replaceState({}, document.title, window.location.pathname);
+	}
+} catch {}
 
 elements.authButton.addEventListener("click", async () => {
 	if (currentUser) {
@@ -4844,9 +5390,12 @@ elements.signOutButton.addEventListener("click", async () => {
 });
 elements.deleteAccountButton.addEventListener("click", async () => {
 	if (!currentUser) return;
-	const confirmed = window.confirm(
-		"Excluir permanentemente sua conta, configurações, contadores, histórico e imagens? Esta ação não pode ser desfeita.",
-	);
+	const confirmed = await confirmAction({
+		title: "Excluir conta e dados?",
+		message:
+			"Sua conta, configurações, contadores, histórico e imagens serão excluídos permanentemente. Esta ação não pode ser desfeita.",
+		confirmLabel: "Excluir minha conta",
+	});
 	if (!confirmed) return;
 
 	const userToDelete = currentUser;
@@ -5085,8 +5634,8 @@ for (const input of [
 elements.counterForm.addEventListener("submit", async (event) => {
 	event.preventDefault();
 	elements.counterMessage.textContent = "";
-	if (!editingCounterId && userSettings.customCounters.length >= MAX_COUNTERS) {
-		elements.counterMessage.textContent = "Você já possui cinco contadores.";
+	if (!editingCounterId && userSettings.customCounters.length >= getMaxCounters()) {
+		elements.counterMessage.textContent = `Você atingiu o limite de ${getMaxCounters()} contadores.`;
 		return;
 	}
 	const data = new FormData(elements.counterForm);
@@ -5152,6 +5701,11 @@ elements.counterForm.addEventListener("submit", async (event) => {
 		color: data.get("colorEnabled") ? String(data.get("color")) : null,
 		createdAt: existingCounter?.createdAt || new Date().toISOString(),
 	};
+	if (userTier === "premium") {
+		const groupName = String(data.get("group") || "").trim().slice(0, 30);
+		if (groupName) counter.group = groupName;
+		if (existingCounter?.hidden) counter.hidden = true;
+	}
 	if (currentChecklist.length > 0) {
 		counter.checklist = currentChecklist.map((item) => ({
 			id: item.id || createCounterId(),

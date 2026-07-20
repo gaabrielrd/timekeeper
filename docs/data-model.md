@@ -48,14 +48,18 @@ generalConfig/holiday-YYYY-MM-DD
 | `displayName` | string | Firebase Auth |
 | `email` | string | Firebase Auth |
 | `photoURL` | string | Firebase Auth |
+| `tier` | `free` ou `premium` | Padrão `"free"`, atualizado via Stripe Webhook ou Admin |
+| `stripeCustomerId` | string opcional | ID do cliente no Stripe |
+| `aiGenerationsTotal` | number opcional | Contagem de imagens de IA geradas (máx 8 para free) |
+| `aiGenerationsMonth` | string opcional | Mês corrente de cota (`YYYY-MM`) |
+| `aiGenerationsMonthCount` | number opcional | Contagem de imagens de IA no mês (máx 40 para premium) |
 | `isAdmin` | boolean opcional | Operação privilegiada |
 | `updatedAt` | timestamp | `serverTimestamp()` |
 
 Esse documento também é a origem do formato legado. `ensureUserData` lê eventuais
 configurações/`customCounters` na raiz, cria os documentos novos se ainda faltarem e
-então substitui a raiz somente pelos campos atuais do perfil. Quando `isAdmin`
-existe, a normalização preserva o valor; o próprio usuário não pode criá-lo,
-alterá-lo ou removê-lo pelas Rules.
+então substitui a raiz somente pelos campos atuais do perfil. Quando `isAdmin` ou `tier`
+existem, a normalização preserva o valor; o próprio usuário não pode alterar `tier` ou `isAdmin` pelas Rules.
 
 ## Configuração geral — `/generalConfig/{configId}`
 
@@ -100,6 +104,7 @@ remoções intencionais.
 | `notificationSources` | map | todas `true` | chaves `workday`, `payment`, `holiday`, `counters` |
 | `notificationQuietHours` | map | 22:00–07:00, desligado | boolean e horários locais `HH:mm` |
 | `weatherEffectsEnabled` | boolean | `false` | boolean estrito ao aplicar |
+| `counterGroups` | string[] | `[]` | até 10 grupos de contadores (strings até 30 chars cada) |
 | `updatedAt` | timestamp | servidor | `serverTimestamp()` |
 
 O campo legado `customCounters` pode existir no documento raiz, mas não deve ser
@@ -129,7 +134,7 @@ sete dias. `/pushMetrics/{YYYY-MM-DD}` contém apenas contagens agregadas de
 
 ```js
 {
-  items: [/* até cinco objetos, em ordem de exibição */],
+  items: [/* até 5 (Free) ou 15 (Premium) objetos, em ordem de exibição */],
   updatedAt: serverTimestamp()
 }
 ```
@@ -146,6 +151,8 @@ sete dias. `/pushMetrics/{YYYY-MM-DD}` contém apenas contagens agregadas de
 | `imageId` | string ou `null` | referência a `data/images.items[].id` |
 | `imageOpacity` | number | 0–100; cliente persiste inteiro, rules aceitam number |
 | `overlayOpacity` | number | 0–100; cliente persiste inteiro, rules aceitam number |
+| `group` | string ou `null` | nome de grupo cadastrado pelo usuário (até 30 chars) |
+| `hidden` | boolean opcional | `true` para ocultar o contador da dashboard principal |
 | `checklist` | object[] ou `null` | Array de até 3 subtarefas: `id` (string), `text` (string), `done` (boolean) |
 
 ### Período fixo

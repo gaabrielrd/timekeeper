@@ -8,14 +8,14 @@ const root = path.resolve(__dirname, "../..");
 const read = (relativePath) =>
 	fs.readFileSync(path.join(root, relativePath), "utf8");
 
-test("limite de cinco permanece alinhado entre HTML, cliente e rules", () => {
+test("limite de contadores permanece alinhado entre HTML, cliente e rules", () => {
 	const html = read("public/index.html");
 	const client = read("public/src/firebase.js");
 	const rules = read("firestore.rules");
-	assert.match(html, /id="counter-count"[^>]*>0 \/ 5</);
-	assert.match(html, /Até cinco/);
-	assert.match(client, /const MAX_COUNTERS = 5;/);
-	assert.match(rules, /items\.size\(\) <= 5/);
+	assert.match(html, /id="counter-count"/);
+	assert.match(client, /getMaxCounters/);
+	assert.match(rules, /getMaxCounters\(userId\)/);
+	assert.match(rules, /isPremiumUser\(userId\) \? 15 : 5/);
 });
 
 test("documentos Firestore usam matches isolados para preservar o orçamento de expressões", () => {
@@ -394,6 +394,7 @@ test("modo de foco cobre todos os cards, restaura a sessão e integra o shell PW
 	assert.equal((html.match(/data-focus-id="standard:/g) || []).length, 3);
 	assert.match(html, /id="focus-mode"[\s\S]*role="dialog"[\s\S]*aria-modal="true"/);
 	assert.match(html, /id="focus-mode-close"[\s\S]*Sair do modo de foco/);
+	assert.match(html, /id="focus-mode-media"[\s\S]*id="focus-mode-image"[\s\S]*id="focus-mode-overlay"/);
 	assert.match(html, /src="src\/focus\.js"/);
 	assert.match(client, /panel\.dataset\.focusId = counter\.id/);
 	assert.match(client, /focusButton\.dataset\.focusTrigger/);
@@ -401,9 +402,26 @@ test("modo de foco cobre todos os cards, restaura a sessão e integra o shell PW
 	assert.match(focus, /root\.sessionStorage/);
 	assert.match(focus, /event\.key === "Escape"/);
 	assert.match(focus, /new MutationObserver\(tryRestore\)/);
+	assert.match(focus, /function syncFocusedMedia/);
+	assert.match(focus, /sourceImage\.style\.backgroundImage/);
+	assert.match(focus, /sourceOverlay\.style\.opacity/);
 	assert.match(styles, /body\.focus-mode-active \.focus-mode/);
+	assert.match(styles, /body\.focus-mode-active\[data-background-enabled="true"\] \.ambient-background/);
+	assert.match(styles, /\.focus-mode-image[\s\S]*background-size: cover/);
 	assert.match(styles, /@media \(max-width: 800px\), \(orientation: portrait\)/);
 	assert.match(serviceWorker, /"\/src\/focus\.js"/);
+});
+
+test("confirmações usam dialog acessível em vez da interface nativa", () => {
+	const html = read("public/index.html");
+	const client = read("public/src/firebase.js");
+	const styles = read("public/src/style.css");
+	assert.match(html, /id="confirmation-dialog"/);
+	assert.match(html, /aria-describedby="confirmation-dialog-message"/);
+	assert.match(client, /function confirmAction\(/);
+	assert.match(client, /confirmationDialog\.showModal\(\)/);
+	assert.doesNotMatch(client, /window\.(?:alert|confirm)\s*\(/);
+	assert.match(styles, /\.confirmation-dialog-confirm\.is-danger/);
 });
 
 test("arquivo de conquistas exige ação manual e mantém limite alinhado", () => {
@@ -421,7 +439,7 @@ test("arquivo de conquistas exige ação manual e mantém limite alinhado", () =
 	assert.match(html, /id="archive-dialog"[\s\S]*aria-labelledby="archive-title"/);
 	assert.match(client, /const MAX_ARCHIVED_COUNTERS = 100;/);
 	assert.match(client, /runTransaction\(db, async \(transaction\)/);
-	assert.match(client, /window\.confirm\(`Arquivar o contador/);
+	assert.match(client, /title: "Arquivar contador\?"/);
 	assert.match(client, /counter\.type === "fixed"/);
 	assert.match(client, /archiveButton\.hidden = !isComplete/);
 	assert.match(client, /className = "counter-card-archive"/);
