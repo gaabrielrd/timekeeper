@@ -5,13 +5,22 @@ service cloud.firestore {
     function isGoogleOwner(userId) {
       return request.auth != null
         && request.auth.uid == userId
-        && request.auth.token.firebase.sign_in_provider == 'google.com';
+        && (!('firebase' in request.auth.token)
+          || !('sign_in_provider' in request.auth.token.firebase)
+          || request.auth.token.firebase.sign_in_provider == 'google.com'
+          || request.auth.token.firebase.sign_in_provider == 'google');
     }
 
     function isGoogleAdmin() {
       return request.auth != null
-        && request.auth.token.firebase.sign_in_provider == 'google.com'
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+        && (!('firebase' in request.auth.token)
+          || !('sign_in_provider' in request.auth.token.firebase)
+          || request.auth.token.firebase.sign_in_provider == 'google.com'
+          || request.auth.token.firebase.sign_in_provider == 'google')
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        ? ('isAdmin' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data
+          && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true)
+        : false;
     }
 
     function isHexColor(value) {
@@ -221,7 +230,7 @@ service cloud.firestore {
         && (!('aiGenerationsMonthCount' in data)
           || (data.aiGenerationsMonthCount is int && data.aiGenerationsMonthCount >= 0))
         && (!('customCounters' in data)
-          || (data.customCounters is list && data.customCounters.size() <= 5))
+          || (data.customCounters is list && data.customCounters.size() <= 15))
         && hasValidSettingsFields(data)
         && hasValidUpdatedAt(data);
     }
@@ -255,13 +264,17 @@ service cloud.firestore {
         && (!('color' in counter)
           || counter.color == null
           || isHexColor(counter.color))
-        && ((!('imageId' in counter) || counter.imageId == null)
-          ? (!('imageOpacity' in counter) && !('overlayOpacity' in counter))
-          : (counter.imageId.matches('^.{1,100}$')
-            && counter.imageOpacity is number
+        && (!('imageId' in counter)
+          || counter.imageId == null
+          || (counter.imageId is string && counter.imageId.matches('^.{1,100}$')))
+        && (!('imageOpacity' in counter)
+          || counter.imageOpacity == null
+          || ((counter.imageOpacity is int || counter.imageOpacity is float)
             && counter.imageOpacity >= 0
-            && counter.imageOpacity <= 100
-            && counter.overlayOpacity is number
+            && counter.imageOpacity <= 100))
+        && (!('overlayOpacity' in counter)
+          || counter.overlayOpacity == null
+          || ((counter.overlayOpacity is int || counter.overlayOpacity is float)
             && counter.overlayOpacity >= 0
             && counter.overlayOpacity <= 100))
         && (!('group' in counter)
@@ -275,8 +288,8 @@ service cloud.firestore {
     }
 
     function isValidFixedCounter(counter) {
-      return counter.startAtMs is int
-        && counter.endAtMs is int
+      return (counter.startAtMs is int || counter.startAtMs is float)
+        && (counter.endAtMs is int || counter.endAtMs is float)
         && counter.startAtMs >= 0
         && counter.endAtMs > counter.startAtMs;
     }
@@ -308,12 +321,56 @@ service cloud.firestore {
 
     function isPremiumUser(userId) {
       return exists(/databases/$(database)/documents/users/$(userId))
-        && ('tier' in get(/databases/$(database)/documents/users/$(userId)).data)
-        && get(/databases/$(database)/documents/users/$(userId)).data.tier == 'premium';
+        ? (('tier' in get(/databases/$(database)/documents/users/$(userId)).data
+            && get(/databases/$(database)/documents/users/$(userId)).data.tier == 'premium')
+           || ('isAdmin' in get(/databases/$(database)/documents/users/$(userId)).data
+            && get(/databases/$(database)/documents/users/$(userId)).data.isAdmin == true))
+        : false;
     }
 
     function getMaxCounters(userId) {
       return isPremiumUser(userId) ? 15 : 5;
+    }
+
+    function getMaxCreatedTeams(userId) {
+      return isPremiumUser(userId) ? 3 : 1;
+    }
+
+    function getMaxTeamMembers(ownerUid) {
+      return isPremiumUser(ownerUid) ? 12 : 5;
+    }
+
+    function isTeamMember(teamId) {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/teams/$(teamId))
+        && request.auth.uid in get(/databases/$(database)/documents/teams/$(teamId)).data.members.keys();
+    }
+
+    function getTeamRole(teamId) {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/teams/$(teamId))
+        && request.auth.uid in get(/databases/$(database)/documents/teams/$(teamId)).data.members.keys()
+        ? get(/databases/$(database)/documents/teams/$(teamId)).data.members[request.auth.uid].role
+        : null;
+    }
+
+    function isTeamAdmin(teamId) {
+      return getTeamRole(teamId) == 'admin';
+    }
+
+    function isTeamEditorOrAdmin(teamId) {
+      return getTeamRole(teamId) in ['admin', 'editor'];
+    }
+
+    function isValidTeamDocument(data) {
+      return data.keys().hasOnly(['id', 'name', 'ownerUid', 'ownerTier', 'members', 'createdAt', 'updatedAt'])
+        && data.id is string && data.id.matches('^.{1,100}$')
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 50
+        && data.ownerUid is string && data.ownerUid.matches('^.{1,128}$')
+        && data.ownerTier in ['free', 'premium']
+        && data.members is map
+        && data.members.keys().size() <= getMaxTeamMembers(data.ownerUid)
+        && hasValidUpdatedAt(data);
     }
 
     function hasValidCounterItems(userId, items) {
@@ -388,8 +445,8 @@ service cloud.firestore {
           'archivedAt'
         ])
         && counter.type == 'fixed'
-        && counter.startAtMs is int
-        && counter.endAtMs is int
+        && (counter.startAtMs is int || counter.startAtMs is float)
+        && (counter.endAtMs is int || counter.endAtMs is float)
         && counter.startAtMs >= 0
         && counter.endAtMs > counter.startAtMs
         && counter.archivedAt.matches(
@@ -494,6 +551,24 @@ service cloud.firestore {
             && !('daysOfWeek' in data)));
     }
 
+    function isProtectedFieldUnchanged(field) {
+      return !(field in resource.data)
+        ? !(field in request.resource.data)
+        : (field in request.resource.data && request.resource.data[field] == resource.data[field]);
+    }
+
+    function hasUnchangedProtectedFields() {
+      return isProtectedFieldUnchanged('isAdmin')
+        && isProtectedFieldUnchanged('tier')
+        && isProtectedFieldUnchanged('stripeCustomerId')
+        && isProtectedFieldUnchanged('subscriptionStatus')
+        && isProtectedFieldUnchanged('currentPeriodEnd')
+        && isProtectedFieldUnchanged('cancelAtPeriodEnd')
+        && isProtectedFieldUnchanged('aiGenerationsTotal')
+        && isProtectedFieldUnchanged('aiGenerationsMonth')
+        && isProtectedFieldUnchanged('aiGenerationsMonthCount');
+    }
+
     match /generalConfig/{configId} {
       allow read: if true;
       allow create, update: if isGoogleAdmin()
@@ -516,17 +591,7 @@ service cloud.firestore {
         && !('aiGenerationsMonthCount' in request.resource.data);
       allow update: if isGoogleOwner(userId)
         && hasValidProfileFields(request.resource.data)
-        && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
-          'isAdmin',
-          'tier',
-          'stripeCustomerId',
-          'subscriptionStatus',
-          'currentPeriodEnd',
-          'cancelAtPeriodEnd',
-          'aiGenerationsTotal',
-          'aiGenerationsMonth',
-          'aiGenerationsMonthCount'
-        ]);
+        && hasUnchangedProtectedFields();
 
       match /data/settings {
         allow read, delete: if isGoogleOwner(userId);
@@ -561,6 +626,31 @@ service cloud.firestore {
 
       match /devices/{deviceId} {
         allow read, write: if false;
+      }
+    }
+
+    match /teams/{teamId} {
+      allow read: if request.auth != null
+        && (resource.data.ownerUid == request.auth.uid || request.auth.uid in resource.data.members.keys());
+      allow create: if request.auth != null
+        && request.resource.data.ownerUid == request.auth.uid
+        && isValidTeamDocument(request.resource.data);
+      allow update: if request.auth != null
+        && (isTeamAdmin(teamId) || request.auth.uid in request.resource.data.members.keys())
+        && isValidTeamDocument(request.resource.data);
+      allow delete: if request.auth != null
+        && (resource.data.ownerUid == request.auth.uid || isTeamAdmin(teamId));
+
+      match /data/counters {
+        allow read: if isTeamMember(teamId);
+        allow create, update: if isTeamEditorOrAdmin(teamId)
+          && isValidCountersDocument(get(/databases/$(database)/documents/teams/$(teamId)).data.ownerUid, request.resource.data);
+        allow delete: if isTeamAdmin(teamId);
+      }
+
+      match /invites/{inviteId} {
+        allow read: if request.auth != null;
+        allow create, update, delete: if isTeamAdmin(teamId);
       }
     }
 

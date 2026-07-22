@@ -18,9 +18,11 @@ import {
 	getFirestore,
 	initializeFirestore,
 	onSnapshot,
+	query,
 	runTransaction,
 	serverTimestamp,
 	setDoc,
+	where,
 	writeBatch,
 } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
 import {
@@ -337,6 +339,37 @@ const elements = {
 	notificationQuietStart: document.querySelector("#notification-quiet-start"),
 	notificationQuietEnd: document.querySelector("#notification-quiet-end"),
 	timelineList: document.querySelector("#timeline-list"),
+	workspaceSwitcher: document.querySelector("#workspace-switcher"),
+	pendingInvitesButton: document.querySelector("#pending-invites-button"),
+	pendingInvitesCount: document.querySelector("#pending-invites-count"),
+	pendingInvitesDialog: document.querySelector("#pending-invites-dialog"),
+	pendingInvitesClose: document.querySelector("#pending-invites-close"),
+	pendingInvitesList: document.querySelector("#pending-invites-list"),
+	teamManageDialog: document.querySelector("#team-manage-dialog"),
+	teamManageClose: document.querySelector("#team-manage-close"),
+	teamDetailsDialog: document.querySelector("#team-details-dialog"),
+	teamDetailsTitle: document.querySelector("#team-details-title"),
+	teamDetailsName: document.querySelector("#team-details-name"),
+	teamDetailsSubtitle: document.querySelector("#team-details-subtitle"),
+	teamDetailsRole: document.querySelector("#team-details-role"),
+	teamDetailsClose: document.querySelector("#team-details-close"),
+	teamNameInput: document.querySelector("#team-name-input"),
+	saveTeamNameButton: document.querySelector("#save-team-name-button"),
+	generateTeamInviteButton: document.querySelector("#generate-team-invite-button"),
+	teamInviteLinkBox: document.querySelector("#team-invite-link-box"),
+	teamInviteLinkInput: document.querySelector("#team-invite-link-input"),
+	copyTeamInviteButton: document.querySelector("#copy-team-invite-button"),
+	teamMemberCount: document.querySelector("#team-member-count"),
+	teamMemberCapacity: document.querySelector("#team-member-capacity"),
+	teamMembersList: document.querySelector("#team-members-list"),
+	leaveTeamButton: document.querySelector("#leave-team-button"),
+	teamsManageButton: document.querySelector("#teams-manage-button"),
+	teamCreatePanel: document.querySelector("#team-create-panel"),
+	teamDetailsPanel: document.querySelector("#team-details-panel"),
+	teamQuotaInfo: document.querySelector("#team-quota-info"),
+	userTeamsGrid: document.querySelector("#user-teams-grid"),
+	createTeamNameInput: document.querySelector("#create-team-name-input"),
+	createTeamSubmitButton: document.querySelector("#create-team-submit-button"),
 	timelineEmpty: document.querySelector("#timeline-empty"),
 	timelineRange: document.querySelector("#timeline-range"),
 	timelineLegend: document.querySelector("#timeline-legend"),
@@ -469,7 +502,11 @@ let unsubscribeCounters = null;
 let unsubscribeArchive = null;
 let unsubscribeImages = null;
 let unsubscribeProfile = null;
+let unsubscribeTeams = null;
 let unsubscribeGeneralConfig = null;
+let userTeams = [];
+let activeWorkspace = { type: "personal" };
+let pendingInvites = [];
 let customProgressBars = [];
 let toastTimer = null;
 let editingCounterId = null;
@@ -2092,6 +2129,7 @@ function createCustomPanel(counter, index) {
 	);
 	const imageUrl = counter.imageId ? imageUrls.get(counter.imageId) : "";
 	if (imageUrl) {
+		panel.classList.add("has-media");
 		const media = document.createElement("div");
 		media.className = "counter-card-media";
 		media.setAttribute("aria-hidden", "true");
@@ -4265,11 +4303,18 @@ function unsubscribeUserData() {
 	unsubscribeArchive?.();
 	unsubscribeImages?.();
 	unsubscribeProfile?.();
+	unsubscribeTeams?.();
 	unsubscribeSettings = null;
 	unsubscribeCounters = null;
 	unsubscribeArchive = null;
 	unsubscribeImages = null;
 	unsubscribeProfile = null;
+	unsubscribeTeams = null;
+	userTeams = [];
+	pendingInvites = [];
+	activeWorkspace = { type: "personal" };
+	if (elements.workspaceSwitcher) elements.workspaceSwitcher.hidden = true;
+	if (elements.pendingInvitesButton) elements.pendingInvitesButton.hidden = true;
 	countersReady = false;
 	archiveReady = false;
 	userTier = "free";
@@ -4405,6 +4450,9 @@ async function ensureUserData(user) {
 				photoURL: user.photoURL || "",
 				...(typeof legacy.isAdmin === "boolean"
 					? { isAdmin: legacy.isAdmin }
+					: {}),
+				...(typeof legacy.tier === "string"
+					? { tier: legacy.tier }
 					: {}),
 				updatedAt: serverTimestamp(),
 			},
@@ -5724,6 +5772,8 @@ onAuthStateChanged(auth, (user) => {
 	updateAccountUi(user);
 	if (user) {
 		subscribeToUserData(user);
+		subscribeToTeams(user);
+		checkInviteUrlParams();
 		return;
 	}
 	unsubscribeUserData();
@@ -5774,3 +5824,678 @@ if (typeof timelineOrientationQuery.addEventListener === "function") {
 window.setInterval(updateCustomCounters, 1000);
 window.setInterval(updateTimelineTemporalStates, 60000);
 window.setInterval(scanNotifications, 15000);
+
+// --- Phase 12: Teams & Collaboration Implementation ---
+
+function activeCountersReference() {
+	if (activeWorkspace.type === "team" && activeWorkspace.id) {
+		return doc(db, "teams", activeWorkspace.id, "data", "counters");
+	}
+	return doc(db, "users", currentUser.uid, "data", "counters");
+}
+
+function getMaxCreatedTeams() {
+	return userTier === "premium" ? 3 : 1;
+}
+
+function getMaxTeamMembers(ownerTier = "free") {
+	return ownerTier === "premium" ? 12 : 5;
+}
+
+function escapeHtml(text) {
+	return String(text || "")
+		.replace(/&/g, "&amp;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;")
+		.replace(/"/g, "&quot;")
+		.replace(/'/g, "&#039;");
+}
+
+function subscribeToTeams(user) {
+	if (unsubscribeTeams) unsubscribeTeams();
+	const userTeamsQuery = query(
+		collection(db, "teams"),
+		where(`members.${user.uid}.role`, "in", ["admin", "editor", "viewer"]),
+	);
+	unsubscribeTeams = onSnapshot(
+		userTeamsQuery,
+		(snapshot) => {
+			userTeams = snapshot.docs.map((d) => d.data());
+			renderWorkspaceSwitcher();
+			if (activeWorkspace.type === "team") {
+				const currentTeam = userTeams.find((t) => t.id === activeWorkspace.id);
+				if (currentTeam) {
+					activeWorkspace.name = currentTeam.name;
+					activeWorkspace.ownerTier = currentTeam.ownerTier || "free";
+					activeWorkspace.role = currentTeam.members[user.uid]?.role || "viewer";
+					elements.openCounterModal.disabled = activeWorkspace.role === "viewer";
+				} else {
+					switchWorkspace("personal");
+				}
+			}
+		},
+		(error) => {
+			console.error("Falha ao acompanhar equipes.", error);
+		},
+	);
+}
+
+function renderWorkspaceSwitcher() {
+	if (elements.teamsManageButton) {
+		elements.teamsManageButton.hidden = !currentUser;
+	}
+	if (!elements.workspaceSwitcher) return;
+	if (!currentUser || userTeams.length === 0) {
+		elements.workspaceSwitcher.hidden = true;
+		if (activeWorkspace.type !== "personal") {
+			switchWorkspace("personal");
+		}
+		return;
+	}
+	elements.workspaceSwitcher.hidden = false;
+	const optionsHTML = [
+		'<option value="personal">👤 Meu Espaço Pessoal</option>',
+		...userTeams.map(
+			(team) =>
+				`<option value="team:${team.id}">👥 Equipe: ${escapeHtml(team.name)}</option>`,
+		),
+		'<option value="create_team">+ Criar nova equipe...</option>',
+	].join("");
+	elements.workspaceSwitcher.innerHTML = optionsHTML;
+	if (activeWorkspace.type === "team") {
+		elements.workspaceSwitcher.value = `team:${activeWorkspace.id}`;
+	} else {
+		elements.workspaceSwitcher.value = "personal";
+	}
+}
+
+async function switchWorkspace(workspaceValue) {
+	if (workspaceValue === "create_team") {
+		renderWorkspaceSwitcher();
+		openTeamManageModal();
+		return;
+	}
+
+	if (workspaceValue === "personal") {
+		activeWorkspace = { type: "personal" };
+		elements.openCounterModal.disabled = false;
+		if (currentUser) {
+			listenToWorkspaceCounters();
+		}
+		renderWorkspaceSwitcher();
+		return;
+	}
+
+	if (workspaceValue.startsWith("team:")) {
+		const teamId = workspaceValue.slice(5);
+		const team = userTeams.find((t) => t.id === teamId);
+		if (!team) return;
+		const myRole = team.members[currentUser.uid]?.role || "viewer";
+		activeWorkspace = {
+			type: "team",
+			id: team.id,
+			name: team.name,
+			ownerUid: team.ownerUid,
+			ownerTier: team.ownerTier || "free",
+			role: myRole,
+		};
+		elements.openCounterModal.disabled = myRole === "viewer";
+		listenToWorkspaceCounters();
+		renderWorkspaceSwitcher();
+	}
+}
+
+function listenToWorkspaceCounters() {
+	if (unsubscribeCounters) {
+		unsubscribeCounters();
+		unsubscribeCounters = null;
+	}
+	countersReady = false;
+	setCounterState("Conectando...", "connecting");
+
+	const targetRef = activeCountersReference();
+	unsubscribeCounters = onSnapshot(
+		targetRef,
+		(snapshot) => {
+			countersReady = true;
+			applyCounters(snapshot.exists() ? snapshot.data().items : []);
+			setCounterState("Ao vivo", "live");
+		},
+		(error) => {
+			console.error("Falha ao carregar contadores do espaço.", error);
+			setCounterState("Erro de conexão", "error");
+			showToast("Não foi possível carregar os contadores.");
+		},
+	);
+}
+
+async function createTeam(name) {
+	if (!currentUser) return;
+	const ownedTeamsCount = userTeams.filter(
+		(team) => team.ownerUid === currentUser.uid,
+	).length;
+	const maxTeams = getMaxCreatedTeams();
+	if (ownedTeamsCount >= maxTeams) {
+		showToast(
+			userTier === "premium"
+				? "Você atingiu o limite de 3 equipes."
+				: "Usuários Free podem criar 1 equipe. Assine o Premium para criar mais!",
+		);
+		return;
+	}
+
+	const teamId = `team_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+	const newTeam = {
+		id: teamId,
+		name: name.slice(0, 50),
+		ownerUid: currentUser.uid,
+		ownerTier: userTier,
+		members: {
+			[currentUser.uid]: {
+				role: "admin",
+				joinedAt: new Date().toISOString(),
+			},
+		},
+		createdAt: new Date().toISOString(),
+		updatedAt: serverTimestamp(),
+	};
+	try {
+		await setDoc(doc(db, "teams", teamId), newTeam);
+		await setDoc(doc(db, "teams", teamId, "data", "counters"), {
+			items: [],
+			updatedAt: serverTimestamp(),
+		});
+		showToast(`Equipe "${name}" criada com sucesso!`);
+		switchWorkspace(`team:${teamId}`);
+		if (elements.teamManageDialog) elements.teamManageDialog.close();
+	} catch (error) {
+		console.error("Falha ao criar equipe.", error);
+		showToast("Não foi possível criar a equipe.");
+	}
+}
+
+let currentlyManagingTeamId = null;
+
+function openTeamManageModal() {
+	if (!currentUser || !elements.teamManageDialog) return;
+	renderTeamsModalContent();
+	elements.teamManageDialog.showModal();
+}
+
+function openTeamDetailsModal(teamId) {
+	if (!currentUser || !elements.teamDetailsDialog) return;
+	currentlyManagingTeamId = teamId;
+	const team = userTeams.find((t) => t.id === teamId);
+	if (!team) return;
+
+	if (elements.teamDetailsTitle) {
+		elements.teamDetailsTitle.textContent = `Gerenciar ${team.name}`;
+	}
+	if (elements.teamDetailsName) {
+		elements.teamDetailsName.textContent = team.name;
+	}
+	if (elements.teamNameInput) {
+		elements.teamNameInput.value = team.name;
+	}
+	if (elements.teamInviteLinkBox) {
+		elements.teamInviteLinkBox.hidden = true;
+	}
+
+	const isOwner = team.ownerUid === currentUser.uid;
+	const myRole = team.members[currentUser.uid]?.role || "viewer";
+	const isAdmin = isOwner || myRole === "admin";
+	const members = team.members || {};
+	const memberCount = Object.keys(members).length;
+	const maxMembers = getMaxTeamMembers(team.ownerTier || "free");
+	const roleLabels = { admin: "ADMIN", editor: "EDITOR", viewer: "LEITOR" };
+
+	if (elements.saveTeamNameButton) elements.saveTeamNameButton.hidden = !isAdmin;
+	if (elements.teamNameInput) elements.teamNameInput.disabled = !isAdmin;
+	if (elements.generateTeamInviteButton) elements.generateTeamInviteButton.hidden = !isAdmin;
+	if (elements.teamDetailsRole) {
+		elements.teamDetailsRole.textContent = isOwner ? "DONO" : roleLabels[myRole] || "LEITOR";
+	}
+	if (elements.teamDetailsSubtitle) {
+		elements.teamDetailsSubtitle.textContent = `${memberCount} ${memberCount === 1 ? "membro" : "membros"} · ${team.ownerTier === "premium" ? "Plano Premium" : "Plano Free"}`;
+	}
+	if (elements.teamMemberCapacity) {
+		elements.teamMemberCapacity.textContent = `${memberCount} / ${maxMembers}`;
+	}
+
+	// Members list
+	if (elements.teamMembersList) {
+		if (elements.teamMemberCount) elements.teamMemberCount.textContent = memberCount;
+
+		elements.teamMembersList.innerHTML = Object.entries(members)
+			.map(([uid, memberData]) => {
+				const isMe = uid === currentUser.uid;
+				const isMemberOwner = uid === team.ownerUid;
+				const role = memberData.role || "viewer";
+				const memberName = memberData.displayName || (isMe ? "Você" : "Membro da equipe");
+				const memberIdentifier = isMe ? "Sua conta" : `ID ${uid.slice(0, 8)}…`;
+				const initials = isMe ? "VC" : uid.slice(0, 2).toUpperCase();
+				return `
+				<div class="team-member-item">
+					<div class="team-member-info">
+						<span class="team-member-avatar" aria-hidden="true">${initials}</span>
+						<span class="team-member-copy">
+							<strong class="team-member-name">${escapeHtml(memberName)}</strong>
+							<span class="team-member-id">${escapeHtml(memberIdentifier)}</span>
+						</span>
+					</div>
+					<div class="team-member-controls">
+						${
+							isAdmin && !isMemberOwner && !isMe
+								? `
+			<select class="team-member-role-select" aria-label="Papel de ${escapeHtml(memberName)}" data-action="change-role" data-uid="${uid}">
+								<option value="admin" ${role === "admin" ? "selected" : ""}>Admin</option>
+								<option value="editor" ${role === "editor" ? "selected" : ""}>Editor</option>
+								<option value="viewer" ${role === "viewer" ? "selected" : ""}>Leitor</option>
+							</select>
+							<button class="icon-button danger-icon" data-action="remove-member" data-uid="${uid}" title="Remover ${escapeHtml(memberName)}"><i class="material-icons">person_remove</i></button>
+						`
+								: `<span class="team-role-label">${isMemberOwner ? "DONO" : roleLabels[role] || "LEITOR"}</span>`
+						}
+					</div>
+				</div>
+			`;
+			})
+			.join("");
+	}
+
+	if (elements.leaveTeamButton) elements.leaveTeamButton.hidden = isOwner;
+	if (elements.deleteTeamButton) elements.deleteTeamButton.hidden = !isOwner;
+
+	elements.teamDetailsDialog.showModal();
+}
+
+function renderTeamsModalContent() {
+	if (!currentUser) return;
+
+	// Render Quota Info & Creation Panel Visibility
+	const ownedCount = userTeams.filter((t) => t.ownerUid === currentUser.uid).length;
+	const maxTeams = getMaxCreatedTeams();
+	const canCreate = ownedCount < maxTeams;
+
+	if (elements.teamCreatePanel) {
+		elements.teamCreatePanel.hidden = !canCreate;
+	}
+
+	if (elements.teamQuotaInfo) {
+		elements.teamQuotaInfo.textContent =
+			userTier === "premium"
+				? `Você possui ${ownedCount} de ${maxTeams} equipes criadas (Plano Premium)`
+				: `Você possui ${ownedCount} de ${maxTeams} equipe criada (Plano Free)`;
+	}
+
+	// Render User Teams Grid
+	if (elements.userTeamsGrid) {
+		const personalActive = activeWorkspace.type === "personal";
+		const personalCardHTML = `
+			<div class="team-card-item ${personalActive ? "is-active" : ""}">
+				<div class="team-card-identity">
+					<span class="team-section-icon" aria-hidden="true"><i class="material-icons">person</i></span>
+					<div>
+						<strong>Meu Espaço Pessoal</strong>
+					<div class="team-card-meta">Seus contadores individuais e privados</div>
+					</div>
+				</div>
+				<div class="team-card-actions">
+					${
+						personalActive
+							? '<span class="team-role-label">ATIVO</span>'
+							: '<button class="secondary-button compact-button" data-action="switch-workspace" data-workspace="personal">Alternar</button>'
+					}
+				</div>
+			</div>
+		`;
+
+		const teamsCardsHTML = userTeams
+			.map((team) => {
+				const isActive = activeWorkspace.type === "team" && activeWorkspace.id === team.id;
+				const isOwner = team.ownerUid === currentUser.uid;
+				const memberRole = team.members[currentUser.uid]?.role || "viewer";
+				const memberCount = Object.keys(team.members || {}).length;
+				const maxMembers = getMaxTeamMembers(team.ownerTier || "free");
+				return `
+				<div class="team-card-item ${isActive ? "is-active" : ""}">
+					<div class="team-card-identity">
+						<span class="team-section-icon" aria-hidden="true"><i class="material-icons">groups</i></span>
+						<div>
+						<strong>${escapeHtml(team.name)}</strong>
+						<div class="team-card-meta">
+							<span>${isOwner ? "Proprietário" : memberRole.toUpperCase()}</span> •
+							<span>${memberCount}/${maxMembers} membros</span>
+						</div>
+						</div>
+					</div>
+					<div class="team-card-actions">
+						${
+							isActive
+								? '<span class="team-role-label">ATIVO</span>'
+								: `<button class="secondary-button compact-button" data-action="switch-workspace" data-workspace="team:${team.id}">Alternar</button>`
+						}
+						<button class="secondary-button compact-button" data-action="manage-team" data-team-id="${team.id}">Gerenciar</button>
+					</div>
+				</div>
+			`;
+			})
+			.join("");
+
+		elements.userTeamsGrid.innerHTML = personalCardHTML + teamsCardsHTML;
+	}
+}
+
+function generateTeamInviteLink(teamId) {
+	const inviteToken = btoa(JSON.stringify({ teamId, ts: Date.now() }));
+	const url = new URL(window.location.href);
+	url.searchParams.set("invite", inviteToken);
+	return url.toString();
+}
+
+function checkInviteUrlParams() {
+	const params = new URLSearchParams(window.location.search);
+	const inviteToken = params.get("invite");
+	if (!inviteToken) return;
+
+	try {
+		const data = JSON.parse(atob(inviteToken));
+		if (data.teamId) {
+			showPendingInviteModal(data.teamId);
+		}
+	} catch (e) {
+		console.error("Link de convite inválido.", e);
+	}
+}
+
+async function showPendingInviteModal(teamId) {
+	if (!currentUser) {
+		showToast("Faça login com sua conta Google para aceitar o convite!");
+		return;
+	}
+	try {
+		const teamDoc = await getDoc(doc(db, "teams", teamId));
+		if (!teamDoc.exists()) {
+			showToast("Equipe não encontrada ou convite expirado.");
+			return;
+		}
+		const team = teamDoc.data();
+		if (hasOwn(team.members, currentUser.uid)) {
+			showToast(`Você já é membro da equipe "${team.name}"!`);
+			switchWorkspace(`team:${team.id}`);
+			return;
+		}
+		pendingInvites = [{ teamId: team.id, teamName: team.name, teamOwnerTier: team.ownerTier }];
+		renderPendingInvites();
+		if (elements.pendingInvitesDialog) {
+			elements.pendingInvitesDialog.showModal();
+		}
+	} catch (error) {
+		console.error("Erro ao verificar convite.", error);
+	}
+}
+
+function renderPendingInvites() {
+	if (!elements.pendingInvitesButton) return;
+	if (pendingInvites.length === 0) {
+		elements.pendingInvitesButton.hidden = true;
+		return;
+	}
+	elements.pendingInvitesButton.hidden = false;
+	elements.pendingInvitesCount.textContent = pendingInvites.length;
+	if (elements.pendingInvitesList) {
+		elements.pendingInvitesList.innerHTML = pendingInvites
+			.map(
+				(invite) => `
+			<div class="pending-invite-card">
+				<div>
+					<strong>${escapeHtml(invite.teamName)}</strong>
+					<p class="muted">Você foi convidado para esta equipe.</p>
+				</div>
+				<div class="pending-invite-actions">
+					<button class="primary-button compact-button" data-action="accept-invite" data-team-id="${invite.teamId}">Aceitar</button>
+					<button class="secondary-button compact-button" data-action="decline-invite" data-team-id="${invite.teamId}">Recusar</button>
+				</div>
+			</div>
+		`,
+			)
+			.join("");
+	}
+}
+
+async function acceptTeamInvite(teamId) {
+	if (!currentUser) return;
+	try {
+		const teamRef = doc(db, "teams", teamId);
+		const teamDoc = await getDoc(teamRef);
+		if (!teamDoc.exists()) return;
+		const team = teamDoc.data();
+		const currentMemberCount = Object.keys(team.members || {}).length;
+		const maxMembers = getMaxTeamMembers(team.ownerTier);
+		if (currentMemberCount >= maxMembers) {
+			showToast(`Esta equipe atingiu o limite máximo de ${maxMembers} membros.`);
+			return;
+		}
+		const updatedMembers = {
+			...team.members,
+			[currentUser.uid]: {
+				role: "editor",
+				joinedAt: new Date().toISOString(),
+			},
+		};
+		await setDoc(teamRef, { members: updatedMembers, updatedAt: serverTimestamp() }, { merge: true });
+		pendingInvites = pendingInvites.filter((i) => i.teamId !== teamId);
+		renderPendingInvites();
+		if (elements.pendingInvitesDialog) elements.pendingInvitesDialog.close();
+		showToast(`Você entrou na equipe "${team.name}"!`);
+		switchWorkspace(`team:${teamId}`);
+	} catch (error) {
+		console.error("Falha ao aceitar convite.", error);
+		showToast("Não foi possível aceitar o convite.");
+	}
+}
+
+function declineTeamInvite(teamId) {
+	pendingInvites = pendingInvites.filter((i) => i.teamId !== teamId);
+	renderPendingInvites();
+	if (elements.pendingInvitesDialog) elements.pendingInvitesDialog.close();
+}
+
+// Event Listeners for Teams Modal & Buttons
+if (elements.teamsManageButton) {
+	elements.teamsManageButton.addEventListener("click", () => {
+		openTeamManageModal();
+	});
+}
+if (elements.teamManageClose) {
+	elements.teamManageClose.addEventListener("click", () => {
+		if (elements.teamManageDialog) elements.teamManageDialog.close();
+	});
+}
+if (elements.teamDetailsClose) {
+	elements.teamDetailsClose.addEventListener("click", () => {
+		if (elements.teamDetailsDialog) elements.teamDetailsDialog.close();
+	});
+}
+
+if (elements.createTeamSubmitButton) {
+	elements.createTeamSubmitButton.addEventListener("click", async () => {
+		const name = elements.createTeamNameInput?.value?.trim();
+		if (name) {
+			await createTeam(name);
+			if (elements.createTeamNameInput) elements.createTeamNameInput.value = "";
+		}
+	});
+}
+
+if (elements.userTeamsGrid) {
+	elements.userTeamsGrid.addEventListener("click", (e) => {
+		const target = e.target.closest("button");
+		if (!target) return;
+		const action = target.dataset.action;
+		if (action === "switch-workspace") {
+			const ws = target.dataset.workspace;
+			if (ws) switchWorkspace(ws);
+			if (elements.teamManageDialog) elements.teamManageDialog.close();
+		}
+		if (action === "manage-team") {
+			const teamId = target.dataset.teamId;
+			if (teamId) {
+				openTeamDetailsModal(teamId);
+			}
+		}
+	});
+}
+
+if (elements.generateTeamInviteButton) {
+	elements.generateTeamInviteButton.addEventListener("click", () => {
+		if (!currentlyManagingTeamId) return;
+		const inviteUrl = generateTeamInviteLink(currentlyManagingTeamId);
+		if (elements.teamInviteLinkInput) elements.teamInviteLinkInput.value = inviteUrl;
+		if (elements.teamInviteLinkBox) elements.teamInviteLinkBox.hidden = false;
+	});
+}
+
+if (elements.copyTeamInviteButton) {
+	elements.copyTeamInviteButton.addEventListener("click", async () => {
+		const link = elements.teamInviteLinkInput?.value;
+		if (link) {
+			await navigator.clipboard.writeText(link);
+			showToast("Link de convite copiado!");
+		}
+	});
+}
+
+if (elements.saveTeamNameButton) {
+	elements.saveTeamNameButton.addEventListener("click", async () => {
+		if (!currentlyManagingTeamId) return;
+		const newName = elements.teamNameInput?.value?.trim();
+		if (!newName) return;
+		try {
+			await setDoc(
+				doc(db, "teams", currentlyManagingTeamId),
+				{ name: newName.slice(0, 50), updatedAt: serverTimestamp() },
+				{ merge: true },
+			);
+			showToast("Nome da equipe atualizado!");
+			if (elements.teamDetailsTitle) elements.teamDetailsTitle.textContent = `Gerenciar ${newName}`;
+			if (elements.teamDetailsName) elements.teamDetailsName.textContent = newName;
+			renderTeamsModalContent();
+		} catch (e) {
+			console.error("Falha ao salvar nome da equipe.", e);
+			showToast("Não foi possível atualizar o nome da equipe.");
+		}
+	});
+}
+
+if (elements.leaveTeamButton) {
+	elements.leaveTeamButton.addEventListener("click", async () => {
+		if (!currentlyManagingTeamId || !currentUser) return;
+		const team = userTeams.find((t) => t.id === currentlyManagingTeamId);
+		if (!team) return;
+		if (
+			!(await confirmAction({
+				title: "Sair da equipe?",
+				message: `Você perderá o acesso aos contadores da equipe “${team.name}”.`,
+				confirmLabel: "Sair da equipe",
+			}))
+		)
+			return;
+
+		try {
+			const updatedMembers = { ...team.members };
+			delete updatedMembers[currentUser.uid];
+			await setDoc(doc(db, "teams", currentlyManagingTeamId), { members: updatedMembers, updatedAt: serverTimestamp() }, { merge: true });
+			showToast(`Você saiu da equipe "${team.name}".`);
+			if (elements.teamDetailsDialog) elements.teamDetailsDialog.close();
+			if (activeWorkspace.type === "team" && activeWorkspace.id === currentlyManagingTeamId) {
+				switchWorkspace("personal");
+			}
+			renderTeamsModalContent();
+		} catch (e) {
+			console.error("Falha ao sair da equipe.", e);
+			showToast("Não foi possível sair da equipe.");
+		}
+	});
+}
+
+if (elements.deleteTeamButton) {
+	elements.deleteTeamButton.addEventListener("click", async () => {
+		if (!currentlyManagingTeamId || !currentUser) return;
+		const team = userTeams.find((t) => t.id === currentlyManagingTeamId);
+		if (!team) return;
+		if (
+			!(await confirmAction({
+				title: "Excluir equipe permanentemente?",
+				message: `Esta ação é permanente e não pode ser desfeita. A equipe “${team.name}” e todos os seus contadores serão excluídos definitivamente.`,
+				confirmLabel: "Excluir equipe",
+				danger: true,
+			}))
+		)
+			return;
+
+		try {
+			await deleteDoc(doc(db, "teams", currentlyManagingTeamId));
+			showToast(`Equipe "${team.name}" excluída.`);
+			if (elements.teamDetailsDialog) elements.teamDetailsDialog.close();
+			if (activeWorkspace.type === "team" && activeWorkspace.id === currentlyManagingTeamId) {
+				switchWorkspace("personal");
+			}
+			renderTeamsModalContent();
+		} catch (e) {
+			console.error("Falha ao excluir equipe.", e);
+			showToast("Não foi possível excluir a equipe.");
+		}
+	});
+}
+
+if (elements.teamMembersList) {
+	elements.teamMembersList.addEventListener("change", async (e) => {
+		const target = e.target;
+		if (target.dataset.action === "change-role" && currentlyManagingTeamId) {
+			const uid = target.dataset.uid;
+			const newRole = target.value;
+			const team = userTeams.find((t) => t.id === currentlyManagingTeamId);
+			if (!team || !uid) return;
+			try {
+				const updatedMembers = {
+					...team.members,
+					[uid]: { ...team.members[uid], role: newRole },
+				};
+				await setDoc(doc(db, "teams", currentlyManagingTeamId), { members: updatedMembers, updatedAt: serverTimestamp() }, { merge: true });
+				showToast("Papel do membro atualizado!");
+			} catch (err) {
+				console.error("Falha ao atualizar papel.", err);
+				showToast("Não foi possível atualizar o papel do membro.");
+			}
+		}
+	});
+
+	elements.teamMembersList.addEventListener("click", async (e) => {
+		const target = e.target.closest("button");
+		if (target && target.dataset.action === "remove-member" && currentlyManagingTeamId) {
+			const uid = target.dataset.uid;
+			const team = userTeams.find((t) => t.id === currentlyManagingTeamId);
+			if (!team || !uid) return;
+			if (
+				!(await confirmAction({
+					title: "Remover membro?",
+					message: "Este usuário perderá o acesso à equipe.",
+					confirmLabel: "Remover membro",
+				}))
+			)
+				return;
+
+			try {
+				const updatedMembers = { ...team.members };
+				delete updatedMembers[uid];
+				await setDoc(doc(db, "teams", currentlyManagingTeamId), { members: updatedMembers, updatedAt: serverTimestamp() }, { merge: true });
+				showToast("Membro removido da equipe.");
+				renderTeamsModalContent();
+			} catch (err) {
+				console.error("Falha ao remover membro.", err);
+				showToast("Não foi possível remover o membro.");
+			}
+		}
+	});
+}

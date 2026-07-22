@@ -34,6 +34,8 @@ sem interromper a experiência de visitantes ou a sincronização atual pelo Fir
 | 9 | Calendário Mensal | Fases 0, 2 e 4 | Grade visual de calendário para ocorrências da Timeline |
 | 10 | Clima Dinâmico | Fases 0, 2 e 3 | Efeitos climáticos (chuva, sol, noite) nos cards de previsão |
 | 11 | Plano Premium & Monetização | Fases 0, 2 e 5B | Cotas de IA, 15 contadores, grupos, visibilidade e Stripe Billing |
+| 12 | Espaços de Equipe & Colaboração | Fases 0, 2 e 11 | Criação de equipes, permissões (admin/editor/viewer), convites no header e alternância de espaço |
+| 13 | Paisagens Sonoras no Modo de Foco | Fase 7 | Sons ambientes (chuva, natureza, ruído) disponíveis gratuitamente em public/sounds/ |
 
 ## Status da execução
 
@@ -50,6 +52,8 @@ sem interromper a experiência de visitantes ou a sincronização atual pelo Fir
 - [x] Fase 9 — visualização em grade de calendário
 - [x] Fase 10 — clima dinâmico nos cards
 - [ ] Fase 11 — plano premium & monetização (em desenvolvimento)
+- [ ] Fase 12 — espaços de equipe & colaboração
+- [ ] Fase 13 — paisagens sonoras no modo de foco
 
 As marcações acima representam implementação, documentação e gates automatizados
 concluídos. A validação manual em navegadores e dispositivos reais permanece no
@@ -418,6 +422,57 @@ Introduzir o Plano Premium no Timekeeper, expandindo capacidades para usuários 
 - Regras do Firestore (`firestore.rules`) garantem os limites de 5 e 15 contadores baseados no `tier` validado no servidor.
 - O campo `tier` só pode ser alterado por administradores ou webhooks autenticados do Stripe (Cloud Functions).
 - Todos os testes de regras e contratos continuam passando.
+
+## Fase 12 — Espaços de Equipe & Colaboração
+
+### Objetivo
+Permitir que usuários compartilhem e gerenciem contadores e metas em tempo real através de equipes colaborativas com controle estrito de permissões (RBAC), links de convite e cotas separadas por plano.
+
+### Escopo MVP
+- **Cotas de Criação de Equipes**:
+  - Usuários no plano **Free**: Podem criar até **1 equipe**.
+  - Usuários no plano **Premium**: Podem criar até **3 equipes**.
+- **Capacidade de Membros por Equipe**:
+  - Equipes cujo proprietário é **Free**: limite de até **5 membros**.
+  - Equipes cujo proprietário é **Premium**: limite de até **12 membros**.
+- **Orçamento Separado de Contadores da Equipe**:
+  - Os contadores de uma equipe são **contados separadamente do espaço pessoal** de cada membro.
+  - Limites de contadores da equipe: até **5 contadores** para equipes de proprietário Free e até **15 contadores** para equipes de proprietário Premium.
+- **Participação & Convites por Link**:
+  - Convites são gerados como **links compartilháveis seguros** criados pelos Admins da equipe.
+  - Qualquer usuário pode aceitar convites e participar de um **número ilimitado de equipes**.
+  - Ícone discreto de **Convites Pendentes** exibido no cabeçalho principal **apenas quando houver um convite ativo/pendente a ser aceito**.
+- **Alternância de Espaços (Workspace Switcher)**:
+  - Seletor de espaço no cabeçalho permitindo alternar fluidamente entre o **Espaço Pessoal** e os **Espaços de Equipes**.
+- **Níveis de Acesso e Permissões (RBAC)**:
+  - `admin`: Gerenciamento completo da equipe, geração de links de convite, atribuição/alteração de papéis e exclusão da equipe.
+  - `editor`: Criar, editar, reordenar e excluir contadores no espaço da equipe.
+  - `viewer`: Visualização em tempo real dos contadores da equipe (somente leitura).
+
+### Schema Proposto (Firestore)
+- Coleção raiz `/teams/{teamId}` com subcoleção `/teams/{teamId}/counters/{counterId}` e mapa `members: { [uid]: "admin" | "editor" | "viewer" }`.
+- Coleção de convites `/teams/{teamId}/invites/{inviteId}` com token único de expiração e papel padrão atribuído.
+
+### Critérios de aceite
+- Firestore Rules impedem que um usuário Free crie mais de 1 equipe ou ultrapasse o limite de contadores da equipe.
+- O ícone de convites pendentes permanece oculto no header quando não há convites ativos.
+- Alternar de espaço carrega os contadores correspondentes sem misturar dados do espaço pessoal com o espaço de equipe.
+- Ao remover um membro ou deletar uma equipe, o acesso em tempo real é revogado instantaneamente.
+
+## Fase 13 — Paisagens Sonoras no Modo de Foco
+
+### Objetivo
+Enriquecer a experiência imersiva do Modo de Foco (Fase 7) integrando a biblioteca de áudios ambientes já presente em `public/sounds/`, disponível gratuitamente para todos os usuários (visitantes, Free e Premium).
+
+### Escopo MVP
+- Mapear a biblioteca de sons de `public/sounds/` (categorias como chuva, natureza, binaural, ruído, lugares e urbanos).
+- Adicionar um seletor visual e controles de reprodução (play/pause, volume e loop) no painel da tela cheia do Modo de Foco.
+- Garantir áudio sob demanda e limpo (sem autoplay antes de uma ação do usuário).
+
+### Critérios de aceite
+- Disponível para todos os perfis de uso (Visitante, Free e Premium) no Modo de Foco.
+- O áudio pausa automaticamente ao fechar o Modo de Foco (`Esc` ou botão fechar).
+- Respeita as permissões do navegador e não causa erros em carregamentos offline/PWA sem os assets em cache.
 
 ## Testes transversais
 

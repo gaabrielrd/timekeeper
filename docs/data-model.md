@@ -39,6 +39,10 @@ generalConfig/payment-YYYY-MM-DD
 
 generalConfig/holiday-YYYY-MM-DD
 └── type: "holiday" + dateTime
+
+teams/{teamId}
+├── id, name, ownerUid, ownerTier, members map (admin | editor | viewer)
+└── data/counters (items[0..4] Free ou items[0..14] Premium)
 ```
 
 ## Perfil — `/users/{uid}`

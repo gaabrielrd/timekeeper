@@ -40,7 +40,9 @@ test("configuração geral mantém seed, modal administrativo e regras alinhados
 	assert.equal(seed.filter((item) => item.type === "payment").length, 12);
 	assert.equal(seed.filter((item) => item.type === "holiday").length, 10);
 	assert.match(html, /id="admin-dialog"/);
-	assert.equal((html.match(/role="tab"/g) || []).length, 3);
+	const adminDialogStart = html.indexOf('id="admin-dialog"');
+	const adminDialogHTML = html.slice(adminDialogStart, html.indexOf("</dialog>", adminDialogStart));
+	assert.equal((adminDialogHTML.match(/role="tab"/g) || []).length, 3);
 	assert.match(client, /collection\(db, "generalConfig"\)/);
 	assert.match(client, /snapshot\.data\(\)\?\.isAdmin === true/);
 	assert.match(rules, /match \/generalConfig\/\{configId\}/);
@@ -499,4 +501,14 @@ test("todos os links Markdown locais resolvem", () => {
 			assert.ok(fs.existsSync(target), `${file} aponta para ${match[1]}`);
 		}
 	}
+});
+
+test("espaços de equipe e colaboração mantêm regras, cotas e papéis alinhados", () => {
+	const rules = read("firestore.rules");
+	assert.match(rules, /function isTeamMember\(teamId\)/);
+	assert.match(rules, /function getTeamRole\(teamId\)/);
+	assert.match(rules, /function getMaxCreatedTeams\(userId\)/);
+	assert.match(rules, /function getMaxTeamMembers\(ownerUid\)/);
+	assert.match(rules, /match \/teams\/\{teamId\}/);
+	assert.match(rules, /isTeamEditorOrAdmin\(teamId\)/);
 });

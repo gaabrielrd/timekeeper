@@ -195,6 +195,26 @@
 					<span>Meus contadores</span>
 				</button>
 
+				<select
+					id="workspace-switcher"
+					class="workspace-switcher-select"
+					aria-label="Espaço de trabalho"
+					hidden
+				>
+					<option value="personal">👤 Meu Espaço Pessoal</option>
+				</select>
+
+				<button
+					id="pending-invites-button"
+					class="header-tool-button pending-invites-btn"
+					type="button"
+					title="Convites pendentes"
+					hidden
+				>
+					<i class="material-icons" aria-hidden="true">mail</i>
+					<span id="pending-invites-count" class="invite-badge">0</span>
+				</button>
+
 				<button
 					id="auth-button"
 					class="account-button"
@@ -491,6 +511,16 @@
 						title="Plano Premium"
 					>
 						<i class="material-icons">star</i>
+					</button>
+					<button
+						id="teams-manage-button"
+						class="icon-button"
+						type="button"
+						aria-label="Gerenciar equipes"
+						title="Gerenciar equipes"
+						hidden
+					>
+						<i class="material-icons">group</i>
 					</button>
 					<button
 						id="sidebar-close"
@@ -2094,6 +2124,182 @@
 					class="form-message"
 					aria-live="polite"
 				></p>
+			</div>
+		</dialog>
+		<dialog
+			id="pending-invites-dialog"
+			class="counter-dialog pending-invites-dialog"
+			aria-labelledby="pending-invites-title"
+		>
+			<div class="team-shell">
+				<div class="modal-heading">
+					<div>
+						<p class="section-kicker">Colaboração</p>
+						<h2 id="pending-invites-title">Convites pendentes</h2>
+					</div>
+					<button
+						id="pending-invites-close"
+						class="icon-button"
+						type="button"
+						aria-label="Fechar convites"
+					>
+						<i class="material-icons">close</i>
+					</button>
+				</div>
+				<div id="pending-invites-list" class="pending-invites-list" aria-live="polite"></div>
+			</div>
+		</dialog>
+		<dialog
+			id="team-manage-dialog"
+			class="counter-dialog team-manage-dialog"
+			aria-labelledby="team-manage-title"
+		>
+			<div class="team-shell">
+				<div class="modal-heading">
+					<div>
+						<p class="section-kicker">Colaboração</p>
+						<h2 id="team-manage-title">Equipes & Colaboração</h2>
+					</div>
+					<button
+						id="team-manage-close"
+						class="icon-button"
+						type="button"
+						aria-label="Fechar gerenciamento de equipes"
+					>
+						<i class="material-icons">close</i>
+					</button>
+				</div>
+
+				<div class="team-manage-content">
+					<div id="team-create-panel" class="team-create-panel team-section">
+						<div class="team-section-heading">
+							<div>
+								<p class="section-kicker">Novo espaço</p>
+								<h3>Crie uma equipe para colaborar</h3>
+								<p class="team-section-description">Separe os contadores do trabalho, da família ou de qualquer projeto.</p>
+							</div>
+							<span class="team-section-icon" aria-hidden="true"><i class="material-icons">groups</i></span>
+						</div>
+						<div class="form-row">
+							<label for="create-team-name-input">Criar nova equipe</label>
+							<div class="input-with-button">
+								<input
+									id="create-team-name-input"
+									type="text"
+									maxlength="50"
+									placeholder="Ex: Projeto Alpha, Família, Estudo..."
+								/>
+								<button id="create-team-submit-button" class="primary-button compact-button" type="button">
+									Criar equipe
+								</button>
+							</div>
+						</div>
+					</div>
+
+					<div class="team-list-section">
+						<div class="team-list-heading">
+							<div>
+								<p class="section-kicker">Seus espaços</p>
+								<h3>Escolha onde trabalhar</h3>
+							</div>
+							<div id="team-quota-info" class="team-quota-info">
+								Você possui 0 de 1 equipe criada (Plano Free)
+							</div>
+						</div>
+						<div id="user-teams-grid" class="user-teams-grid"></div>
+					</div>
+				</div>
+			</div>
+		</dialog>
+
+		<dialog
+			id="team-details-dialog"
+			class="counter-dialog team-manage-dialog"
+			aria-labelledby="team-details-title"
+		>
+			<div class="team-shell">
+				<div class="modal-heading">
+					<div>
+						<p class="section-kicker">Gerenciamento</p>
+						<h2 id="team-details-title">Gerenciar equipe</h2>
+					</div>
+					<button
+						id="team-details-close"
+						class="icon-button"
+						type="button"
+						aria-label="Fechar gerenciamento da equipe"
+					>
+						<i class="material-icons">close</i>
+					</button>
+				</div>
+
+				<div class="team-manage-content">
+					<div class="team-identity-panel">
+						<span class="team-identity-mark" aria-hidden="true"><i class="material-icons">groups</i></span>
+						<div class="team-identity-copy">
+							<p class="section-kicker">Espaço compartilhado</p>
+							<h3 id="team-details-name">Sua equipe</h3>
+							<p id="team-details-subtitle" class="team-section-description">Contadores sincronizados em tempo real.</p>
+						</div>
+						<span id="team-details-role" class="team-role-chip">ADMIN</span>
+					</div>
+
+					<section class="team-section team-settings-section" aria-labelledby="team-settings-title">
+						<div class="team-section-heading">
+							<div>
+								<p class="section-kicker">Identidade</p>
+								<h3 id="team-settings-title">Nome da equipe</h3>
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="team-name-input">Nome visível para os membros</label>
+							<div class="input-with-button">
+								<input id="team-name-input" type="text" maxlength="50" placeholder="Nome da equipe" />
+								<button id="save-team-name-button" class="primary-button compact-button" type="button"><i class="material-icons" aria-hidden="true">check</i>Salvar</button>
+							</div>
+							<p class="field-hint">Use um nome curto para que todos reconheçam este espaço rapidamente.</p>
+						</div>
+					</section>
+
+					<section class="team-section team-invite-section" aria-labelledby="team-invite-title">
+						<div class="team-section-heading">
+							<div>
+								<p class="section-kicker">Acesso</p>
+								<h3 id="team-invite-title">Convide seu time</h3>
+								<p class="team-section-description">Gere um link para compartilhar com quem precisa acompanhar este espaço.</p>
+							</div>
+						</div>
+						<button id="generate-team-invite-button" class="secondary-button" type="button">
+							<i class="material-icons" aria-hidden="true">link</i>
+							<span>Gerar link de convite</span><i class="material-icons team-button-arrow" aria-hidden="true">arrow_forward</i>
+						</button>
+						<div id="team-invite-link-box" class="invite-link-box" hidden>
+							<input id="team-invite-link-input" type="text" readonly />
+							<button id="copy-team-invite-button" class="primary-button compact-button" type="button"><i class="material-icons" aria-hidden="true">content_copy</i><span>Copiar</span></button>
+						</div>
+					</section>
+
+					<section class="team-section team-members-section" aria-labelledby="team-members-title">
+						<div class="team-section-heading">
+							<div>
+								<p class="section-kicker">Pessoas</p>
+								<h3 id="team-members-title">Membros da equipe <span class="team-count-mark">· <span id="team-member-count">0</span></span></h3>
+							</div>
+							<span id="team-member-capacity" class="team-capacity">0 / 5</span>
+						</div>
+						<div id="team-members-list" class="team-members-list"></div>
+					</section>
+					<div class="team-actions-footer">
+						<div>
+							<p class="section-kicker">Zona de saída</p>
+							<p class="field-hint">Ações aqui alteram o acesso de todos os membros.</p>
+						</div>
+						<div class="team-footer-actions">
+							<button id="leave-team-button" class="secondary-button danger-button" type="button"><i class="material-icons" aria-hidden="true">logout</i>Sair</button>
+							<button id="delete-team-button" class="secondary-button danger-button" type="button" hidden><i class="material-icons" aria-hidden="true">delete_outline</i>Excluir equipe</button>
+						</div>
+					</div>
+				</div>
 			</div>
 		</dialog>
 		<div
