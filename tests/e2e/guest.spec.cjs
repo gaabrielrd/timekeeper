@@ -51,6 +51,15 @@ test("modo de foco restaura o contador e fecha por Escape sem overflow", async (
 	await expect(page.locator("#focus-mode")).toHaveAttribute("aria-hidden", "false");
 	await expect(page.locator("#focus-mode-title")).toHaveText("Expediente");
 	await expect(page.locator("#focus-mode-main")).not.toHaveText("carregando...");
+	await expect(page.locator("#focus-mode-soundscape")).toBeVisible();
+	await expect(page.locator("#focus-mode-sound-toggle")).toBeDisabled();
+	await page.locator("#focus-mode-sound-select").selectOption("rain:light-rain");
+	await expect(page.locator("#focus-mode-sound-toggle")).toBeEnabled();
+	await expect(page.locator("#focus-mode-sound-toggle")).toHaveAttribute(
+		"aria-pressed",
+		"false",
+	);
+	await expect(page.locator("#focus-mode-sound-status")).toContainText("Pausado");
 	const ambientOpacity = await page
 		.locator("#ambient-background")
 		.evaluate((element) => Number.parseFloat(getComputedStyle(element).opacity));
@@ -68,6 +77,7 @@ test("modo de foco restaura o contador e fecha por Escape sem overflow", async (
 	await page.reload();
 	await expect(page.locator("body")).toHaveClass(/focus-mode-active/);
 	await expect(page.locator("#focus-mode-title")).toHaveText("Expediente");
+	await expect(page.locator("#focus-mode-sound-toggle")).toBeDisabled();
 	const dimensions = await page.evaluate(() => ({
 		clientWidth: document.documentElement.clientWidth,
 		scrollWidth: document.documentElement.scrollWidth,

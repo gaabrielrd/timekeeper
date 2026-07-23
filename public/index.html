@@ -27,6 +27,7 @@
 		<script src="src/occurrences.js"></script>
 		<script src="src/weather.js"></script>
 		<script src="src/notifications.js"></script>
+		<script src="src/soundscapes.js"></script>
 		<script defer src="src/focus.js"></script>
 		<script src="src/progressbar.min.js"></script>
 		<script defer src="src/analytics.js"></script>
@@ -141,6 +142,65 @@
 					class="focus-mode-progress"
 					aria-hidden="true"
 				></div>
+				<div
+					id="focus-mode-soundscape"
+					class="focus-mode-soundscape"
+					aria-labelledby="focus-mode-soundscape-title"
+				>
+					<div class="focus-mode-soundscape-heading">
+						<div>
+							<p class="focus-mode-soundscape-kicker">Ambiente</p>
+							<h2 id="focus-mode-soundscape-title">Paisagem sonora</h2>
+						</div>
+						<p
+							id="focus-mode-sound-status"
+							class="focus-mode-sound-status"
+							role="status"
+							aria-live="polite"
+						>
+							Som pausado
+						</p>
+					</div>
+					<div class="focus-mode-sound-controls">
+						<label class="focus-mode-sound-select" for="focus-mode-sound-select">
+							<span>Escolha um som</span>
+							<select id="focus-mode-sound-select" aria-label="Escolha uma paisagem sonora">
+								<option value="">Escolha uma paisagem sonora</option>
+							</select>
+						</label>
+						<button
+							id="focus-mode-sound-toggle"
+							class="focus-mode-sound-toggle"
+							type="button"
+							aria-pressed="false"
+							disabled
+							aria-label="Reproduzir paisagem sonora"
+						>
+							<i id="focus-mode-sound-toggle-icon" class="material-icons" aria-hidden="true">play_arrow</i>
+							<span id="focus-mode-sound-toggle-label">Reproduzir</span>
+						</button>
+						<label class="focus-mode-sound-volume" for="focus-mode-sound-volume">
+							<span>Volume <output id="focus-mode-sound-volume-output" for="focus-mode-sound-volume">60%</output></span>
+							<input
+								id="focus-mode-sound-volume"
+								type="range"
+								min="0"
+								max="100"
+								value="60"
+								step="1"
+								aria-label="Volume da paisagem sonora"
+							/>
+						</label>
+						<label class="focus-mode-sound-loop" for="focus-mode-sound-loop">
+							<input
+								id="focus-mode-sound-loop"
+								type="checkbox"
+								aria-label="Repetir paisagem sonora"
+							/>
+							<span>Repetir</span>
+						</label>
+					</div>
+				</div>
 				<p class="focus-mode-hint"><kbd>Esc</kbd> para sair</p>
 			</div>
 		</section>
@@ -354,7 +414,7 @@
 				<div class="custom-counters-reveal">
 					<div class="section-heading">
 						<div>
-							<p class="section-kicker">Sua conta</p>
+							<p id="custom-counters-kicker" class="section-kicker">Sua conta</p>
 							<h2 id="custom-counters-title">Meus contadores</h2>
 						</div>
 						<span
@@ -585,7 +645,7 @@
 								Até cinco
 							</p>
 							<h2 id="counter-management-title">
-								Meus contadores
+								<span id="counter-management-label">Meus contadores</span>
 								<span
 									id="user-tier-badge"
 									class="user-tier-badge"
@@ -611,6 +671,24 @@
 						class="counter-list"
 						aria-live="polite"
 					></div>
+					<div id="counter-group-controls" class="counter-group-controls" hidden>
+						<div class="counter-group-controls-heading">
+							<div>
+								<p class="setting-label">Visualização dos grupos</p>
+								<p class="setting-help">Defina a sequência e quais grupos aparecem na dashboard.</p>
+							</div>
+							<button
+								id="create-counter-group-button"
+								class="icon-button"
+								type="button"
+								aria-label="Criar grupo"
+								title="Criar grupo"
+							>
+								<i class="material-icons" aria-hidden="true">create_new_folder</i>
+							</button>
+						</div>
+						<div id="counter-group-order-list" class="counter-group-order-list"></div>
+					</div>
 					<button
 						id="open-counter-modal"
 						class="primary-button confirmation-dialog-confirm"
@@ -685,7 +763,7 @@
 						aria-label="Ordem e visibilidade das seções"
 					></div>
 					<p class="setting-help">
-						Use as setas para organizar as seções e grupos.
+						Use as setas para organizar as seções.
 					</p>
 
 					<div class="appearance-divider"></div>

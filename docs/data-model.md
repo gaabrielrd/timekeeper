@@ -42,8 +42,14 @@ generalConfig/holiday-YYYY-MM-DD
 
 teams/{teamId}
 ├── id, name, ownerUid, ownerTier, members map (admin | editor | viewer)
-└── data/counters (items[0..4] Free ou items[0..14] Premium)
+├── data/counters (items[0..4] Free ou items[0..14] Premium)
+├── data/settings (counterGroups, hiddenCounterGroups, updatedAt)
+└── invites/{inviteId} (teamId, teamName, role, createdBy, createdAt, expiresAt)
 ```
+
+Convites usam um UUID imprevisível, duram até sete dias e podem ser lidos somente
+pelo caminho exato. A entrada do membro não é escrita pelo navegador: a callable
+Function `acceptTeamInvite` valida convite, expiração e cota em uma transação.
 
 ## Perfil — `/users/{uid}`
 
@@ -109,10 +115,20 @@ remoções intencionais.
 | `notificationQuietHours` | map | 22:00–07:00, desligado | boolean e horários locais `HH:mm` |
 | `weatherEffectsEnabled` | boolean | `false` | boolean estrito ao aplicar |
 | `counterGroups` | string[] | `[]` | até 10 grupos de contadores (strings até 30 chars cada) |
+| `hiddenCounterGroups` | string[] | `[]` | grupos ocultos na visualização do workspace |
+| `activeWorkspace` | `personal` ou `team:{teamId}` | `personal` | seleção restaurada e sincronizada entre abas/dispositivos |
 | `updatedAt` | timestamp | servidor | `serverTimestamp()` |
 
 O campo legado `customCounters` pode existir no documento raiz, mas não deve ser
 usado para novas escritas.
+
+## Settings de equipe — `/teams/{teamId}/data/settings`
+
+Equipes Premium compartilham a ordem dos grupos (`counterGroups`) e os grupos
+ocultos (`hiddenCounterGroups`). Todos os membros recebem esse documento em tempo
+real. Somente `admin` e `editor` podem criar ou atualizar as preferências; `viewer`
+tem acesso estritamente de leitura. Aparência, notificações, clima e layout geral
+continuam pertencendo ao settings pessoal.
 
 A Timeline e os candidatos de notificação são derivados dos snapshots de
 `generalConfig`, `settings` e `counters`; não existe coleção persistida de
@@ -239,6 +255,11 @@ Cada item no arquivo estende o formato de um contador do tipo `fixed` adicionand
 O Modo de Foco não adiciona campo persistido ao Firestore. A chave de
 `sessionStorage` `timekeeper:focus-counter` guarda por aba o ID estável de um
 contador padrão ou pessoal e é removida ao sair da visualização.
+
+As paisagens sonoras do Modo de Foco também não adicionam schema persistido:
+catálogo, faixa selecionada, volume, loop e estado de reprodução vivem somente
+na memória da aba. Os arquivos são assets locais em `public/sounds/` e são
+carregados sob demanda, sem pré-cache do catálogo completo.
 
 Os dois cookies são gravados com `path=/` e `SameSite=Lax`. Não possuem `Secure`
 nem `HttpOnly`, pois são configurações não sensíveis acessadas pelo JavaScript.

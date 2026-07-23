@@ -36,6 +36,8 @@ sem interromper a experiência de visitantes ou a sincronização atual pelo Fir
 | 11 | Plano Premium & Monetização | Fases 0, 2 e 5B | Cotas de IA, 15 contadores, grupos, visibilidade e Stripe Billing |
 | 12 | Espaços de Equipe & Colaboração | Fases 0, 2 e 11 | Criação de equipes, permissões (admin/editor/viewer), convites no header e alternância de espaço |
 | 13 | Paisagens Sonoras no Modo de Foco | Fase 7 | Sons ambientes (chuva, natureza, ruído) disponíveis gratuitamente em public/sounds/ |
+| 14 | Criação via Linguagem Natural & Checklists IA | Fases 0, 6 e 11 | Criação rápida por comando em linguagem natural e sugestão automática de subtarefas por IA |
+| 15 | Links Públicos Compartilháveis & Embeds | Fases 0, 2 e 12 | Links únicos de leitura externa e widgets iFrame incorporáveis em sites externos |
 
 ## Status da execução
 
@@ -53,7 +55,9 @@ sem interromper a experiência de visitantes ou a sincronização atual pelo Fir
 - [x] Fase 10 — clima dinâmico nos cards
 - [ ] Fase 11 — plano premium & monetização (em desenvolvimento)
 - [ ] Fase 12 — espaços de equipe & colaboração
-- [ ] Fase 13 — paisagens sonoras no modo de foco
+- [x] Fase 13 — paisagens sonoras no modo de foco
+- [ ] Fase 14 — criação via linguagem natural & checklists IA
+- [ ] Fase 15 — links públicos & embeds
 
 As marcações acima representam implementação, documentação e gates automatizados
 concluídos. A validação manual em navegadores e dispositivos reais permanece no
@@ -473,6 +477,48 @@ Enriquecer a experiência imersiva do Modo de Foco (Fase 7) integrando a bibliot
 - Disponível para todos os perfis de uso (Visitante, Free e Premium) no Modo de Foco.
 - O áudio pausa automaticamente ao fechar o Modo de Foco (`Esc` ou botão fechar).
 - Respeita as permissões do navegador e não causa erros em carregamentos offline/PWA sem os assets em cache.
+
+## Fase 14 — Criação via Linguagem Natural & Checklists IA
+
+### Objetivo
+Reduzir a fricção de criação e configuração de contadores (Intelligence & UX Friction Reduction), permitindo entrada rápida por comandos em linguagem natural (NLP) e geração dinâmica de mini-checklists contextuais via IA (Gemini API / Firebase AI Logic).
+
+### Escopo MVP
+- **Interface de Criação por NLP**:
+  - Prompt inteligente *"O que você quer acompanhar?"* no modal de contadores.
+  - Parser local e via Cloud Function para extrair título, datas ("daqui a 3 semanas", "dia 15 às 14h"), tipo de recorrência e categorias.
+- **Sugestão Inteligente de Mini-Checklists**:
+  - Geração automática de subtarefas/etapas contextuais (ex: *"Lançamento de Produto"* -> `["Testes de QA", "SEO Meta Tags", "Release Notes", "Deploy"]`).
+  - Permite aceitar, modificar ou descartar os itens antes de salvar.
+- **Cotagem e Monetização**:
+  - Templates estáticos pré-definidos para visitantes e usuários Free.
+  - Chamadas de IA generativa ilimitadas ou cota mensal expandida para contas Premium.
+
+### Critérios de aceite
+- Reconhecimento preciso de termos temporais em português com fusos horários locais.
+- Interface de prévia amigável antes de confirmar o cadastro do contador.
+- Fallback gracioso para criação convencional em caso de ausência de rede ou erro na API de IA.
+
+## Fase 15 — Links Públicos Compartilháveis & Embeds
+
+### Objetivo
+Aumentar o alcance social e o crescimento orgânico do produto (Growth & Social Reach), permitindo que contadores e dashboards de equipe sejam compartilhados publicamente via links diretos e incorporados em sites externos, Notions, blogs e portais via iFrame.
+
+### Escopo MVP
+- **Links Públicos de Leitura (`/p/<token>`)**:
+  - Configuração de visibilidade `isPublic: true` nos contadores e espaços de equipe.
+  - URL de leitura pública que renderiza contadores em tempo real sem exigir autenticação.
+- **Embeds para iFrame**:
+  - Gerador de snippet `<iframe src="..." ...></iframe>` com opções de personalização visual (tema escuro, compacto, transparente).
+  - Ajuste automático de layout para diferentes larguras de incorporação.
+- **Segurança & Firestore Rules**:
+  - Regra `allow read: if resource.data.isPublic == true;` para acessos não autenticados.
+  - Garantia de que contadores privados e dados pessoais permanecem protegidos por UID.
+
+### Critérios de aceite
+- Páginas públicas e iFrames carregam a contagem ao vivo sem exigir login.
+- Firestore Security Rules impedem a leitura de contadores não marcados como `isPublic`.
+- Layouts incorporados adaptam-se responsivamente sem gerar barras de rolagem desnecessárias.
 
 ## Testes transversais
 

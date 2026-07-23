@@ -9,6 +9,7 @@
 	let syncTimer = null;
 	let restoreTimer = null;
 	let restoreObserver = null;
+	let soundController = null;
 	let initialized = false;
 
 	function storedCounterId() {
@@ -41,7 +42,132 @@
 			overlay: root.document.querySelector("#focus-mode-overlay"),
 			checklist: root.document.querySelector("#focus-mode-checklist"),
 			progress: root.document.querySelector("#focus-mode-progress"),
+			soundscape: root.document.querySelector("#focus-mode-soundscape"),
+			soundSelect: root.document.querySelector("#focus-mode-sound-select"),
+			soundToggle: root.document.querySelector("#focus-mode-sound-toggle"),
+			soundToggleIcon: root.document.querySelector(
+				"#focus-mode-sound-toggle-icon",
+			),
+			soundToggleLabel: root.document.querySelector(
+				"#focus-mode-sound-toggle-label",
+			),
+			soundVolume: root.document.querySelector("#focus-mode-sound-volume"),
+			soundVolumeOutput: root.document.querySelector(
+				"#focus-mode-sound-volume-output",
+			),
+			soundLoop: root.document.querySelector("#focus-mode-sound-loop"),
+			soundStatus: root.document.querySelector("#focus-mode-sound-status"),
 		};
+	}
+
+	function soundTrackStatus(snapshot) {
+		if (!snapshot.track) return "Escolha um som";
+		if (snapshot.state === "playing") return `Tocando · ${snapshot.track.label}`;
+		if (snapshot.state === "error") return "Indisponível offline";
+		if (snapshot.state === "loading") return "Carregando…";
+		return `Pausado · ${snapshot.track.label}`;
+	}
+
+	function renderSoundscape(snapshot) {
+		const elements = focusElements();
+		if (!elements.soundscape) return;
+		if (elements.soundStatus) {
+			elements.soundStatus.textContent = soundTrackStatus(snapshot);
+		}
+		if (elements.soundSelect && snapshot.track) {
+			elements.soundSelect.value = snapshot.track.id;
+		} else if (elements.soundSelect) {
+			elements.soundSelect.value = "";
+		}
+		if (elements.soundToggle) {
+			const isPlaying = snapshot.state === "playing";
+			elements.soundToggle.disabled = !snapshot.track;
+			elements.soundToggle.setAttribute("aria-pressed", String(isPlaying));
+			elements.soundToggle.setAttribute(
+				"aria-label",
+				isPlaying
+					? "Pausar paisagem sonora"
+					: "Reproduzir paisagem sonora",
+			);
+		}
+		if (elements.soundToggleIcon) {
+			elements.soundToggleIcon.textContent =
+				snapshot.state === "playing" ? "pause" : "play_arrow";
+		}
+		if (elements.soundToggleLabel) {
+			elements.soundToggleLabel.textContent =
+				snapshot.state === "playing"
+					? "Pausar"
+					: snapshot.state === "error"
+						? "Tentar novamente"
+						: "Reproduzir";
+		}
+		if (elements.soundVolume) {
+			elements.soundVolume.value = String(Math.round(snapshot.volume * 100));
+		}
+		if (elements.soundVolumeOutput) {
+			elements.soundVolumeOutput.textContent = `${Math.round(
+				snapshot.volume * 100,
+			)}%`;
+		}
+		if (elements.soundLoop) elements.soundLoop.checked = snapshot.loop;
+	}
+
+	function populateSoundscapeSelect(elements) {
+		const catalog = root.TimekeeperSoundscapes?.catalog || [];
+		const categories = root.TimekeeperSoundscapes?.categories || [];
+		if (!elements.soundSelect || !catalog.length) return;
+		elements.soundSelect.replaceChildren();
+		const placeholder = root.document.createElement("option");
+		placeholder.value = "";
+		placeholder.textContent = "Escolha uma paisagem sonora";
+		elements.soundSelect.append(placeholder);
+		categories.forEach((category) => {
+			const group = root.document.createElement("optgroup");
+			group.label = category.label;
+			catalog
+				.filter((track) => track.category === category.id)
+				.forEach((track) => {
+					const option = root.document.createElement("option");
+					option.value = track.id;
+					option.textContent = track.label;
+					group.append(option);
+				});
+			if (group.children.length) elements.soundSelect.append(group);
+		});
+	}
+
+	function initializeSoundscape() {
+		const elements = focusElements();
+		if (!elements.soundscape) return;
+		if (!root.TimekeeperSoundscapes?.createController) {
+			elements.soundscape.hidden = true;
+			return;
+		}
+		soundController = root.TimekeeperSoundscapes.createController();
+		if (!soundController) {
+			elements.soundscape.hidden = true;
+			return;
+		}
+		populateSoundscapeSelect(elements);
+		soundController.setVolume(Number(elements.soundVolume?.value || 60) / 100);
+		soundController.subscribe(renderSoundscape);
+		elements.soundSelect?.addEventListener("change", () => {
+			soundController.select(elements.soundSelect.value);
+		});
+		elements.soundToggle?.addEventListener("click", () => {
+			if (soundController.snapshot().state === "playing") {
+				soundController.pause();
+			} else {
+				soundController.play();
+			}
+		});
+		elements.soundVolume?.addEventListener("input", () => {
+			soundController.setVolume(Number(elements.soundVolume.value) / 100);
+		});
+		elements.soundLoop?.addEventListener("change", () => {
+			soundController.setLoop(elements.soundLoop.checked);
+		});
 	}
 
 	function counterElement(counterId) {
@@ -160,6 +286,7 @@
 	function closeFocusMode(options = {}) {
 		const { restoreFocus = true } = options;
 		const elements = focusElements();
+		soundController?.pause();
 		stopRestoreWatch();
 		root.clearInterval(syncTimer);
 		syncTimer = null;
@@ -209,6 +336,7 @@
 		initialized = true;
 		const elements = focusElements();
 		if (!elements.view) return;
+		initializeSoundscape();
 
 		root.document.addEventListener("click", (event) => {
 			const trigger = event.target.closest?.("[data-focus-trigger]");
@@ -237,6 +365,11 @@
 			if (source) openFocusMode(source);
 		},
 		sync: syncFocusedCounter,
+		sound: {
+			pause() {
+				soundController?.pause();
+			},
+		},
 	};
 
 	if (root.document.readyState === "loading") {

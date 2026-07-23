@@ -51,6 +51,12 @@ foco ao abrir, `Esc` encerra o modo e o foco retorna ao botão de origem quando 
 ainda existe. A regra global de `prefers-reduced-motion` reduz as transições e as
 animações do fundo sem esconder conteúdo.
 
+O painel de paisagem sonora ocupa uma faixa compacta abaixo do progresso, com
+hierarquia editorial discreta para não competir com o contador. Seus controles
+mantêm alvos de toque confortáveis, reorganizam-se em duas colunas até 600 px e
+usam a cor do contador apenas como sinal de ação. A seleção inicial é neutra e o
+estado pausado fica explícito, evitando surpresa sonora ao entrar no foco.
+
 ### Header
 
 Barra de controle fixa com título, horário anônimo ou toggle de contadores, conta e
@@ -116,6 +122,10 @@ animação indispensável e herda o comportamento global de movimento reduzido.
 A sidebar ocupa o lado direito, bloqueia interação externa via backdrop/`inert` e
 contém rotina, contadores, aparência, clima, notificações e ações da conta no mesmo
 fluxo rolável. Abaixo da biblioteca, `Arquivados` abre o histórico fora desse fluxo.
+No espaço de uma equipe Premium, a área de contadores também expõe uma lista linear
+para criar grupos, definir sua sequência e alternar sua visibilidade. Admins e
+editores recebem os controles; viewers veem a lista de contadores sem ações de
+escrita.
 Sair
 precede excluir conta, que encerra o conteúdo. Um `<dialog>` reúne criação e
 edição com uma prévia compacta que reage a nome, cor, imagem e opacidades; outro

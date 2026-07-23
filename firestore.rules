@@ -167,7 +167,10 @@ service cloud.firestore {
         && (!('counterGroups' in data)
           || (data.counterGroups is list && data.counterGroups.size() <= 10))
         && (!('hiddenCounterGroups' in data)
-          || (data.hiddenCounterGroups is list && data.hiddenCounterGroups.size() <= 10));
+          || (data.hiddenCounterGroups is list && data.hiddenCounterGroups.size() <= 10))
+        && (!('activeWorkspace' in data)
+          || (data.activeWorkspace is string
+            && data.activeWorkspace.matches('^(personal|team:.{1,100})$')));
     }
 
     function hasValidProfileFields(data) {
@@ -373,6 +376,27 @@ service cloud.firestore {
         && hasValidUpdatedAt(data);
     }
 
+    function isValidTeamInviteDocument(teamId, data) {
+      return data.keys().hasOnly([
+          'teamId',
+          'teamName',
+          'role',
+          'createdBy',
+          'createdAt',
+          'expiresAt'
+        ])
+        && data.teamId == teamId
+        && data.teamName is string
+        && data.teamName.size() >= 1
+        && data.teamName.size() <= 50
+        && data.role == 'editor'
+        && data.createdBy == request.auth.uid
+        && data.createdAt is timestamp
+        && data.expiresAt is timestamp
+        && data.expiresAt > request.time
+        && data.expiresAt <= request.time + duration.value(7, 'd');
+    }
+
     function hasValidCounterItems(userId, items) {
       return items is list
         && items.size() <= getMaxCounters(userId)
@@ -416,6 +440,7 @@ service cloud.firestore {
           'notificationQuietHours',
           'counterGroups',
           'hiddenCounterGroups',
+          'activeWorkspace',
           'updatedAt'
         ])
         && hasValidSettingsFields(data)
@@ -425,6 +450,16 @@ service cloud.firestore {
     function isValidCountersDocument(userId, data) {
       return data.keys().hasOnly(['items', 'updatedAt'])
         && hasValidCounterItems(userId, data.items)
+        && hasValidUpdatedAt(data);
+    }
+
+    function isValidTeamSettingsDocument(data) {
+      return data.keys().hasOnly([
+          'counterGroups',
+          'hiddenCounterGroups',
+          'updatedAt'
+        ])
+        && hasValidSettingsFields(data)
         && hasValidUpdatedAt(data);
     }
 
@@ -648,9 +683,19 @@ service cloud.firestore {
         allow delete: if isTeamAdmin(teamId);
       }
 
+      match /data/settings {
+        allow read: if isTeamMember(teamId);
+        allow create, update: if isTeamEditorOrAdmin(teamId)
+          && isValidTeamSettingsDocument(request.resource.data);
+        allow delete: if isTeamAdmin(teamId);
+      }
+
       match /invites/{inviteId} {
-        allow read: if request.auth != null;
-        allow create, update, delete: if isTeamAdmin(teamId);
+        allow get: if request.auth != null;
+        allow list: if false;
+        allow create: if isTeamAdmin(teamId)
+          && isValidTeamInviteDocument(teamId, request.resource.data);
+        allow update, delete: if isTeamAdmin(teamId);
       }
     }
 

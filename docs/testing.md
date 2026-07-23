@@ -116,6 +116,8 @@ outro diretório silenciosamente.
 - notificações concedidas, negadas e indisponíveis sem prompt automático.
 - Modo de Foco padrão e pessoal, reload da sessão, `Esc`, botão de fechar, reduced
   motion e ausência de overflow em desktop/mobile.
+- Catálogo local de paisagens sonoras, ausência de autoplay, controles de seleção,
+  volume e loop, além do estado seguro quando um asset não está disponível offline.
 
 Os E2E usam `demo-timekeeper` e só ativam emuladores com `?emulators=1` em
 localhost. Nenhum teste automatizado escreve no projeto Firebase de produção.

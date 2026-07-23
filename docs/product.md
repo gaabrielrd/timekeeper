@@ -102,6 +102,24 @@ Ambos podem ter uma cor própria. Sem cor, usam o destaque principal da interfac
 - A biblioteca aceita até dez arquivos de 5 MiB; excluir um remove seu uso em todos
   os contadores sem excluir os próprios contadores.
 
+## Espaços pessoais e de equipe
+
+O seletor do header alterna entre o espaço pessoal e as equipes das quais a conta
+participa. A seleção fica salva no settings pessoal e sincroniza em tempo real entre
+abas e dispositivos; se a equipe deixar de estar disponível, o app retorna ao espaço
+pessoal. Cada troca substitui imediatamente os contadores da área principal e da
+sidebar, sem misturar dados entre workspaces.
+
+Equipes cujo proprietário é Premium também sincronizam grupos, ordem e visibilidade
+dos grupos. Admins e editores podem criar grupos, reordenar ou ocultar grupos e
+criar, editar, reordenar, ocultar e excluir contadores. Viewers recebem os mesmos
+contadores e preferências de visualização em tempo real, mas todos os controles de
+escrita ficam indisponíveis.
+
+Admins geram links de convite com validade de sete dias. O convidado autenticado
+vê o nome da equipe antes de aceitar; a entrada é concluída no backend somente se o
+convite ainda estiver válido e houver vaga no limite do plano do proprietário.
+
 ## Aparência
 
 O fundo animado começa desligado. Quando ativado, o usuário escolhe:
@@ -182,6 +200,14 @@ O ID do contador em foco fica somente em `sessionStorage`, na chave
 a aba encerra a preferência. Se um contador pessoal não estiver mais disponível, o
 estado transitório expira sem bloquear a dashboard. O usuário sai pelo botão de
 fechar ou pela tecla `Esc`.
+
+O Modo de Foco também oferece uma biblioteca local de paisagens sonoras para
+visitantes e contas autenticadas. A seleção é organizada por categorias, com
+reprodução/pausa, volume e repetição. Nenhum som inicia automaticamente: a
+reprodução depende do gesto explícito do usuário e das permissões do navegador.
+Ao fechar o modo ou sair com `Esc`, o áudio é pausado. As preferências de áudio
+são transitórias na aba e não entram no Firestore; quando um arquivo não está
+disponível offline, a interface informa a indisponibilidade sem bloquear o foco.
 
 ## Estados importantes da interface
 

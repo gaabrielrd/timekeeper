@@ -125,6 +125,31 @@ async function seedProfile(uid, isAdmin = false) {
 	});
 }
 
+async function seedTeam(teamId = "team-alpha") {
+	await environment.withSecurityRulesDisabled(async (context) => {
+		const db = context.firestore();
+		await setDoc(doc(db, "users/owner"), {
+			displayName: "owner",
+			email: "owner@example.com",
+			photoURL: "",
+			tier: "premium",
+		});
+		await setDoc(doc(db, `teams/${teamId}`), {
+			id: teamId,
+			name: "Equipe Alpha",
+			ownerUid: "owner",
+			ownerTier: "premium",
+			members: {
+				owner: { role: "admin" },
+				editor: { role: "editor" },
+				viewer: { role: "viewer" },
+			},
+			createdAt: "2026-07-22T20:00:00.000Z",
+			updatedAt: new Date(),
+		});
+	});
+}
+
 test("nega leituras sem autenticação e entre usuários", async () => {
 	const anonymous = environment.unauthenticatedContext().firestore();
 	await assertFails(getDoc(doc(anonymous, "users/alice/data/settings")));
@@ -281,10 +306,12 @@ test("aceita settings válidas e rejeita range ou campo desconhecido", async () 
 				startTime: "22:00",
 				endTime: "07:00",
 			},
+			activeWorkspace: "team:team-alpha",
 			updatedAt: serverTimestamp(),
 		}),
 	);
 	await assertFails(setDoc(reference, { backgroundIntensity: 101 }));
+	await assertFails(setDoc(reference, { activeWorkspace: "workspace-invalido" }));
 	await assertFails(setDoc(reference, { dashboardLayout: "unknown" }));
 	await assertFails(
 		setDoc(reference, { dashboardSectionOrder: ["standard", "standard"] }),
@@ -343,6 +370,65 @@ test("aceita settings válidas e rejeita range ou campo desconhecido", async () 
 		}),
 	);
 	await assertFails(setDoc(reference, { admin: true }));
+});
+
+test("settings da equipe são compartilhadas e viewers permanecem somente leitura", async () => {
+	await seedTeam();
+	const reference = "teams/team-alpha/data/settings";
+	await assertSucceeds(
+		setDoc(doc(googleDb("editor"), reference), {
+			counterGroups: ["__outros__", "Produto", "Operação"],
+			hiddenCounterGroups: ["Operação"],
+			updatedAt: serverTimestamp(),
+		}),
+	);
+	await assertSucceeds(getDoc(doc(googleDb("viewer"), reference)));
+	await assertFails(
+		setDoc(doc(googleDb("viewer"), reference), {
+			counterGroups: ["Somente leitura"],
+			hiddenCounterGroups: [],
+			updatedAt: serverTimestamp(),
+		}),
+	);
+	await assertFails(getDoc(doc(googleDb("outsider"), reference)));
+	await assertFails(
+		setDoc(doc(googleDb("editor"), reference), {
+			counterGroups: [],
+			hiddenCounterGroups: [],
+			accentPrimary: "#ffffff",
+			updatedAt: serverTimestamp(),
+		}),
+	);
+});
+
+test("convite pode ser lido pelo link exato sem expor a coleção", async () => {
+	await seedTeam();
+	const inviteId = "11111111-1111-4111-8111-111111111111";
+	const invitePath = `teams/team-alpha/invites/${inviteId}`;
+	await assertSucceeds(
+		setDoc(doc(googleDb("owner"), invitePath), {
+			teamId: "team-alpha",
+			teamName: "Equipe Alpha",
+			role: "editor",
+			createdBy: "owner",
+			createdAt: serverTimestamp(),
+			expiresAt: new Date(Date.now() + 6 * 24 * 60 * 60 * 1000),
+		}),
+	);
+	await assertSucceeds(getDoc(doc(googleDb("outsider"), invitePath)));
+	await assertFails(
+		getDocs(collection(googleDb("outsider"), "teams/team-alpha/invites")),
+	);
+	await assertFails(
+		setDoc(doc(googleDb("viewer"), `teams/team-alpha/invites/${crypto.randomUUID()}`), {
+			teamId: "team-alpha",
+			teamName: "Equipe Alpha",
+			role: "editor",
+			createdBy: "viewer",
+			createdAt: serverTimestamp(),
+			expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+		}),
+	);
 });
 
 test("aceita contadores fixo e recorrente válidos", async () => {

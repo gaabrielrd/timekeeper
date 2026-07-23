@@ -22,6 +22,7 @@ import {
 	runTransaction,
 	serverTimestamp,
 	setDoc,
+	Timestamp,
 	where,
 	writeBatch,
 } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
@@ -34,6 +35,7 @@ import {
 	uploadBytesResumable,
 } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-storage.js";
 import {
+	connectFunctionsEmulator,
 	getFunctions,
 	httpsCallable,
 } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-functions.js";
@@ -81,6 +83,7 @@ const pushConfigured =
 	typeof pushConfig.recaptchaEnterpriseSiteKey === "string" &&
 	pushConfig.recaptchaEnterpriseSiteKey.length > 10;
 let pushFunctions = null;
+let sharedFunctions = null;
 let appCheckInitialized = false;
 /** Sentinel used in counterGroups to track the "ungrouped" row position. */
 const OUTROS_KEY = "__outros__";
@@ -119,6 +122,18 @@ function ensurePushBackend() {
 		);
 	}
 	return pushFunctions;
+}
+
+function ensureFunctionsBackend() {
+	ensureAppCheck();
+	if (!sharedFunctions) {
+		sharedFunctions = getFunctions(
+			app,
+			pushConfig.functionsRegion || "southamerica-east1",
+		);
+		if (useLocalEmulators) connectFunctionsEmulator(sharedFunctions, "127.0.0.1", 5001);
+	}
+	return sharedFunctions;
 }
 
 // Initialize Firebase AI Logic (Gemini API)
@@ -453,6 +468,7 @@ const elements = {
 	counterMessage: document.querySelector("#counter-message"),
 	counterSubmit: document.querySelector("#counter-submit"),
 	counterKicker: document.querySelector("#counter-kicker"),
+	counterManagementLabel: document.querySelector("#counter-management-label"),
 	userTierBadge: document.querySelector("#user-tier-badge"),
 	openUpgradeDialog: document.querySelector("#open-upgrade-dialog"),
 	upgradeDialog: document.querySelector("#upgrade-dialog"),
@@ -532,6 +548,7 @@ const elements = {
 	adminHolidayList: document.querySelector("#admin-holiday-list"),
 	adminMessage: document.querySelector("#admin-message"),
 	customSection: document.querySelector("#custom-counters-section"),
+	customCountersKicker: document.querySelector("#custom-counters-kicker"),
 	customPanels: document.querySelector("#custom-panels"),
 	toast: document.querySelector("#app-toast"),
 };
@@ -2629,7 +2646,7 @@ function renderCustomCounters(counters) {
 					<div class="group-row-title-wrap">
 						<span class="group-row-badge">
 							<i class="material-icons" style="font-size: 14px;" aria-hidden="true">folder</i>
-							${entry}
+							${escapeHtml(entry)}
 						</span>
 					</div>
 					<span class="group-row-count">${groupCounters.length} contador(es)</span>
@@ -2746,12 +2763,12 @@ function buildGroupOrderSubmenu(groups) {
 
 		const label = document.createElement("span");
 		label.className = "group-order-item-label";
-		if (entry === OUTROS_KEY) {
-			label.innerHTML =
-				'<i class="material-icons" style="font-size:14px" aria-hidden="true">label_outline</i> Outros (Não agrupados)';
-		} else {
-			label.innerHTML = `<i class="material-icons" style="font-size:14px" aria-hidden="true">folder</i> ${entry}`;
-		}
+		const icon = document.createElement("i");
+		icon.className = "material-icons";
+		icon.style.fontSize = "14px";
+		icon.setAttribute("aria-hidden", "true");
+		icon.textContent = entry === OUTROS_KEY ? "label_outline" : "folder";
+		label.append(icon, document.createTextNode(displayTitle));
 		toggle.append(checkbox, label);
 
 		const acts = document.createElement("div");
@@ -2808,7 +2825,10 @@ function renderDashboardSectionControls(data = userSettings) {
 			});
 		});
 		const label = document.createElement("span");
-		label.textContent = DASHBOARD_SECTION_LABELS[sectionId];
+		label.textContent =
+			sectionId === "custom" && activeWorkspace.type === "team"
+				? "Contadores da equipe"
+				: DASHBOARD_SECTION_LABELS[sectionId];
 		toggle.append(input, label);
 
 		const actions = document.createElement("div");
@@ -4257,6 +4277,9 @@ function applySettings(data) {
 function applyWorkspaceGroupSettings(data = {}) {
 	workspaceGroupSettings = normalizeGroupSettings(data);
 	Object.assign(userSettings, workspaceGroupSettings);
+	if (elements.counterDialog?.open) {
+		renderGroupChips(elements.counterGroup?.value || "");
+	}
 	renderDashboardSectionControls(userSettings);
 	renderCounterGroupControls();
 	renderCustomCounters(userSettings.customCounters || []);
@@ -4680,6 +4703,7 @@ async function subscribeToUserData(user) {
 			}
 			renderAiQuota(data);
 			updateDowngradeRestrictions();
+			updateActiveWorkspaceUi();
 		},
 		(error) => {
 			console.error("Falha ao acompanhar perfil do usuário.", error);
@@ -5142,44 +5166,23 @@ async function deleteCounterGroup(groupName) {
 function renderCounterGroupControls() {
 	if (!elements.counterGroupControls || !elements.counterGroupOrderList) return;
 	const groups = (userSettings.counterGroups || []).filter((g) => g !== OUTROS_KEY);
-	const isPremium = userTier === "premium";
-	elements.counterGroupControls.hidden = !isPremium || groups.length === 0;
-	if (!isPremium || groups.length === 0) return;
-
+	const canManage = isActiveWorkspacePremium() && canEditActiveWorkspace();
+	elements.counterGroupControls.hidden = !canManage;
+	if (!canManage) return;
 	elements.counterGroupOrderList.replaceChildren();
-	groups.forEach((groupName, index) => {
-		const row = document.createElement("div");
-		row.className = "dashboard-section-item";
-
-		const copy = document.createElement("div");
-		copy.className = "dashboard-section-copy";
-		const title = document.createElement("strong");
-		title.textContent = groupName;
-		copy.append(title);
-
-		const actions = document.createElement("div");
-		actions.className = "dashboard-section-actions";
-
-		const upBtn = document.createElement("button");
-		upBtn.className = "counter-action";
-		upBtn.type = "button";
-		upBtn.disabled = index === 0;
-		upBtn.title = `Mover grupo ${groupName} para cima`;
-		upBtn.innerHTML = '<i class="material-icons" aria-hidden="true">arrow_upward</i>';
-		upBtn.addEventListener("click", () => reorderCounterGroup(index, -1));
-
-		const downBtn = document.createElement("button");
-		downBtn.className = "counter-action";
-		downBtn.type = "button";
-		downBtn.disabled = index === groups.length - 1;
-		downBtn.title = `Mover grupo ${groupName} para baixo`;
-		downBtn.innerHTML = '<i class="material-icons" aria-hidden="true">arrow_downward</i>';
-		downBtn.addEventListener("click", () => reorderCounterGroup(index, 1));
-
-		actions.append(upBtn, downBtn);
-		row.append(copy, actions);
-		elements.counterGroupOrderList.append(row);
-	});
+	if (elements.createCounterGroupButton) {
+		elements.createCounterGroupButton.disabled = groups.length >= 3;
+	}
+	if (groups.length === 0) {
+		const empty = document.createElement("p");
+		empty.className = "counter-group-empty";
+		empty.textContent = "Crie um grupo para organizar os contadores deste espaço.";
+		elements.counterGroupOrderList.append(empty);
+		return;
+	}
+	elements.counterGroupOrderList.append(
+		buildGroupOrderSubmenu(userSettings.counterGroups || []),
+	);
 }
 
 async function reorderCounterGroup(index, delta, preserveSelection = "") {
@@ -5252,7 +5255,7 @@ function openCounterDialog(counter = null) {
 	renderGroupChips(counter?.group || "");
 	if (elements.counterHidden) {
 		elements.counterHidden.checked = Boolean(counter?.hidden);
-		elements.counterHidden.disabled = userTier !== "premium";
+		elements.counterHidden.disabled = !isActiveWorkspacePremium();
 	}
 	currentChecklist = counter?.checklist ? JSON.parse(JSON.stringify(counter.checklist)) : [];
 	renderChecklistInputs();
@@ -5306,6 +5309,12 @@ function renderAiQuota(userData = {}) {
 }
 
 function updateDowngradeRestrictions() {
+	if (activeWorkspace.type === "team") {
+		if (elements.excessCountersWarning) {
+			elements.excessCountersWarning.hidden = true;
+		}
+		return;
+	}
 	const counterCount = userSettings.customCounters.length;
 	const isOverCounterLimit = userTier === "free" && counterCount > 5;
 	if (elements.excessCountersWarning) {
@@ -5476,6 +5485,9 @@ for (const form of [elements.adminPaymentForm, elements.adminHolidayForm]) {
 	);
 }
 elements.openCounterModal.addEventListener("click", () => openCounterDialog());
+elements.createCounterGroupButton?.addEventListener("click", () =>
+	promptCreateCounterGroup(),
+);
 elements.openImageLibrary.addEventListener("click", () => openImageLibrary());
 elements.openArchiveDialog.addEventListener("click", openArchiveDialog);
 elements.chooseCounterImage.addEventListener("click", () =>
@@ -5984,6 +5996,10 @@ function updateActiveWorkspaceUi() {
 	document.body.dataset.workspaceRole =
 		activeWorkspace.type === "team" ? activeWorkspace.role || "viewer" : "owner";
 	const mainTitle = document.querySelector("#custom-counters-title");
+	if (elements.customCountersKicker) {
+		elements.customCountersKicker.textContent =
+			activeWorkspace.type === "team" ? "Equipe" : "Sua conta";
+	}
 	if (mainTitle) {
 		mainTitle.textContent =
 			activeWorkspace.type === "team"
@@ -5995,10 +6011,31 @@ function updateActiveWorkspaceUi() {
 			? "Até 15 contadores"
 			: "Até cinco";
 	}
+	if (elements.counterManagementLabel) {
+		elements.counterManagementLabel.textContent =
+			activeWorkspace.type === "team"
+				? activeWorkspace.name || "Equipe"
+				: "Meus contadores";
+	}
+	if (elements.userTierBadge) {
+		elements.userTierBadge.textContent = isPremium ? "★ Premium" : "Free";
+		elements.userTierBadge.className = `user-tier-badge ${isPremium ? "tier-premium" : "tier-free"}`;
+	}
+	const timelineCountersOption = elements.timelineSourceFilter?.querySelector(
+		'option[value="counters"]',
+	);
+	if (timelineCountersOption) {
+		timelineCountersOption.textContent =
+			activeWorkspace.type === "team"
+				? "Contadores da equipe"
+				: "Meus contadores";
+	}
 	const counterSettings = elements.counterList?.closest(".counter-settings");
 	counterSettings?.classList.toggle("is-readonly", !canEdit);
+	if (!canEdit && elements.counterDialog?.open) closeCounterDialog();
+	renderDashboardSectionControls(userSettings);
 	renderCounterGroupControls();
-	renderCounterList(userSettings.customCounters || []);
+	renderCustomCounters(userSettings.customCounters || []);
 	renderTimeline();
 }
 
@@ -6112,7 +6149,11 @@ async function switchWorkspace(workspaceValue, { persist = true } = {}) {
 	if (normalizedValue === activeWorkspaceValue()) {
 		renderWorkspaceSwitcher();
 		updateActiveWorkspaceUi();
-		if (persist && preferredWorkspaceValue !== normalizedValue) {
+		if (
+			persist &&
+			normalizeWorkspacePreference(personalSettingsData.activeWorkspace) !==
+				normalizedValue
+		) {
 			preferredWorkspaceValue = normalizedValue;
 			await saveSettings({ activeWorkspace: normalizedValue });
 		}
@@ -6242,8 +6283,11 @@ async function createTeam(name) {
 			hiddenCounterGroups: [],
 			updatedAt: serverTimestamp(),
 		});
+		if (!userTeams.some((team) => team.id === teamId)) {
+			userTeams = [...userTeams, newTeam];
+		}
 		showToast(`Equipe "${name}" criada com sucesso!`);
-		switchWorkspace(`team:${teamId}`);
+		await switchWorkspace(`team:${teamId}`);
 		if (elements.teamManageDialog) elements.teamManageDialog.close();
 	} catch (error) {
 		console.error("Falha ao criar equipe.", error);
@@ -6423,8 +6467,19 @@ function renderTeamsModalContent() {
 	}
 }
 
-function generateTeamInviteLink(teamId) {
-	const inviteToken = btoa(JSON.stringify({ teamId, ts: Date.now() }));
+async function generateTeamInviteLink(teamId) {
+	const team = userTeams.find((item) => item.id === teamId);
+	if (!team || !currentUser) throw new Error("Equipe indisponível para convite.");
+	const inviteId = crypto.randomUUID();
+	await setDoc(doc(db, "teams", teamId, "invites", inviteId), {
+		teamId,
+		teamName: team.name,
+		role: "editor",
+		createdBy: currentUser.uid,
+		createdAt: serverTimestamp(),
+		expiresAt: Timestamp.fromMillis(Date.now() + 7 * 24 * 60 * 60 * 1000),
+	});
+	const inviteToken = btoa(JSON.stringify({ teamId, inviteId }));
 	const url = new URL(window.location.href);
 	url.searchParams.set("invite", inviteToken);
 	return url.toString();
@@ -6437,32 +6492,40 @@ function checkInviteUrlParams() {
 
 	try {
 		const data = JSON.parse(atob(inviteToken));
-		if (data.teamId) {
-			showPendingInviteModal(data.teamId);
+		if (data.teamId && data.inviteId) {
+			showPendingInviteModal(data.teamId, data.inviteId);
+		} else {
+			showToast("Este link de convite é antigo. Peça um novo link ao administrador.");
 		}
 	} catch (e) {
 		console.error("Link de convite inválido.", e);
 	}
 }
 
-async function showPendingInviteModal(teamId) {
+async function showPendingInviteModal(teamId, inviteId) {
 	if (!currentUser) {
 		showToast("Faça login com sua conta Google para aceitar o convite!");
 		return;
 	}
 	try {
-		const teamDoc = await getDoc(doc(db, "teams", teamId));
-		if (!teamDoc.exists()) {
+		const inviteDoc = await getDoc(doc(db, "teams", teamId, "invites", inviteId));
+		if (!inviteDoc.exists()) {
 			showToast("Equipe não encontrada ou convite expirado.");
 			return;
 		}
-		const team = teamDoc.data();
-		if (hasOwn(team.members, currentUser.uid)) {
-			showToast(`Você já é membro da equipe "${team.name}"!`);
-			switchWorkspace(`team:${team.id}`);
+		const invite = inviteDoc.data();
+		const expiresAtMs = invite.expiresAt?.toMillis?.();
+		if (invite.teamId !== teamId || !Number.isFinite(expiresAtMs) || expiresAtMs <= Date.now()) {
+			showToast("Este convite expirou. Peça um novo link ao administrador.");
 			return;
 		}
-		pendingInvites = [{ teamId: team.id, teamName: team.name, teamOwnerTier: team.ownerTier }];
+		const existingTeam = userTeams.find((team) => team.id === teamId);
+		if (existingTeam) {
+			showToast(`Você já é membro da equipe "${existingTeam.name}"!`);
+			await switchWorkspace(`team:${teamId}`);
+			return;
+		}
+		pendingInvites = [{ teamId, inviteId, teamName: invite.teamName }];
 		renderPendingInvites();
 		if (elements.pendingInvitesDialog) {
 			elements.pendingInvitesDialog.showModal();
@@ -6490,8 +6553,8 @@ function renderPendingInvites() {
 					<p class="muted">Você foi convidado para esta equipe.</p>
 				</div>
 				<div class="pending-invite-actions">
-					<button class="primary-button compact-button" data-action="accept-invite" data-team-id="${invite.teamId}">Aceitar</button>
-					<button class="secondary-button compact-button" data-action="decline-invite" data-team-id="${invite.teamId}">Recusar</button>
+					<button class="primary-button compact-button" data-action="accept-invite" data-team-id="${invite.teamId}" data-invite-id="${invite.inviteId}">Aceitar</button>
+					<button class="secondary-button compact-button" data-action="decline-invite" data-team-id="${invite.teamId}" data-invite-id="${invite.inviteId}">Recusar</button>
 				</div>
 			</div>
 		`,
@@ -6500,35 +6563,29 @@ function renderPendingInvites() {
 	}
 }
 
-async function acceptTeamInvite(teamId) {
+async function acceptTeamInvite(teamId, inviteId) {
 	if (!currentUser) return;
 	try {
-		const teamRef = doc(db, "teams", teamId);
-		const teamDoc = await getDoc(teamRef);
-		if (!teamDoc.exists()) return;
-		const team = teamDoc.data();
-		const currentMemberCount = Object.keys(team.members || {}).length;
-		const maxMembers = getMaxTeamMembers(team.ownerTier);
-		if (currentMemberCount >= maxMembers) {
-			showToast(`Esta equipe atingiu o limite máximo de ${maxMembers} membros.`);
-			return;
-		}
-		const updatedMembers = {
-			...team.members,
-			[currentUser.uid]: {
-				role: "editor",
-				joinedAt: new Date().toISOString(),
-			},
+		const acceptInvite = httpsCallable(ensureFunctionsBackend(), "acceptTeamInvite");
+		const response = await acceptInvite({ teamId, inviteId });
+		const team = response.data?.team;
+		if (!team) throw new Error("Resposta inválida ao aceitar convite.");
+		const joinedTeam = {
+			...team,
+			members: { [currentUser.uid]: { role: team.role || "editor" } },
 		};
-		await setDoc(teamRef, { members: updatedMembers, updatedAt: serverTimestamp() }, { merge: true });
+		userTeams = [
+			...userTeams.filter((item) => item.id !== teamId),
+			joinedTeam,
+		];
 		pendingInvites = pendingInvites.filter((i) => i.teamId !== teamId);
 		renderPendingInvites();
 		if (elements.pendingInvitesDialog) elements.pendingInvitesDialog.close();
 		showToast(`Você entrou na equipe "${team.name}"!`);
-		switchWorkspace(`team:${teamId}`);
+		await switchWorkspace(`team:${teamId}`);
 	} catch (error) {
 		console.error("Falha ao aceitar convite.", error);
-		showToast("Não foi possível aceitar o convite.");
+		showToast(error?.message || "Não foi possível aceitar o convite.");
 	}
 }
 
@@ -6539,6 +6596,11 @@ function declineTeamInvite(teamId) {
 }
 
 // Event Listeners for Teams Modal & Buttons
+if (elements.workspaceSwitcher) {
+	elements.workspaceSwitcher.addEventListener("change", () => {
+		switchWorkspace(elements.workspaceSwitcher.value);
+	});
+}
 if (elements.teamsManageButton) {
 	elements.teamsManageButton.addEventListener("click", () => {
 		openTeamManageModal();
@@ -6585,11 +6647,34 @@ if (elements.userTeamsGrid) {
 }
 
 if (elements.generateTeamInviteButton) {
-	elements.generateTeamInviteButton.addEventListener("click", () => {
+	elements.generateTeamInviteButton.addEventListener("click", async () => {
 		if (!currentlyManagingTeamId) return;
-		const inviteUrl = generateTeamInviteLink(currentlyManagingTeamId);
-		if (elements.teamInviteLinkInput) elements.teamInviteLinkInput.value = inviteUrl;
-		if (elements.teamInviteLinkBox) elements.teamInviteLinkBox.hidden = false;
+		elements.generateTeamInviteButton.disabled = true;
+		try {
+			const inviteUrl = await generateTeamInviteLink(currentlyManagingTeamId);
+			if (elements.teamInviteLinkInput) elements.teamInviteLinkInput.value = inviteUrl;
+			if (elements.teamInviteLinkBox) elements.teamInviteLinkBox.hidden = false;
+		} catch (error) {
+			console.error("Falha ao gerar convite.", error);
+			showToast("Não foi possível gerar o link de convite.");
+		} finally {
+			elements.generateTeamInviteButton.disabled = false;
+		}
+	});
+}
+
+if (elements.pendingInvitesList) {
+	elements.pendingInvitesList.addEventListener("click", async (event) => {
+		const target = event.target.closest("button[data-action]");
+		if (!target) return;
+		const { action, teamId, inviteId } = target.dataset;
+		if (!teamId || !inviteId) return;
+		if (action === "accept-invite") {
+			target.disabled = true;
+			await acceptTeamInvite(teamId, inviteId);
+			target.disabled = false;
+		}
+		if (action === "decline-invite") declineTeamInvite(teamId);
 	});
 }
 
