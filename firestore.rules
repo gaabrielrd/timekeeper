@@ -267,11 +267,11 @@ service cloud.firestore {
         && (counter.get('imageId', null) == null
           || (counter.imageId is string && counter.imageId.matches('^.{1,100}$')))
         && (counter.get('imageOpacity', null) == null
-          || ((counter.imageOpacity is int || counter.imageOpacity is float)
+          || (counter.imageOpacity is number
             && counter.imageOpacity >= 0
             && counter.imageOpacity <= 100))
         && (counter.get('overlayOpacity', null) == null
-          || ((counter.overlayOpacity is int || counter.overlayOpacity is float)
+          || (counter.overlayOpacity is number
             && counter.overlayOpacity >= 0
             && counter.overlayOpacity <= 100))
         && (counter.get('group', null) == null
@@ -282,8 +282,8 @@ service cloud.firestore {
     }
 
     function isValidFixedCounter(counter) {
-      return (counter.startAtMs is int || counter.startAtMs is float)
-        && (counter.endAtMs is int || counter.endAtMs is float)
+      return counter.startAtMs is number
+        && counter.endAtMs is number
         && counter.startAtMs >= 0
         && counter.endAtMs > counter.startAtMs;
     }
@@ -321,7 +321,7 @@ service cloud.firestore {
           'checklist'
         ])
         && hasValidCounterBase(counter)
-        && (((!('type' in counter) || counter.type == 'fixed')
+        && ((counter.type == 'fixed'
             && isValidFixedCounter(counter))
           || (counter.type == 'recurring'
             && isValidRecurringCounter(counter)));
