@@ -5,7 +5,7 @@
   "description": "Dashboard estática de contadores com Firebase Auth e Firestore.",
   "scripts": {
 		"check": "npm run check:syntax && npm run test:unit && npm run test:functions",
-		"check:syntax": "node --check public/src/runtime-config.js && node --check public/src/time.js && node --check public/src/occurrences.js && node --check public/src/weather.js && node --check public/src/notifications.js && node --check public/src/focus.js && node --check public/src/pwa.js && node --check public/sw.js && node --check public/src/analytics.js && node --check public/src/firebase.js && node --check scripts/serve-public.cjs",
+		"check:syntax": "node --check public/src/runtime-config.js && node --check public/src/time.js && node --check public/src/occurrences.js && node --check public/src/weather.js && node --check public/src/notifications.js && node --check public/src/soundscapes.js && node --check public/src/focus.js && node --check public/src/pwa.js && node --check public/sw.js && node --check public/src/analytics.js && node --check public/src/firebase.js && node --check scripts/serve-public.cjs",
 		"test": "npm run test:unit && npm run test:functions && npm run test:rules",
 		"test:e2e": "firebase emulators:exec --config firebase.e2e.json --project demo-timekeeper --only auth,firestore,storage \"playwright test\"",
 		"test:unit": "node --test tests/unit/time.test.cjs tests/unit/occurrences.test.cjs tests/unit/weather.test.cjs tests/unit/notifications.test.cjs tests/contracts/project.test.cjs",

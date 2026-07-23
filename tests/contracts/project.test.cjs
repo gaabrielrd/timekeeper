@@ -443,7 +443,7 @@ test("arquivo de conquistas exige ação manual e mantém limite alinhado", () =
 	assert.match(client, /runTransaction\(db, async \(transaction\)/);
 	assert.match(client, /title: "Arquivar contador\?"/);
 	assert.match(client, /counter\.type === "fixed"/);
-	assert.match(client, /archiveButton\.hidden = !isComplete/);
+	assert.match(client, /archiveButton\.hidden =[\s\S]{0,120}!isComplete/);
 	assert.match(client, /className = "counter-card-archive"/);
 	assert.match(styles, /\.a-panel:hover \.counter-card-archive/);
 	assert.match(rules, /data\.items\.size\(\) <= 100/);
@@ -511,4 +511,10 @@ test("espaços de equipe e colaboração mantêm regras, cotas e papéis alinhad
 	assert.match(rules, /function getMaxTeamMembers\(ownerUid\)/);
 	assert.match(rules, /match \/teams\/\{teamId\}/);
 	assert.match(rules, /isTeamEditorOrAdmin\(teamId\)/);
+	assert.match(rules, /match \/data\/settings \{/);
+	assert.match(rules, /isValidTeamSettingsDocument\(request\.resource\.data\)/);
+	const client = read("public/src/firebase.js");
+	assert.match(client, /activeWorkspace: "personal"/);
+	assert.match(client, /teamSettingsReference\(teamId\)/);
+	assert.match(client, /canEditActiveWorkspace\(\)/);
 });

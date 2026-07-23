@@ -167,7 +167,10 @@ service cloud.firestore {
         && (!('counterGroups' in data)
           || (data.counterGroups is list && data.counterGroups.size() <= 10))
         && (!('hiddenCounterGroups' in data)
-          || (data.hiddenCounterGroups is list && data.hiddenCounterGroups.size() <= 10));
+          || (data.hiddenCounterGroups is list && data.hiddenCounterGroups.size() <= 10))
+        && (!('activeWorkspace' in data)
+          || (data.activeWorkspace is string
+            && data.activeWorkspace.matches('^(personal|team:.{1,100})$')));
     }
 
     function hasValidProfileFields(data) {
@@ -416,6 +419,7 @@ service cloud.firestore {
           'notificationQuietHours',
           'counterGroups',
           'hiddenCounterGroups',
+          'activeWorkspace',
           'updatedAt'
         ])
         && hasValidSettingsFields(data)
@@ -425,6 +429,16 @@ service cloud.firestore {
     function isValidCountersDocument(userId, data) {
       return data.keys().hasOnly(['items', 'updatedAt'])
         && hasValidCounterItems(userId, data.items)
+        && hasValidUpdatedAt(data);
+    }
+
+    function isValidTeamSettingsDocument(data) {
+      return data.keys().hasOnly([
+          'counterGroups',
+          'hiddenCounterGroups',
+          'updatedAt'
+        ])
+        && hasValidSettingsFields(data)
         && hasValidUpdatedAt(data);
     }
 
@@ -645,6 +659,13 @@ service cloud.firestore {
         allow read: if isTeamMember(teamId);
         allow create, update: if isTeamEditorOrAdmin(teamId)
           && isValidCountersDocument(get(/databases/$(database)/documents/teams/$(teamId)).data.ownerUid, request.resource.data);
+        allow delete: if isTeamAdmin(teamId);
+      }
+
+      match /data/settings {
+        allow read: if isTeamMember(teamId);
+        allow create, update: if isTeamEditorOrAdmin(teamId)
+          && isValidTeamSettingsDocument(request.resource.data);
         allow delete: if isTeamAdmin(teamId);
       }
 

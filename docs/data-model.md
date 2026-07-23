@@ -42,7 +42,8 @@ generalConfig/holiday-YYYY-MM-DD
 
 teams/{teamId}
 ├── id, name, ownerUid, ownerTier, members map (admin | editor | viewer)
-└── data/counters (items[0..4] Free ou items[0..14] Premium)
+├── data/counters (items[0..4] Free ou items[0..14] Premium)
+└── data/settings (counterGroups, hiddenCounterGroups, updatedAt)
 ```
 
 ## Perfil — `/users/{uid}`
@@ -109,10 +110,20 @@ remoções intencionais.
 | `notificationQuietHours` | map | 22:00–07:00, desligado | boolean e horários locais `HH:mm` |
 | `weatherEffectsEnabled` | boolean | `false` | boolean estrito ao aplicar |
 | `counterGroups` | string[] | `[]` | até 10 grupos de contadores (strings até 30 chars cada) |
+| `hiddenCounterGroups` | string[] | `[]` | grupos ocultos na visualização do workspace |
+| `activeWorkspace` | `personal` ou `team:{teamId}` | `personal` | seleção restaurada e sincronizada entre abas/dispositivos |
 | `updatedAt` | timestamp | servidor | `serverTimestamp()` |
 
 O campo legado `customCounters` pode existir no documento raiz, mas não deve ser
 usado para novas escritas.
+
+## Settings de equipe — `/teams/{teamId}/data/settings`
+
+Equipes Premium compartilham a ordem dos grupos (`counterGroups`) e os grupos
+ocultos (`hiddenCounterGroups`). Todos os membros recebem esse documento em tempo
+real. Somente `admin` e `editor` podem criar ou atualizar as preferências; `viewer`
+tem acesso estritamente de leitura. Aparência, notificações, clima e layout geral
+continuam pertencendo ao settings pessoal.
 
 A Timeline e os candidatos de notificação são derivados dos snapshots de
 `generalConfig`, `settings` e `counters`; não existe coleção persistida de

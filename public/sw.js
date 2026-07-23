@@ -20,6 +20,7 @@ const APP_SHELL = [
 	"/src/occurrences.js",
 	"/src/weather.js",
 	"/src/notifications.js",
+	"/src/soundscapes.js",
 	"/src/focus.js",
 	"/src/progressbar.min.js",
 	"/src/anime.min.js",

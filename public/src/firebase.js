@@ -167,6 +167,7 @@ const DEFAULTS = {
 	...window.TimekeeperNotifications.normalizePreferences(),
 	counterGroups: [],
 	hiddenCounterGroups: [],
+	activeWorkspace: "personal",
 	customCounters: [],
 };
 const DASHBOARD_LAYOUTS = new Set(["focus", "balanced", "compact"]);
@@ -183,6 +184,28 @@ function uniqueDashboardSections(value) {
 	return [...new Set(Array.isArray(value) ? value : [])].filter((section) =>
 		DASHBOARD_SECTION_IDS.includes(section),
 	);
+}
+
+function normalizeWorkspacePreference(value) {
+	const normalized = String(value || "personal");
+	return normalized === "personal" || /^team:.{1,100}$/.test(normalized)
+		? normalized
+		: "personal";
+}
+
+function normalizeGroupSettings(data = {}) {
+	return {
+		counterGroups: (Array.isArray(data.counterGroups) ? data.counterGroups : [])
+			.map((group) => String(group || "").trim().slice(0, 30))
+			.filter(Boolean)
+			.slice(0, 10),
+		hiddenCounterGroups: (
+			Array.isArray(data.hiddenCounterGroups) ? data.hiddenCounterGroups : []
+		)
+			.map((group) => String(group || "").trim().slice(0, 30))
+			.filter(Boolean)
+			.slice(0, 10),
+	};
 }
 
 function normalizeDashboardPreferences(data = {}) {
@@ -242,8 +265,25 @@ function cacheDashboardPreferences(preferences) {
 
 applyDashboardPreferences(cachedDashboardPreferences());
 let userTier = "free";
+function activeWorkspaceTier() {
+	return activeWorkspace.type === "team"
+		? activeWorkspace.ownerTier || "free"
+		: userTier;
+}
+
+function isActiveWorkspacePremium() {
+	return activeWorkspaceTier() === "premium";
+}
+
+function canEditActiveWorkspace() {
+	return (
+		activeWorkspace.type !== "team" ||
+		["admin", "editor"].includes(activeWorkspace.role)
+	);
+}
+
 function getMaxCounters() {
-	return userTier === "premium" ? 15 : 5;
+	return isActiveWorkspacePremium() ? 15 : 5;
 }
 const MAX_ARCHIVED_COUNTERS = 100;
 const MAX_IMAGES = 10;
@@ -413,6 +453,7 @@ const elements = {
 	counterMessage: document.querySelector("#counter-message"),
 	counterSubmit: document.querySelector("#counter-submit"),
 	counterKicker: document.querySelector("#counter-kicker"),
+	counterManagementLabel: document.querySelector("#counter-management-label"),
 	userTierBadge: document.querySelector("#user-tier-badge"),
 	openUpgradeDialog: document.querySelector("#open-upgrade-dialog"),
 	upgradeDialog: document.querySelector("#upgrade-dialog"),
@@ -479,6 +520,7 @@ const elements = {
 	counterGroupChips: document.querySelector("#counter-group-chips"),
 	counterGroupControls: document.querySelector("#counter-group-controls"),
 	counterGroupOrderList: document.querySelector("#counter-group-order-list"),
+	createCounterGroupButton: document.querySelector("#create-counter-group-button"),
 	openAdminModal: document.querySelector("#open-admin-modal"),
 	adminDialog: document.querySelector("#admin-dialog"),
 	adminDialogClose: document.querySelector("#admin-dialog-close"),
@@ -491,6 +533,7 @@ const elements = {
 	adminHolidayList: document.querySelector("#admin-holiday-list"),
 	adminMessage: document.querySelector("#admin-message"),
 	customSection: document.querySelector("#custom-counters-section"),
+	customCountersKicker: document.querySelector("#custom-counters-kicker"),
 	customPanels: document.querySelector("#custom-panels"),
 	toast: document.querySelector("#app-toast"),
 };
@@ -503,9 +546,15 @@ let unsubscribeArchive = null;
 let unsubscribeImages = null;
 let unsubscribeProfile = null;
 let unsubscribeTeams = null;
+let unsubscribeWorkspaceSettings = null;
 let unsubscribeGeneralConfig = null;
 let userTeams = [];
 let activeWorkspace = { type: "personal" };
+let personalSettingsData = { ...DEFAULTS };
+let workspaceGroupSettings = normalizeGroupSettings();
+let preferredWorkspaceValue = "personal";
+let teamsReady = false;
+let workspaceSubscriptionVersion = 0;
 let pendingInvites = [];
 let customProgressBars = [];
 let toastTimer = null;
@@ -643,6 +692,10 @@ function setArchiveState(label, state = "live") {
 
 function settingsReference(userId) {
 	return doc(db, "users", userId, "data", "settings");
+}
+
+function teamSettingsReference(teamId) {
+	return doc(db, "teams", teamId, "data", "settings");
 }
 
 function countersReference(userId) {
@@ -2035,13 +2088,47 @@ function updateAccountUi(user) {
 
 async function saveSettings(partialSettings) {
 	if (!currentUser) return false;
+	const entries = Object.entries(partialSettings || {});
+	const groupKeys = new Set(["counterGroups", "hiddenCounterGroups"]);
+	const teamEntries =
+		activeWorkspace.type === "team"
+			? entries.filter(([key]) => groupKeys.has(key))
+			: [];
+	const personalEntries = entries.filter(
+		([key]) => activeWorkspace.type !== "team" || !groupKeys.has(key),
+	);
+	if (teamEntries.length > 0 && !canEditActiveWorkspace()) {
+		showToast("Seu acesso a esta equipe é somente para visualização.");
+		return false;
+	}
 	setSaveState("Salvando...", true);
 	try {
-		await setDoc(
-			settingsReference(currentUser.uid),
-			{ ...partialSettings, updatedAt: serverTimestamp() },
-			{ merge: true },
-		);
+		const writes = [];
+		if (personalEntries.length > 0) {
+			writes.push(
+				setDoc(
+					settingsReference(currentUser.uid),
+					{
+						...Object.fromEntries(personalEntries),
+						updatedAt: serverTimestamp(),
+					},
+					{ merge: true },
+				),
+			);
+		}
+		if (teamEntries.length > 0) {
+			writes.push(
+				setDoc(
+					teamSettingsReference(activeWorkspace.id),
+					{
+						...Object.fromEntries(teamEntries),
+						updatedAt: serverTimestamp(),
+					},
+					{ merge: true },
+				),
+			);
+		}
+		await Promise.all(writes);
 		setSaveState("Sincronizado");
 		return true;
 	} catch (error) {
@@ -2054,11 +2141,15 @@ async function saveSettings(partialSettings) {
 
 async function saveCounters(counters) {
 	if (!currentUser) return false;
+	if (!canEditActiveWorkspace()) {
+		showToast("Seu acesso a esta equipe é somente para visualização.");
+		return false;
+	}
 	setCounterState("Salvando...", "saving");
 	const sanitized = normalizeCounters(counters);
 	try {
 		await setDoc(
-			countersReference(currentUser.uid),
+			activeCountersReference(),
 			{ items: sanitized.slice(0, getMaxCounters()), updatedAt: serverTimestamp() },
 		);
 		userSettings.customCounters = sanitized;
@@ -2111,7 +2202,8 @@ function updateCustomCounters() {
 			const isComplete =
 				counter.type === "fixed" &&
 				state.target - now < 1000;
-			archiveButton.hidden = !isComplete;
+			archiveButton.hidden =
+				!isComplete || !canEditActiveWorkspace() || activeWorkspace.type === "team";
 			archiveButton.disabled =
 				!archiveReady || archivedCounters.length >= MAX_ARCHIVED_COUNTERS;
 		}
@@ -2177,7 +2269,7 @@ function createCustomPanel(counter, index) {
 		if (currentCounter) archiveCounter(currentCounter);
 	});
 	top.append(archiveButton);
-	if (counter.imageId) {
+	if (counter.imageId && canEditActiveWorkspace()) {
 		const removeImage = document.createElement("button");
 		removeImage.type = "button";
 		removeImage.className = "counter-card-image-remove";
@@ -2214,6 +2306,7 @@ function createCustomPanel(counter, index) {
 			const checkbox = document.createElement("input");
 			checkbox.type = "checkbox";
 			checkbox.checked = item.done;
+			checkbox.disabled = !canEditActiveWorkspace();
 			checkbox.addEventListener("change", async () => {
 				checkbox.disabled = true;
 				const isChecked = checkbox.checked;
@@ -2289,7 +2382,11 @@ function formatDateRange(counter) {
 }
 
 async function toggleCounterVisibility(counter) {
-	if (userTier !== "premium") {
+	if (!canEditActiveWorkspace()) {
+		showToast("Seu acesso a esta equipe é somente para visualização.");
+		return;
+	}
+	if (!isActiveWorkspacePremium()) {
 		showToast("🔒 Ocultar contadores da dashboard é um recurso do plano Premium.");
 		return;
 	}
@@ -2307,6 +2404,8 @@ async function toggleCounterVisibility(counter) {
 
 function renderCounterList(counters) {
 	elements.counterList.replaceChildren();
+	const canEdit = canEditActiveWorkspace();
+	const isPremium = isActiveWorkspacePremium();
 	counters.forEach((counter, index) => {
 		const item = document.createElement("div");
 		item.className = "counter-list-item";
@@ -2323,6 +2422,11 @@ function renderCounterList(counters) {
 		const dates = document.createElement("span");
 		dates.textContent = formatDateRange(counter);
 		copy.append(name, dates);
+		if (!canEdit) {
+			item.append(dot, copy);
+			elements.counterList.append(item);
+			return;
+		}
 		const actions = document.createElement("div");
 		actions.className = "counter-list-actions";
 
@@ -2341,11 +2445,11 @@ function renderCounterList(counters) {
 		const isHidden = Boolean(counter.hidden);
 		const toggleVisibility = actionButton(
 			isHidden ? "visibility_off" : "visibility",
-			userTier === "premium"
+			isPremium
 				? (isHidden ? `Exibir ${counter.name} na dashboard` : `Ocultar ${counter.name} da dashboard`)
 				: "🔒 Ocultar contador (Recurso Premium)",
 			() => toggleCounterVisibility(counter),
-			userTier !== "premium",
+			!isPremium,
 		);
 		if (isHidden) toggleVisibility.classList.add("counter-is-hidden");
 
@@ -2367,7 +2471,7 @@ function renderCounterList(counters) {
 				openCounterDialog(counter),
 			),
 		);
-		if (counter.type === "fixed") {
+		if (counter.type === "fixed" && activeWorkspace.type !== "team") {
 			const archive = actionButton(
 				"archive",
 				`Arquivar contador ${counter.name}`,
@@ -2463,7 +2567,7 @@ function renderCustomCounters(counters) {
 	elements.customPanels.replaceChildren();
 
 	const visibleCounters = counters.filter(
-		(c) => userTier !== "premium" || !c.hidden,
+		(c) => !isActiveWorkspacePremium() || !c.hidden,
 	);
 	const rawGroups = userSettings.counterGroups || [];
 	const namedGroups = rawGroups.filter((g) => g !== OUTROS_KEY);
@@ -2491,7 +2595,7 @@ function renderCustomCounters(counters) {
 		const hiddenGroups = new Set(userSettings.hiddenCounterGroups || []);
 
 		effectiveOrder.forEach((entry) => {
-			if (userTier === "premium" && hiddenGroups.has(entry)) return;
+			if (isActiveWorkspacePremium() && hiddenGroups.has(entry)) return;
 			if (entry === OUTROS_KEY) {
 				if (ungrouped.length === 0) return;
 				const groupRow = document.createElement("div");
@@ -2527,7 +2631,7 @@ function renderCustomCounters(counters) {
 					<div class="group-row-title-wrap">
 						<span class="group-row-badge">
 							<i class="material-icons" style="font-size: 14px;" aria-hidden="true">folder</i>
-							${entry}
+							${escapeHtml(entry)}
 						</span>
 					</div>
 					<span class="group-row-count">${groupCounters.length} contador(es)</span>
@@ -2554,13 +2658,16 @@ function renderCustomCounters(counters) {
 	renderCounterList(counters);
 	elements.counterCount.textContent = `${counters.length} / ${getMaxCounters()}`;
 	const isFull = counters.length >= getMaxCounters();
-	elements.openCounterModal.disabled = isFull || !countersReady;
+	elements.openCounterModal.disabled =
+		isFull || !countersReady || !canEditActiveWorkspace();
 	elements.openCounterModalLabel.textContent = isFull
 		? "Limite atingido"
-		: "Novo contador";
+		: canEditActiveWorkspace()
+			? "Novo contador"
+			: "Somente leitura";
 	updateCustomVisibility(counters);
 	if (!editingCounterId) {
-		elements.counterSubmit.disabled = isFull;
+		elements.counterSubmit.disabled = isFull || !canEditActiveWorkspace();
 		elements.counterSubmit.textContent = isFull
 			? "Limite atingido"
 			: "Criar contador";
@@ -2604,6 +2711,7 @@ async function persistDashboardPreferences(preferences) {
 }
 
 async function toggleGroupVisibility(groupName) {
+	if (!canEditActiveWorkspace()) return;
 	const hidden = new Set(userSettings.hiddenCounterGroups || []);
 	if (hidden.has(groupName)) {
 		hidden.delete(groupName);
@@ -2640,12 +2748,12 @@ function buildGroupOrderSubmenu(groups) {
 
 		const label = document.createElement("span");
 		label.className = "group-order-item-label";
-		if (entry === OUTROS_KEY) {
-			label.innerHTML =
-				'<i class="material-icons" style="font-size:14px" aria-hidden="true">label_outline</i> Outros (Não agrupados)';
-		} else {
-			label.innerHTML = `<i class="material-icons" style="font-size:14px" aria-hidden="true">folder</i> ${entry}`;
-		}
+		const icon = document.createElement("i");
+		icon.className = "material-icons";
+		icon.style.fontSize = "14px";
+		icon.setAttribute("aria-hidden", "true");
+		icon.textContent = entry === OUTROS_KEY ? "label_outline" : "folder";
+		label.append(icon, document.createTextNode(displayTitle));
 		toggle.append(checkbox, label);
 
 		const acts = document.createElement("div");
@@ -2702,7 +2810,10 @@ function renderDashboardSectionControls(data = userSettings) {
 			});
 		});
 		const label = document.createElement("span");
-		label.textContent = DASHBOARD_SECTION_LABELS[sectionId];
+		label.textContent =
+			sectionId === "custom" && activeWorkspace.type === "team"
+				? "Contadores da equipe"
+				: DASHBOARD_SECTION_LABELS[sectionId];
 		toggle.append(input, label);
 
 		const actions = document.createElement("div");
@@ -2731,16 +2842,6 @@ function renderDashboardSectionControls(data = userSettings) {
 		}
 		mainLine.append(toggle, actions);
 		row.append(mainLine);
-
-		// Group order submenu nested under "Meus contadores"
-		if (sectionId === "custom" && userTier === "premium") {
-			const namedGroups = (userSettings.counterGroups || []).filter(
-				(g) => g !== OUTROS_KEY,
-			);
-			if (namedGroups.length > 0) {
-				row.append(buildGroupOrderSubmenu(userSettings.counterGroups || []));
-			}
-		}
 
 		elements.dashboardSectionControls.append(row);
 	});
@@ -3022,7 +3123,7 @@ function timelineLaneColor(lane) {
 }
 
 function makeTimelineLaneInteractive(group, lane) {
-	if (!lane.editable) return;
+	if (!lane.editable || !canEditActiveWorkspace()) return;
 	const openEditor = () => {
 		const counter = userSettings.customCounters.find(
 			(candidate) => candidate.id === lane.sourceId,
@@ -3357,8 +3458,9 @@ function renderVerticalTimeline(lanes, projection, conflicts) {
 function renderTimelineLegend(lanes) {
 	elements.timelineLegend.replaceChildren();
 	for (const lane of lanes) {
-		const item = document.createElement(lane.editable ? "button" : "span");
-		if (lane.editable) item.type = "button";
+		const isEditable = lane.editable && canEditActiveWorkspace();
+		const item = document.createElement(isEditable ? "button" : "span");
+		if (isEditable) item.type = "button";
 		item.className = "timeline-legend-item";
 		item.style.setProperty("--timeline-color", timelineLaneColor(lane));
 		const marker = document.createElement("i");
@@ -3366,7 +3468,7 @@ function renderTimelineLegend(lanes) {
 		const label = document.createElement("span");
 		label.textContent = lane.label;
 		item.append(marker, label);
-		if (lane.editable) {
+		if (isEditable) {
 			item.setAttribute("aria-label", `Editar ${lane.label}`);
 			item.addEventListener("click", () => {
 				const counter = userSettings.customCounters.find(
@@ -3507,8 +3609,9 @@ function renderCalendarDayDetails(day, occurrences) {
 	const list = document.createElement("div");
 	list.className = "timeline-calendar-detail-list";
 	for (const occurrence of occurrences) {
-		const item = document.createElement(occurrence.editable ? "button" : "div");
-		if (occurrence.editable) item.type = "button";
+		const isEditable = occurrence.editable && canEditActiveWorkspace();
+		const item = document.createElement(isEditable ? "button" : "div");
+		if (isEditable) item.type = "button";
 		item.className = "timeline-calendar-detail-item";
 		item.style.setProperty("--timeline-color", calendarOccurrenceColor(occurrence));
 		const marker = document.createElement("i");
@@ -3520,7 +3623,7 @@ function renderCalendarDayDetails(day, occurrences) {
 		meta.textContent = `${TIMELINE_SOURCE_LABELS[occurrence.sourceType]} · ${timelineTimeLabel(occurrence)}`;
 		copy.append(title, meta);
 		item.append(marker, copy);
-		if (occurrence.editable) {
+		if (isEditable) {
 			item.setAttribute("aria-label", `Editar ${occurrence.title}`);
 			item.addEventListener("click", () => {
 				const counter = userSettings.customCounters.find(
@@ -4113,19 +4216,20 @@ function scheduleNotificationScan(delay = 250) {
 
 function applySettings(data) {
 	const currentCounters = userSettings.customCounters || [];
-	userSettings = {
+	const personalGroups = normalizeGroupSettings(data);
+	personalSettingsData = {
 		...DEFAULTS,
 		...data,
+		...personalGroups,
+		activeWorkspace: normalizeWorkspacePreference(data.activeWorkspace),
+	};
+	const effectiveGroups =
+		activeWorkspace.type === "team" ? workspaceGroupSettings : personalGroups;
+	userSettings = {
+		...personalSettingsData,
+		...effectiveGroups,
 		customCounters: currentCounters,
 	};
-	userSettings.counterGroups = (Array.isArray(data.counterGroups) ? data.counterGroups : [])
-		.map((g) => String(g || "").trim().slice(0, 30))
-		.filter(Boolean)
-		.slice(0, 10);
-	userSettings.hiddenCounterGroups = (Array.isArray(data.hiddenCounterGroups) ? data.hiddenCounterGroups : [])
-		.map((g) => String(g || "").trim().slice(0, 30))
-		.filter(Boolean)
-		.slice(0, 10);
 	userSettings.weatherWidgets = window.TimekeeperWeather.normalizeWidgets(
 		data.weatherWidgets,
 	);
@@ -4139,6 +4243,7 @@ function applySettings(data) {
 	Object.assign(userSettings, applyDashboardPreferences(userSettings));
 	if (currentUser) cacheDashboardPreferences(userSettings);
 	renderDashboardSectionControls(userSettings);
+	renderCounterGroupControls();
 
 	renderWeatherWidgetList();
 	renderWeatherWidgets();
@@ -4151,7 +4256,19 @@ function applySettings(data) {
 		registerPushForCurrentUser();
 	}
 	renderTimeline();
-	updateCustomVisibility(currentCounters);
+	renderCustomCounters(currentCounters);
+}
+
+function applyWorkspaceGroupSettings(data = {}) {
+	workspaceGroupSettings = normalizeGroupSettings(data);
+	Object.assign(userSettings, workspaceGroupSettings);
+	if (elements.counterDialog?.open) {
+		renderGroupChips(elements.counterGroup?.value || "");
+	}
+	renderDashboardSectionControls(userSettings);
+	renderCounterGroupControls();
+	renderCustomCounters(userSettings.customCounters || []);
+	renderTimeline();
 }
 
 function createCounterId() {
@@ -4299,12 +4416,14 @@ function applyArchive(counters) {
 
 function unsubscribeUserData() {
 	unsubscribeSettings?.();
+	unsubscribeWorkspaceSettings?.();
 	unsubscribeCounters?.();
 	unsubscribeArchive?.();
 	unsubscribeImages?.();
 	unsubscribeProfile?.();
 	unsubscribeTeams?.();
 	unsubscribeSettings = null;
+	unsubscribeWorkspaceSettings = null;
 	unsubscribeCounters = null;
 	unsubscribeArchive = null;
 	unsubscribeImages = null;
@@ -4313,6 +4432,11 @@ function unsubscribeUserData() {
 	userTeams = [];
 	pendingInvites = [];
 	activeWorkspace = { type: "personal" };
+	personalSettingsData = { ...DEFAULTS };
+	workspaceGroupSettings = normalizeGroupSettings();
+	preferredWorkspaceValue = "personal";
+	teamsReady = false;
+	workspaceSubscriptionVersion += 1;
 	if (elements.workspaceSwitcher) elements.workspaceSwitcher.hidden = true;
 	if (elements.pendingInvitesButton) elements.pendingInvitesButton.hidden = true;
 	countersReady = false;
@@ -4418,6 +4542,7 @@ async function ensureUserData(user) {
 				...notificationPreferences,
 				counterGroups: Array.isArray(legacy.counterGroups) ? legacy.counterGroups : [],
 				hiddenCounterGroups: Array.isArray(legacy.hiddenCounterGroups) ? legacy.hiddenCounterGroups : [],
+				activeWorkspace: normalizeWorkspacePreference(legacy.activeWorkspace),
 				updatedAt: serverTimestamp(),
 				});
 			},
@@ -4563,6 +4688,7 @@ async function subscribeToUserData(user) {
 			}
 			renderAiQuota(data);
 			updateDowngradeRestrictions();
+			updateActiveWorkspaceUi();
 		},
 		(error) => {
 			console.error("Falha ao acompanhar perfil do usuário.", error);
@@ -4573,7 +4699,14 @@ async function subscribeToUserData(user) {
 	unsubscribeSettings = onSnapshot(
 		settingsReference(user.uid),
 		(snapshot) => {
-			if (snapshot.exists()) applySettings(snapshot.data());
+			if (snapshot.exists()) {
+				const data = snapshot.data();
+				preferredWorkspaceValue = normalizeWorkspacePreference(
+					data.activeWorkspace,
+				);
+				applySettings(data);
+				restorePreferredWorkspace();
+			}
 			setSaveState("Sincronizado");
 		},
 		(error) => {
@@ -4878,10 +5011,12 @@ function renderGroupChips(selectedGroup = "") {
 	const hiddenInput = document.querySelector("#counter-group") || elements.counterGroup;
 	if (hiddenInput) hiddenInput.value = selectedGroup;
 
-	const isPremium = userTier === "premium";
+	const isPremium = isActiveWorkspacePremium();
+	const canEdit = canEditActiveWorkspace();
 
 	const noneChip = document.createElement("button");
 	noneChip.type = "button";
+	noneChip.disabled = !canEdit;
 	noneChip.className = `counter-group-chip ${!selectedGroup ? "active" : ""}`;
 	noneChip.textContent = "Nenhum";
 	noneChip.addEventListener("click", () => {
@@ -4895,7 +5030,7 @@ function renderGroupChips(selectedGroup = "") {
 		const chip = document.createElement("div");
 		chip.className = `counter-group-chip ${selectedGroup === groupName ? "active" : ""}`;
 
-		if (isPremium && groups.length > 1) {
+		if (isPremium && canEdit && groups.length > 1) {
 			const moveLeft = document.createElement("button");
 			moveLeft.type = "button";
 			moveLeft.className = "counter-group-chip-btn";
@@ -4912,6 +5047,7 @@ function renderGroupChips(selectedGroup = "") {
 		const chipText = document.createElement("span");
 		chipText.textContent = groupName;
 		chipText.addEventListener("click", () => {
+			if (!canEdit) return;
 			if (!isPremium) {
 				showToast("🔒 Grupos de contadores são um recurso Premium.");
 				return;
@@ -4921,7 +5057,7 @@ function renderGroupChips(selectedGroup = "") {
 		});
 		chip.append(chipText);
 
-		if (isPremium) {
+		if (isPremium && canEdit) {
 			if (groups.length > 1) {
 				const moveRight = document.createElement("button");
 				moveRight.type = "button";
@@ -4952,7 +5088,7 @@ function renderGroupChips(selectedGroup = "") {
 		container.append(chip);
 	});
 
-	if (groups.length < 3 && isPremium) {
+	if (groups.length < 3 && isPremium && canEdit) {
 		const addBtn = document.createElement("button");
 		addBtn.type = "button";
 		addBtn.className = "counter-group-add-btn";
@@ -4963,7 +5099,11 @@ function renderGroupChips(selectedGroup = "") {
 }
 
 async function promptCreateCounterGroup() {
-	if (userTier !== "premium") {
+	if (!canEditActiveWorkspace()) {
+		showToast("Seu acesso a esta equipe é somente para visualização.");
+		return;
+	}
+	if (!isActiveWorkspacePremium()) {
 		showToast("🔒 Criar grupos de contadores é um recurso do plano Premium.");
 		return;
 	}
@@ -4993,6 +5133,7 @@ async function promptCreateCounterGroup() {
 }
 
 async function deleteCounterGroup(groupName) {
+	if (!canEditActiveWorkspace()) return;
 	const currentGroups = userSettings.counterGroups || [];
 	let nextGroups = currentGroups.filter((g) => g !== groupName);
 	// If no named groups remain, remove OUTROS_KEY too (ordering is meaningless)
@@ -5010,47 +5151,27 @@ async function deleteCounterGroup(groupName) {
 function renderCounterGroupControls() {
 	if (!elements.counterGroupControls || !elements.counterGroupOrderList) return;
 	const groups = (userSettings.counterGroups || []).filter((g) => g !== OUTROS_KEY);
-	const isPremium = userTier === "premium";
-	elements.counterGroupControls.hidden = !isPremium || groups.length === 0;
-	if (!isPremium || groups.length === 0) return;
-
+	const canManage = isActiveWorkspacePremium() && canEditActiveWorkspace();
+	elements.counterGroupControls.hidden = !canManage;
+	if (!canManage) return;
 	elements.counterGroupOrderList.replaceChildren();
-	groups.forEach((groupName, index) => {
-		const row = document.createElement("div");
-		row.className = "dashboard-section-item";
-
-		const copy = document.createElement("div");
-		copy.className = "dashboard-section-copy";
-		const title = document.createElement("strong");
-		title.textContent = groupName;
-		copy.append(title);
-
-		const actions = document.createElement("div");
-		actions.className = "dashboard-section-actions";
-
-		const upBtn = document.createElement("button");
-		upBtn.className = "counter-action";
-		upBtn.type = "button";
-		upBtn.disabled = index === 0;
-		upBtn.title = `Mover grupo ${groupName} para cima`;
-		upBtn.innerHTML = '<i class="material-icons" aria-hidden="true">arrow_upward</i>';
-		upBtn.addEventListener("click", () => reorderCounterGroup(index, -1));
-
-		const downBtn = document.createElement("button");
-		downBtn.className = "counter-action";
-		downBtn.type = "button";
-		downBtn.disabled = index === groups.length - 1;
-		downBtn.title = `Mover grupo ${groupName} para baixo`;
-		downBtn.innerHTML = '<i class="material-icons" aria-hidden="true">arrow_downward</i>';
-		downBtn.addEventListener("click", () => reorderCounterGroup(index, 1));
-
-		actions.append(upBtn, downBtn);
-		row.append(copy, actions);
-		elements.counterGroupOrderList.append(row);
-	});
+	if (elements.createCounterGroupButton) {
+		elements.createCounterGroupButton.disabled = groups.length >= 3;
+	}
+	if (groups.length === 0) {
+		const empty = document.createElement("p");
+		empty.className = "counter-group-empty";
+		empty.textContent = "Crie um grupo para organizar os contadores deste espaço.";
+		elements.counterGroupOrderList.append(empty);
+		return;
+	}
+	elements.counterGroupOrderList.append(
+		buildGroupOrderSubmenu(userSettings.counterGroups || []),
+	);
 }
 
 async function reorderCounterGroup(index, delta, preserveSelection = "") {
+	if (!canEditActiveWorkspace()) return;
 	const effectiveOrder = (userSettings.counterGroups || []).includes(OUTROS_KEY)
 		? [...(userSettings.counterGroups || [])]
 		: [OUTROS_KEY, ...(userSettings.counterGroups || []).filter((g) => g !== OUTROS_KEY)];
@@ -5069,6 +5190,10 @@ async function reorderCounterGroup(index, delta, preserveSelection = "") {
 }
 
 function openCounterDialog(counter = null) {
+	if (!canEditActiveWorkspace()) {
+		showToast("Seu acesso a esta equipe é somente para visualização.");
+		return;
+	}
 	editingCounterId = counter?.id || null;
 	elements.counterForm.reset();
 	elements.counterMessage.textContent = "";
@@ -5115,7 +5240,7 @@ function openCounterDialog(counter = null) {
 	renderGroupChips(counter?.group || "");
 	if (elements.counterHidden) {
 		elements.counterHidden.checked = Boolean(counter?.hidden);
-		elements.counterHidden.disabled = userTier !== "premium";
+		elements.counterHidden.disabled = !isActiveWorkspacePremium();
 	}
 	currentChecklist = counter?.checklist ? JSON.parse(JSON.stringify(counter.checklist)) : [];
 	renderChecklistInputs();
@@ -5169,6 +5294,12 @@ function renderAiQuota(userData = {}) {
 }
 
 function updateDowngradeRestrictions() {
+	if (activeWorkspace.type === "team") {
+		if (elements.excessCountersWarning) {
+			elements.excessCountersWarning.hidden = true;
+		}
+		return;
+	}
 	const counterCount = userSettings.customCounters.length;
 	const isOverCounterLimit = userTier === "free" && counterCount > 5;
 	if (elements.excessCountersWarning) {
@@ -5339,6 +5470,9 @@ for (const form of [elements.adminPaymentForm, elements.adminHolidayForm]) {
 	);
 }
 elements.openCounterModal.addEventListener("click", () => openCounterDialog());
+elements.createCounterGroupButton?.addEventListener("click", () =>
+	promptCreateCounterGroup(),
+);
 elements.openImageLibrary.addEventListener("click", () => openImageLibrary());
 elements.openArchiveDialog.addEventListener("click", openArchiveDialog);
 elements.chooseCounterImage.addEventListener("click", () =>
@@ -5726,7 +5860,7 @@ elements.counterForm.addEventListener("submit", async (event) => {
 		color: data.get("colorEnabled") ? String(data.get("color")) : null,
 		createdAt: existingCounter?.createdAt || new Date().toISOString(),
 	};
-	if (userTier === "premium") {
+	if (isActiveWorkspacePremium()) {
 		const groupName = String(data.get("group") || "").trim().slice(0, 30);
 		if (groupName) counter.group = groupName;
 		if (existingCounter?.hidden) counter.hidden = true;
@@ -5834,6 +5968,83 @@ function activeCountersReference() {
 	return doc(db, "users", currentUser.uid, "data", "counters");
 }
 
+function activeWorkspaceValue() {
+	return activeWorkspace.type === "team" && activeWorkspace.id
+		? `team:${activeWorkspace.id}`
+		: "personal";
+}
+
+function updateActiveWorkspaceUi() {
+	const canEdit = canEditActiveWorkspace();
+	const isPremium = isActiveWorkspacePremium();
+	document.body.dataset.workspaceType = activeWorkspace.type;
+	document.body.dataset.workspaceRole =
+		activeWorkspace.type === "team" ? activeWorkspace.role || "viewer" : "owner";
+	const mainTitle = document.querySelector("#custom-counters-title");
+	if (elements.customCountersKicker) {
+		elements.customCountersKicker.textContent =
+			activeWorkspace.type === "team" ? "Equipe" : "Sua conta";
+	}
+	if (mainTitle) {
+		mainTitle.textContent =
+			activeWorkspace.type === "team"
+				? activeWorkspace.name || "Contadores da equipe"
+				: "Meus contadores";
+	}
+	if (elements.counterKicker) {
+		elements.counterKicker.textContent = isPremium
+			? "Até 15 contadores"
+			: "Até cinco";
+	}
+	if (elements.counterManagementLabel) {
+		elements.counterManagementLabel.textContent =
+			activeWorkspace.type === "team"
+				? activeWorkspace.name || "Equipe"
+				: "Meus contadores";
+	}
+	if (elements.userTierBadge) {
+		elements.userTierBadge.textContent = isPremium ? "★ Premium" : "Free";
+		elements.userTierBadge.className = `user-tier-badge ${isPremium ? "tier-premium" : "tier-free"}`;
+	}
+	const timelineCountersOption = elements.timelineSourceFilter?.querySelector(
+		'option[value="counters"]',
+	);
+	if (timelineCountersOption) {
+		timelineCountersOption.textContent =
+			activeWorkspace.type === "team"
+				? "Contadores da equipe"
+				: "Meus contadores";
+	}
+	const counterSettings = elements.counterList?.closest(".counter-settings");
+	counterSettings?.classList.toggle("is-readonly", !canEdit);
+	if (!canEdit && elements.counterDialog?.open) closeCounterDialog();
+	renderDashboardSectionControls(userSettings);
+	renderCounterGroupControls();
+	renderCustomCounters(userSettings.customCounters || []);
+	renderTimeline();
+}
+
+function restorePreferredWorkspace() {
+	if (!currentUser) return;
+	const preferred = normalizeWorkspacePreference(preferredWorkspaceValue);
+	if (preferred === "personal") {
+		if (activeWorkspace.type !== "personal") {
+			switchWorkspace("personal", { persist: false });
+		}
+		return;
+	}
+	if (!teamsReady) return;
+	const teamId = preferred.slice(5);
+	if (userTeams.some((team) => team.id === teamId)) {
+		if (activeWorkspaceValue() !== preferred) {
+			switchWorkspace(preferred, { persist: false });
+		}
+		return;
+	}
+	preferredWorkspaceValue = "personal";
+	switchWorkspace("personal", { persist: true });
+}
+
 function getMaxCreatedTeams() {
 	return userTier === "premium" ? 3 : 1;
 }
@@ -5861,6 +6072,7 @@ function subscribeToTeams(user) {
 		userTeamsQuery,
 		(snapshot) => {
 			userTeams = snapshot.docs.map((d) => d.data());
+			teamsReady = true;
 			renderWorkspaceSwitcher();
 			if (activeWorkspace.type === "team") {
 				const currentTeam = userTeams.find((t) => t.id === activeWorkspace.id);
@@ -5868,11 +6080,13 @@ function subscribeToTeams(user) {
 					activeWorkspace.name = currentTeam.name;
 					activeWorkspace.ownerTier = currentTeam.ownerTier || "free";
 					activeWorkspace.role = currentTeam.members[user.uid]?.role || "viewer";
-					elements.openCounterModal.disabled = activeWorkspace.role === "viewer";
+					updateActiveWorkspaceUi();
 				} else {
-					switchWorkspace("personal");
+					preferredWorkspaceValue = "personal";
+					switchWorkspace("personal", { persist: true });
 				}
 			}
+			restorePreferredWorkspace();
 		},
 		(error) => {
 			console.error("Falha ao acompanhar equipes.", error);
@@ -5909,25 +6123,35 @@ function renderWorkspaceSwitcher() {
 	}
 }
 
-async function switchWorkspace(workspaceValue) {
+async function switchWorkspace(workspaceValue, { persist = true } = {}) {
 	if (workspaceValue === "create_team") {
 		renderWorkspaceSwitcher();
 		openTeamManageModal();
 		return;
 	}
-
-	if (workspaceValue === "personal") {
-		activeWorkspace = { type: "personal" };
-		elements.openCounterModal.disabled = false;
-		if (currentUser) {
-			listenToWorkspaceCounters();
-		}
+	if (!currentUser) return;
+	const normalizedValue = normalizeWorkspacePreference(workspaceValue);
+	if (normalizedValue === activeWorkspaceValue()) {
 		renderWorkspaceSwitcher();
+		updateActiveWorkspaceUi();
+		if (
+			persist &&
+			normalizeWorkspacePreference(personalSettingsData.activeWorkspace) !==
+				normalizedValue
+		) {
+			preferredWorkspaceValue = normalizedValue;
+			await saveSettings({ activeWorkspace: normalizedValue });
+		}
 		return;
 	}
 
-	if (workspaceValue.startsWith("team:")) {
-		const teamId = workspaceValue.slice(5);
+	if (normalizedValue === "personal") {
+		activeWorkspace = { type: "personal" };
+		workspaceGroupSettings = normalizeGroupSettings(personalSettingsData);
+		listenToWorkspaceData();
+		renderWorkspaceSwitcher();
+	} else if (normalizedValue.startsWith("team:")) {
+		const teamId = normalizedValue.slice(5);
 		const team = userTeams.find((t) => t.id === teamId);
 		if (!team) return;
 		const myRole = team.members[currentUser.uid]?.role || "viewer";
@@ -5939,29 +6163,63 @@ async function switchWorkspace(workspaceValue) {
 			ownerTier: team.ownerTier || "free",
 			role: myRole,
 		};
-		elements.openCounterModal.disabled = myRole === "viewer";
-		listenToWorkspaceCounters();
+		workspaceGroupSettings = normalizeGroupSettings();
+		listenToWorkspaceData();
 		renderWorkspaceSwitcher();
+	}
+	updateActiveWorkspaceUi();
+	if (persist) {
+		preferredWorkspaceValue = normalizedValue;
+		await saveSettings({ activeWorkspace: normalizedValue });
 	}
 }
 
-function listenToWorkspaceCounters() {
+function listenToWorkspaceData() {
+	workspaceSubscriptionVersion += 1;
+	const subscriptionVersion = workspaceSubscriptionVersion;
 	if (unsubscribeCounters) {
 		unsubscribeCounters();
 		unsubscribeCounters = null;
 	}
+	unsubscribeWorkspaceSettings?.();
+	unsubscribeWorkspaceSettings = null;
 	countersReady = false;
+	applyCounters([]);
 	setCounterState("Conectando...", "connecting");
+
+	if (activeWorkspace.type === "team") {
+		applyWorkspaceGroupSettings({});
+		const settingsTarget = teamSettingsReference(activeWorkspace.id);
+		unsubscribeWorkspaceSettings = onSnapshot(
+			settingsTarget,
+			(snapshot) => {
+				if (subscriptionVersion !== workspaceSubscriptionVersion) return;
+				applyWorkspaceGroupSettings(snapshot.exists() ? snapshot.data() : {});
+				setSaveState("Sincronizado");
+			},
+			(error) => {
+				if (subscriptionVersion !== workspaceSubscriptionVersion) return;
+				console.error("Falha ao carregar configurações da equipe.", error);
+				setSaveState("Erro de conexão");
+				showToast("Não foi possível carregar os grupos da equipe.");
+			},
+		);
+	} else {
+		applyWorkspaceGroupSettings(personalSettingsData);
+	}
 
 	const targetRef = activeCountersReference();
 	unsubscribeCounters = onSnapshot(
 		targetRef,
 		(snapshot) => {
+			if (subscriptionVersion !== workspaceSubscriptionVersion) return;
 			countersReady = true;
 			applyCounters(snapshot.exists() ? snapshot.data().items : []);
 			setCounterState("Ao vivo", "live");
+			updateActiveWorkspaceUi();
 		},
 		(error) => {
+			if (subscriptionVersion !== workspaceSubscriptionVersion) return;
 			console.error("Falha ao carregar contadores do espaço.", error);
 			setCounterState("Erro de conexão", "error");
 			showToast("Não foi possível carregar os contadores.");
@@ -6005,8 +6263,16 @@ async function createTeam(name) {
 			items: [],
 			updatedAt: serverTimestamp(),
 		});
+		await setDoc(teamSettingsReference(teamId), {
+			counterGroups: [],
+			hiddenCounterGroups: [],
+			updatedAt: serverTimestamp(),
+		});
+		if (!userTeams.some((team) => team.id === teamId)) {
+			userTeams = [...userTeams, newTeam];
+		}
 		showToast(`Equipe "${name}" criada com sucesso!`);
-		switchWorkspace(`team:${teamId}`);
+		await switchWorkspace(`team:${teamId}`);
 		if (elements.teamManageDialog) elements.teamManageDialog.close();
 	} catch (error) {
 		console.error("Falha ao criar equipe.", error);
@@ -6160,7 +6426,7 @@ function renderTeamsModalContent() {
 				return `
 				<div class="team-card-item ${isActive ? "is-active" : ""}">
 					<div class="team-card-identity">
-						<span class="team-section-icon" aria-hidden="true"><i class="material-icons">groups</i></span>
+						<span class="team-section-icon" aria-hidden="true"><i class="material-icons">group</i></span>
 						<div>
 						<strong>${escapeHtml(team.name)}</strong>
 						<div class="team-card-meta">
@@ -6284,11 +6550,16 @@ async function acceptTeamInvite(teamId) {
 			},
 		};
 		await setDoc(teamRef, { members: updatedMembers, updatedAt: serverTimestamp() }, { merge: true });
+		const joinedTeam = { ...team, members: updatedMembers };
+		userTeams = [
+			...userTeams.filter((item) => item.id !== teamId),
+			joinedTeam,
+		];
 		pendingInvites = pendingInvites.filter((i) => i.teamId !== teamId);
 		renderPendingInvites();
 		if (elements.pendingInvitesDialog) elements.pendingInvitesDialog.close();
 		showToast(`Você entrou na equipe "${team.name}"!`);
-		switchWorkspace(`team:${teamId}`);
+		await switchWorkspace(`team:${teamId}`);
 	} catch (error) {
 		console.error("Falha ao aceitar convite.", error);
 		showToast("Não foi possível aceitar o convite.");
@@ -6302,6 +6573,11 @@ function declineTeamInvite(teamId) {
 }
 
 // Event Listeners for Teams Modal & Buttons
+if (elements.workspaceSwitcher) {
+	elements.workspaceSwitcher.addEventListener("change", () => {
+		switchWorkspace(elements.workspaceSwitcher.value);
+	});
+}
 if (elements.teamsManageButton) {
 	elements.teamsManageButton.addEventListener("click", () => {
 		openTeamManageModal();

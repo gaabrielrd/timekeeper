@@ -116,6 +116,10 @@ animação indispensável e herda o comportamento global de movimento reduzido.
 A sidebar ocupa o lado direito, bloqueia interação externa via backdrop/`inert` e
 contém rotina, contadores, aparência, clima, notificações e ações da conta no mesmo
 fluxo rolável. Abaixo da biblioteca, `Arquivados` abre o histórico fora desse fluxo.
+No espaço de uma equipe Premium, a área de contadores também expõe uma lista linear
+para criar grupos, definir sua sequência e alternar sua visibilidade. Admins e
+editores recebem os controles; viewers veem a lista de contadores sem ações de
+escrita.
 Sair
 precede excluir conta, que encerra o conteúdo. Um `<dialog>` reúne criação e
 edição com uma prévia compacta que reage a nome, cor, imagem e opacidades; outro

@@ -49,6 +49,17 @@ Para `/users/{userId}/data/{documentId}`:
   allowlist de `0` a `6`, reduzindo o orçamento de expressões sem relaxar dados;
 - nomes, IDs, cores, horários e dias recebem validação de formato/range.
 
+Para `/teams/{teamId}`:
+
+- somente membros presentes no mapa da equipe podem ler o documento e seus dados;
+- `data/counters` e `data/settings` aceitam escrita apenas de `admin` e `editor`;
+- `viewer` pode acompanhar contadores, grupos e visibilidade em tempo real, sem
+  permissão de criar, atualizar ou excluir esses documentos;
+- `data/settings` possui allowlist restrita a `counterGroups`,
+  `hiddenCounterGroups` e `updatedAt`;
+- o limite dos contadores usa o plano do proprietário da equipe, não o plano do
+  membro que realiza a edição.
+
 Para `/users/{userId}/counter-images/{slot}` no Cloud Storage:
 
 - somente o dono autenticado com Google pode ler, enviar ou excluir;
@@ -57,7 +68,8 @@ Para `/users/{userId}/counter-images/{slot}` no Cloud Storage:
 - dez slots tornam impossível exceder 50 MiB por usuário pelas APIs do Storage.
 
 `generalConfig` é a única leitura pública e query de coleção autorizada. Perfis,
-settings, contadores e imagens continuam privados por UID.
+settings pessoais e imagens continuam privados por UID; dados de equipe são
+compartilhados somente entre os membros do respectivo `teamId`.
 
 ## Lacunas conhecidas
 

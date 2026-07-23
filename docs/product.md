@@ -102,6 +102,20 @@ Ambos podem ter uma cor própria. Sem cor, usam o destaque principal da interfac
 - A biblioteca aceita até dez arquivos de 5 MiB; excluir um remove seu uso em todos
   os contadores sem excluir os próprios contadores.
 
+## Espaços pessoais e de equipe
+
+O seletor do header alterna entre o espaço pessoal e as equipes das quais a conta
+participa. A seleção fica salva no settings pessoal e sincroniza em tempo real entre
+abas e dispositivos; se a equipe deixar de estar disponível, o app retorna ao espaço
+pessoal. Cada troca substitui imediatamente os contadores da área principal e da
+sidebar, sem misturar dados entre workspaces.
+
+Equipes cujo proprietário é Premium também sincronizam grupos, ordem e visibilidade
+dos grupos. Admins e editores podem criar grupos, reordenar ou ocultar grupos e
+criar, editar, reordenar, ocultar e excluir contadores. Viewers recebem os mesmos
+contadores e preferências de visualização em tempo real, mas todos os controles de
+escrita ficam indisponíveis.
+
 ## Aparência
 
 O fundo animado começa desligado. Quando ativado, o usuário escolhe:
