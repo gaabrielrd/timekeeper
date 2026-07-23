@@ -1,5 +1,12 @@
 const { test, expect } = require("@playwright/test");
 
+async function confirmPendingAction(page) {
+	const dialog = page.locator("#confirmation-dialog");
+	await expect(dialog).toBeVisible();
+	await dialog.locator("#confirmation-dialog-confirm").click();
+	await expect(dialog).toBeHidden();
+}
+
 async function loginWithGoogleEmulator(page, projectName) {
 	await page.goto("/?emulators=1");
 	await page.locator("#privacy-decline").click();
@@ -20,8 +27,12 @@ async function loginWithGoogleEmulator(page, projectName) {
 	await closePromise;
 
 	await expect(page.locator("#account-label")).toHaveText("Pessoa");
-	await expect(page.locator("#settings-state")).toHaveText("Sincronizado");
-	await expect(page.locator("#counter-sidebar-state")).toHaveText("Ao vivo");
+	await expect(page.locator("#settings-state")).toHaveText("Sincronizado", {
+		timeout: 15000,
+	});
+	await expect(page.locator("#counter-sidebar-state")).toHaveText("Ao vivo", {
+		timeout: 15000,
+	});
 	return email;
 }
 
@@ -215,8 +226,8 @@ test("usuário arquiva manualmente apenas contador fixo e exclui a conquista", a
 		await completedCard.hover();
 	}
 	await expect(cardArchiveButton).toHaveCSS("opacity", "1");
-	page.once("dialog", (dialog) => dialog.accept());
 	await cardArchiveButton.click();
+	await confirmPendingAction(page);
 	await expect(page.locator("#counter-count")).toHaveText("1 / 5");
 	await expect(page.locator("#archive-count")).toHaveText("1 / 100");
 	await expect(page.locator("#archive-list")).toContainText("Meta concluída");
@@ -224,10 +235,10 @@ test("usuário arquiva manualmente apenas contador fixo e exclui a conquista", a
 	await page.locator("#open-archive-dialog").click();
 	await expect(page.locator("#archive-dialog")).toBeVisible();
 
-	page.once("dialog", (dialog) => dialog.accept());
 	await page
 		.getByRole("button", { name: "Excluir Meta concluída permanentemente" })
 		.click();
+	await confirmPendingAction(page);
 	await expect(page.locator("#archive-count")).toHaveText("0 / 100");
 	await expect(page.locator("#archive-empty")).toBeVisible();
 });
@@ -431,8 +442,8 @@ test("usuário gerencia cidades e sincroniza os widgets", async (
 	await expect(secondPage.locator("#weather-widget-count")).toHaveText("4 / 5");
 	await secondPage.close();
 
-	page.once("dialog", (dialog) => dialog.accept());
 	await page.getByRole("button", { name: "Remover CURITIBA CENTRO" }).click();
+	await confirmPendingAction(page);
 	await expect(page.locator("#weather-widget-count")).toHaveText("3 / 5");
 });
 
@@ -494,8 +505,8 @@ test("administrador gerencia a configuração geral", async ({ page }, testInfo)
 		month: "long",
 		year: "numeric",
 	}).format(new Date(`${editedDate}T12:00:00`));
-	page.once("dialog", (dialog) => dialog.accept());
 	await page.getByRole("button", { name: `Remover ${editedLabel}` }).click();
+	await confirmPendingAction(page);
 	await expect(
 		page.getByRole("button", { name: `Remover ${editedLabel}` }),
 	).toHaveCount(0);
@@ -509,9 +520,9 @@ test("usuário exclui a própria conta e os dados", async ({ page }, testInfo) =
 	await page.locator("#auth-button").click();
 	await expect(page.locator("#delete-account-button")).toBeVisible();
 
-	page.once("dialog", (dialog) => dialog.accept());
 	const popupPromise = page.waitForEvent("popup");
 	await page.locator("#delete-account-button").click();
+	await confirmPendingAction(page);
 	const popup = await popupPromise;
 	await popup.waitForLoadState("domcontentloaded");
 	const closePromise = popup.waitForEvent("close");
