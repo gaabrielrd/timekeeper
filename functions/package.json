@@ -7,10 +7,11 @@
     "node": "22"
   },
   "scripts": {
-    "check": "node --check index.js && node --check src/push-domain.js && node --check src/ai-generator.js && node --check src/stripe-webhook.js && node --test test/*.test.cjs",
+    "check": "node --check index.js && node --check src/push-domain.js && node --check src/ai-generator.js && node --check src/nlp-generator.js && node --check src/stripe-webhook.js && node --test test/*.test.cjs",
     "test": "node --test test/*.test.cjs"
   },
   "dependencies": {
+    "@google/genai": "^2.13.0",
     "firebase-admin": "14.2.0",
     "firebase-functions": "^7.3.2-rc.0",
     "luxon": "3.7.2",

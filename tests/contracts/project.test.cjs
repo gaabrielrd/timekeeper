@@ -536,3 +536,22 @@ test("espaços de equipe e colaboração mantêm regras, cotas e papéis alinhad
 	const functions = read("functions/index.js");
 	assert.match(functions, /exports\.acceptTeamInvite = onCall/);
 });
+
+test("criação via linguagem natural e IA inclui parser client-side e function de geração", () => {
+	const nlpParser = read("public/src/nlp-parser.js");
+	assert.match(nlpParser, /parseNaturalLanguagePrompt/);
+	assert.match(nlpParser, /parseRecurring/);
+	assert.match(nlpParser, /parseFixed/);
+
+	const nlpGenerator = read("functions/src/nlp-generator.js");
+	assert.match(nlpGenerator, /generateChecklistForPrompt/);
+	assert.match(nlpGenerator, /@google\/genai/);
+
+	const html = read("public/index.html");
+	assert.match(html, /id="nlp-prompt-input"/);
+	assert.match(html, /id="nlp-parse-button"/);
+
+	const client = read("public/src/firebase.js");
+	assert.match(client, /httpsCallable\(functions, "generateAiChecklist"\)/);
+	assert.match(client, /window\.NlpParser\.parseNaturalLanguagePrompt/);
+});
