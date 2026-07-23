@@ -3,7 +3,7 @@
 ## Estado atual
 
 O projeto usa Node Test Runner, Playwright e Firebase Emulator Suite. A suíte atual
-contém 69 testes unitários/contratuais do cliente, 12 testes do domínio das Functions,
+contém 73 testes unitários/contratuais do cliente, 12 testes do domínio das Functions,
 44 E2E em Chromium (22 cenários em desktop e mobile) e 25 testes de
 Firestore/Storage Rules. GitHub Actions executa todos em pushes, pull requests e
 disparos manuais.

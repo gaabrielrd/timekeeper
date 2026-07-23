@@ -14,6 +14,7 @@ const {
 	validTimeZone,
 } = require("./src/push-domain.js");
 const { calculateAiQuota } = require("./src/ai-generator.js");
+const { generateChecklistForPrompt } = require("./src/nlp-generator.js");
 const { parseStripeEvent, extractSubscriptionDetails } = require("./src/stripe-webhook.js");
 
 initializeApp();

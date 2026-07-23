@@ -448,6 +448,10 @@ const elements = {
 	counterDialogTitle: document.querySelector("#counter-dialog-title"),
 	counterDialogClose: document.querySelector("#counter-dialog-close"),
 	counterDialogCancel: document.querySelector("#counter-dialog-cancel"),
+	nlpPromptInput: document.querySelector("#nlp-prompt-input"),
+	nlpParseButton: document.querySelector("#nlp-parse-button"),
+	nlpChecklistFieldset: document.querySelector("#nlp-checklist-fieldset"),
+	nlpChecklistItems: document.querySelector("#nlp-checklist-items"),
 	counterPreviewCard: document.querySelector("#counter-preview-card"),
 	counterPreviewImage: document.querySelector("#counter-preview-image"),
 	counterPreviewOverlay: document.querySelector("#counter-preview-overlay"),
@@ -5370,6 +5374,11 @@ function openCounterDialog(counter = null) {
 	}
 	editingCounterId = counter?.id || null;
 	elements.counterForm.reset();
+	if (elements.nlpPromptInput) elements.nlpPromptInput.value = "";
+	if (elements.nlpChecklistItems) {
+		elements.nlpChecklistItems.innerHTML = "";
+		elements.nlpChecklistFieldset.hidden = true;
+	}
 	elements.counterMessage.textContent = "";
 	const isEditing = Boolean(counter);
 	elements.counterDialogKicker.textContent = isEditing
@@ -5382,6 +5391,11 @@ function openCounterDialog(counter = null) {
 		? "Salvar alterações"
 		: "Criar contador";
 	elements.counterSubmit.disabled = false;
+
+	const promptContainer = document.getElementById("nlp-prompt-container");
+	if (promptContainer) {
+		promptContainer.hidden = isEditing;
+	}
 
 	const counterType = counter?.type === "recurring" ? "recurring" : "fixed";
 	elements.counterForm.elements.name.value = counter?.name || "";
@@ -7013,6 +7027,109 @@ if (elements.teamMembersList) {
 				console.error("Falha ao remover membro.", err);
 				showToast("Não foi possível remover o membro.");
 			}
+		}
+	});
+}
+
+// NLP Prompt integration
+async function handleNlpPrompt() {
+	if (!elements.nlpPromptInput || !elements.nlpParseButton) return;
+
+	const promptText = elements.nlpPromptInput.value.trim();
+	if (!promptText) return;
+
+	// Parse locally for date/title
+	if (window.NlpParser) {
+		const parsed = window.NlpParser.parseNaturalLanguagePrompt(promptText);
+		if (parsed) {
+			elements.counterForm.elements.name.value = parsed.title;
+			setCounterType(parsed.type);
+			if (parsed.type === "recurring") {
+				elements.counterForm.elements.startTime.value = parsed.startTime;
+				elements.counterForm.elements.endTime.value = parsed.endTime;
+				const days = new Set(parsed.daysOfWeek);
+				elements.counterForm
+					.querySelectorAll('input[name="daysOfWeek"]')
+					.forEach((input) => (input.checked = days.has(Number(input.value))));
+			} else {
+				const start = new Date(parsed.startAtMs);
+				const end = new Date(parsed.endAtMs);
+				elements.counterForm.elements.startAt.value = toLocalInputValue(start);
+				elements.counterForm.elements.endAt.value = toLocalInputValue(end);
+			}
+			updatePreviewCard();
+		}
+	}
+
+	// Request AI checklist
+	if (currentUser) {
+		elements.nlpParseButton.disabled = true;
+		elements.nlpParseButton.innerHTML = `<i class="material-icons">hourglass_empty</i>`;
+
+		try {
+			const generateAiChecklist = httpsCallable(functions, "generateAiChecklist");
+			const { data } = await generateAiChecklist({ prompt: promptText });
+
+			if (data) {
+				if (data.counterParams && data.counterParams.type) {
+					const cp = data.counterParams;
+					setCounterType(cp.type);
+					if (cp.type === "recurring") {
+						if (cp.startTime) elements.counterForm.elements.startTime.value = cp.startTime;
+						if (cp.endTime) elements.counterForm.elements.endTime.value = cp.endTime;
+						if (cp.daysOfWeek) {
+							const days = new Set(cp.daysOfWeek);
+							elements.counterForm
+								.querySelectorAll('input[name="daysOfWeek"]')
+								.forEach((input) => (input.checked = days.has(Number(input.value))));
+						}
+					} else {
+						if (cp.startAtMs) elements.counterForm.elements.startAt.value = toLocalInputValue(new Date(cp.startAtMs));
+						if (cp.endAtMs) elements.counterForm.elements.endAt.value = toLocalInputValue(new Date(cp.endAtMs));
+					}
+					updatePreviewCard();
+				}
+
+				if (data.checklist && data.checklist.length > 0) {
+					if (!elements.counterForm.elements.name.value || elements.counterForm.elements.name.value === "Contador Recorrente" || elements.counterForm.elements.name.value === "Novo Contador") {
+						elements.counterForm.elements.name.value = data.title || promptText;
+						updatePreviewCard();
+					}
+
+					data.checklist.forEach(itemText => {
+						currentChecklist.push({ id: createCounterId(), text: itemText, done: false });
+					});
+					if (typeof renderChecklistInputs === "function") {
+						renderChecklistInputs();
+					}
+
+					showToast("Checklist IA gerada com sucesso!");
+				}
+			}
+		} catch (error) {
+			console.error("Erro ao gerar checklist via IA:", error);
+			if (error.code === "functions/resource-exhausted") {
+				showToast("Cota de uso da IA esgotada.", true);
+			} else {
+				showToast("Falha ao gerar checklist. Tente novamente mais tarde.");
+			}
+		} finally {
+			elements.nlpParseButton.disabled = false;
+			elements.nlpParseButton.innerHTML = `<i class="material-icons">send</i>`;
+		}
+	} else if (!currentUser) {
+		showToast("Faça login para utilizar a geração de checklists com IA.");
+	}
+}
+
+if (elements.nlpParseButton) {
+	elements.nlpParseButton.addEventListener("click", handleNlpPrompt);
+}
+if (elements.nlpPromptInput) {
+	elements.nlpPromptInput.addEventListener("keydown", (e) => {
+		if (e.key === "Enter") {
+			e.preventDefault();
+			handleNlpPrompt();
 		}
 	});
 }

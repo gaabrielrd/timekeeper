@@ -25,6 +25,7 @@
 		<script src="src/runtime-config.js"></script>
 		<script src="src/time.js"></script>
 		<script src="src/occurrences.js"></script>
+		<script src="src/nlp-parser.js"></script>
 		<script src="src/weather.js"></script>
 		<script src="src/notifications.js"></script>
 		<script src="src/soundscapes.js"></script>
@@ -1298,6 +1299,26 @@
 					>
 						<i class="material-icons">close</i>
 					</button>
+				</div>
+				<div id="nlp-prompt-container" class="nlp-prompt-container">
+					<div class="input-with-button nlp-prompt-card">
+						<i class="material-icons nlp-icon" aria-hidden="true">auto_awesome</i>
+						<input
+							id="nlp-prompt-input"
+							type="text"
+							placeholder="Ex: Lançamento em 15 de agosto com checklist..."
+							aria-label="Criação rápida com IA"
+						/>
+						<button
+							id="nlp-parse-button"
+							class="icon-button nlp-submit"
+							type="button"
+							aria-label="Interpretar"
+							title="Interpretar texto"
+						>
+							<i class="material-icons">send</i>
+						</button>
+					</div>
 				</div>
 				<section
 					class="counter-live-preview"
