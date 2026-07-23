@@ -159,17 +159,17 @@
 
 		const audio = new root.Audio();
 		audio.preload = "none";
-		audio.volume = 0.6;
+		audio.volume = 0.2;
+		audio.loop = true;
 		let current = null;
 		let state = "idle";
-		let loop = false;
 		const listeners = new Set();
 
 		function snapshot() {
 			return Object.freeze({
 				track: current,
 				state,
-				loop,
+				loop: true,
 				volume: audio.volume,
 			});
 		}
@@ -187,8 +187,7 @@
 		function select(trackId) {
 			const nextTrack = CATALOG.find((track) => track.id === trackId) || null;
 			audio.pause();
-			loop = Boolean(loop);
-			audio.loop = loop;
+			audio.loop = true;
 			audio.currentTime = 0;
 			current = nextTrack;
 			if (!nextTrack) {
@@ -226,27 +225,17 @@
 			emit();
 		}
 
-		function setLoop(value) {
-			loop = Boolean(value);
-			audio.loop = loop;
-			emit();
-		}
-
 		function onPlaying() {
 			setState("playing");
 		}
 		function onPause() {
 			if (current && state !== "error") setState("paused");
 		}
-		function onEnded() {
-			if (!loop) setState("paused");
-		}
 		function onError() {
 			setState("error");
 		}
 		audio.addEventListener("playing", onPlaying);
 		audio.addEventListener("pause", onPause);
-		audio.addEventListener("ended", onEnded);
 		audio.addEventListener("error", onError);
 
 		return {
@@ -261,14 +250,12 @@
 			play,
 			pause,
 			setVolume,
-			setLoop,
 			snapshot,
 			destroy() {
 				pause();
 				listeners.clear();
 				audio.removeEventListener("playing", onPlaying);
 				audio.removeEventListener("pause", onPause);
-				audio.removeEventListener("ended", onEnded);
 				audio.removeEventListener("error", onError);
 				audio.removeAttribute("src");
 				audio.load();

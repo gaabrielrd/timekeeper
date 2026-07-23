@@ -45,21 +45,21 @@ test("modo de foco restaura o contador e fecha por Escape sem overflow", async (
 		await page.locator('[data-focus-id="standard:workday"]').hover();
 		await expect(focusTrigger).toHaveCSS("opacity", "1");
 	}
+	await page.locator("#toggle-config").click();
+	await expect(page.locator("#control-center-sound-volume")).toHaveValue("20");
+	await expect(page.locator("#control-center-sound-loop")).toHaveCount(0);
+	await page
+		.locator("#control-center-sound-select")
+		.selectOption("rain:light-rain");
+	await expect(page.locator("#control-center-sound-toggle")).toBeEnabled();
+	await page.locator("#toggle-config").click();
 	await expect(focusTrigger).toBeVisible();
 	await focusTrigger.click();
 	await expect(page.locator("body")).toHaveClass(/focus-mode-active/);
 	await expect(page.locator("#focus-mode")).toHaveAttribute("aria-hidden", "false");
 	await expect(page.locator("#focus-mode-title")).toHaveText("Expediente");
 	await expect(page.locator("#focus-mode-main")).not.toHaveText("carregando...");
-	await expect(page.locator("#focus-mode-soundscape")).toBeVisible();
-	await expect(page.locator("#focus-mode-sound-toggle")).toBeDisabled();
-	await page.locator("#focus-mode-sound-select").selectOption("rain:light-rain");
-	await expect(page.locator("#focus-mode-sound-toggle")).toBeEnabled();
-	await expect(page.locator("#focus-mode-sound-toggle")).toHaveAttribute(
-		"aria-pressed",
-		"false",
-	);
-	await expect(page.locator("#focus-mode-sound-status")).toContainText("Pausado");
+	await expect(page.locator("#focus-mode-soundscape")).toHaveCount(0);
 	const ambientOpacity = await page
 		.locator("#ambient-background")
 		.evaluate((element) => Number.parseFloat(getComputedStyle(element).opacity));
@@ -77,7 +77,6 @@ test("modo de foco restaura o contador e fecha por Escape sem overflow", async (
 	await page.reload();
 	await expect(page.locator("body")).toHaveClass(/focus-mode-active/);
 	await expect(page.locator("#focus-mode-title")).toHaveText("Expediente");
-	await expect(page.locator("#focus-mode-sound-toggle")).toBeDisabled();
 	const dimensions = await page.evaluate(() => ({
 		clientWidth: document.documentElement.clientWidth,
 		scrollWidth: document.documentElement.scrollWidth,
@@ -125,17 +124,13 @@ test("modo de foco preserva imagem e opacidades do contador pessoal", async ({
 	);
 });
 
-test("layout não cria overflow horizontal", async ({ page }, testInfo) => {
+test("layout não cria overflow horizontal", async ({ page }) => {
 	const dimensions = await page.evaluate(() => ({
 		clientWidth: document.documentElement.clientWidth,
 		scrollWidth: document.documentElement.scrollWidth,
 	}));
 	expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth);
-	if (testInfo.project.name === "mobile-chromium") {
-		await expect(page.locator("#toggle-config")).toBeHidden();
-	} else {
-		await expect(page.locator("#toggle-config")).toBeVisible();
-	}
+	await expect(page.locator("#toggle-config")).toBeVisible();
 	await expect(page.locator("#auth-button")).toBeVisible();
 });
 

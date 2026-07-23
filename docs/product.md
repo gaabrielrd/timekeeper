@@ -237,6 +237,9 @@ não podem ser arquivados.
 ### Mini-Checklists nos Contadores
 Cada contador pessoal suporta a adição de até 3 subtarefas (checkpoints) em formato de lista interativa. A conclusão de cada subtarefa atualiza o progresso parcial no card de forma complementar ao progresso temporal. A interface atualiza o estado de forma otimista e sincroniza as edições em tempo real.
 
+### Criação Inteligente & Checklists IA
+O usuário autenticado pode usar linguagem natural no modal de criação (ex: "Férias dia 15 de janeiro" ou "Reunião de equipe toda sexta às 14h"). O input é interpretado para extrair o tipo (Fixo ou Recorrente), a data/hora e o título do evento. Adicionalmente, quando fornecida uma intenção ("Lançamento de produto com checklist"), a inteligência artificial da plataforma (via Firebase Functions e modelo Gemini) é chamada em background para preencher automaticamente uma sugestão de 5 etapas (mini-checklist) no formulário, minimizando atrito na criação de contadores complexos.
+
 ## Requisitos não funcionais atuais
 
 - Conteúdo principal utilizável a partir de 320 px.

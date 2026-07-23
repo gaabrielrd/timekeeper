@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "timekeeper-shell";
-const CACHE_VERSION = "v5";
+const CACHE_VERSION = "v7";
 const CACHE_NAME = `${CACHE_PREFIX}-${CACHE_VERSION}`;
 const APP_SHELL = [
 	"/",

@@ -109,7 +109,9 @@ test("usuário cria, edita, reordena e oculta contadores", async (
 	await expect(page.locator("#custom-panels .panel-title")).toHaveText(
 		"Entrega E2E",
 	);
+	await page.locator("#toggle-config").click();
 	await expect(page.locator("#custom-visibility-button")).toBeVisible();
+	await page.locator("#toggle-config").click();
 
 	await page
 		.locator("#counter-list")
@@ -138,6 +140,7 @@ test("usuário cria, edita, reordena e oculta contadores", async (
 	);
 
 	await page.locator("#sidebar-close").click();
+	await page.locator("#toggle-config").click();
 	await page.locator("#custom-visibility-button").click();
 	await expect(page.locator("#custom-counters-section")).toHaveAttribute(
 		"aria-hidden",
