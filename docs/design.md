@@ -51,17 +51,19 @@ foco ao abrir, `Esc` encerra o modo e o foco retorna ao botão de origem quando 
 ainda existe. A regra global de `prefers-reduced-motion` reduz as transições e as
 animações do fundo sem esconder conteúdo.
 
-O painel de paisagem sonora ocupa uma faixa compacta abaixo do progresso, com
-hierarquia editorial discreta para não competir com o contador. Seus controles
-mantêm alvos de toque confortáveis, reorganizam-se em duas colunas até 600 px e
-usam a cor do contador apenas como sinal de ação. A seleção inicial é neutra e o
-estado pausado fica explícito, evitando surpresa sonora ao entrar no foco.
+O modo de foco exibe somente o contador, seu checklist e o progresso. Paisagens
+sonoras ficam na central do header para não competir com a informação temporal.
 
 ### Header
 
-Barra de controle fixa com título, horário anônimo ou toggle de contadores, conta e
-tela cheia. Permanece visível durante a rolagem e usa transparência e blur para
-preservar o contexto sobre qualquer fundo.
+Barra fixa com título, horário anônimo, conta e um acionador para a central de
+controles. A troca de espaço vive apenas nessa central: clicar em qualquer ponto do
+controle abre o seletor nativo. A mesma superfície reúne visibilidade dos
+contadores, som ambiente e tela cheia. O áudio usa duas linhas compactas — seleção
+na primeira, reprodução e volume na segunda — começa em 20% e repete continuamente.
+Sua superfície de vidro usa blur real, divisões suaves e profundidade por bordas e
+sombras; no mobile, ocupa a largura disponível abaixo do header. Clique externo
+fecha o painel e `Esc` fecha devolvendo o foco ao acionador.
 
 ### Contadores padrão
 

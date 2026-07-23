@@ -83,12 +83,13 @@ test("controlador não reproduz automaticamente e expõe controles de sessão", 
 	const controller = api.createController();
 	assert.equal(FakeAudio.playCalls, 0);
 	assert.equal(controller.snapshot().state, "idle");
+	assert.equal(controller.snapshot().volume, 0.2);
+	assert.equal(controller.snapshot().loop, true);
 
 	controller.select("rain:light-rain");
 	assert.equal(FakeAudio.playCalls, 0);
 	assert.equal(controller.snapshot().state, "ready");
 	controller.setVolume(0.35);
-	controller.setLoop(true);
 	assert.equal(controller.snapshot().volume, 0.35);
 	assert.equal(controller.snapshot().loop, true);
 

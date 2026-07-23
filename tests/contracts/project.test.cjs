@@ -397,11 +397,19 @@ test("modo de foco cobre todos os cards, restaura a sessão e integra o shell PW
 	assert.match(html, /id="focus-mode"[\s\S]*role="dialog"[\s\S]*aria-modal="true"/);
 	assert.match(html, /id="focus-mode-close"[\s\S]*Sair do modo de foco/);
 	assert.match(html, /id="focus-mode-media"[\s\S]*id="focus-mode-image"[\s\S]*id="focus-mode-overlay"/);
-	assert.match(html, /id="focus-mode-soundscape"/);
-	assert.match(html, /id="focus-mode-sound-select"/);
-	assert.match(html, /id="focus-mode-sound-toggle"[\s\S]*aria-pressed="false"/);
-	assert.match(html, /id="focus-mode-sound-volume"/);
-	assert.match(html, /id="focus-mode-sound-loop"/);
+	assert.doesNotMatch(html, /id="focus-mode-soundscape"/);
+	assert.doesNotMatch(html, /id="focus-mode-sound-select"/);
+	assert.match(
+		html,
+		/id="toggle-config"[\s\S]*id="header-control-center"[\s\S]*id="control-center-sound-select"/,
+	);
+	assert.equal((html.match(/id="workspace-switcher"/g) || []).length, 1);
+	assert.match(
+		html,
+		/id="header-control-center"[\s\S]*id="workspace-switcher"/,
+	);
+	assert.match(html, /id="control-center-sound-volume"[\s\S]{0,180}value="20"/);
+	assert.doesNotMatch(html, /id="control-center-sound-loop"/);
 	assert.match(html, /src="src\/focus\.js"/);
 	assert.match(html, /src="src\/soundscapes\.js"/);
 	assert.match(client, /panel\.dataset\.focusId = counter\.id/);
@@ -413,13 +421,15 @@ test("modo de foco cobre todos os cards, restaura a sessão e integra o shell PW
 	assert.match(focus, /function syncFocusedMedia/);
 	assert.match(focus, /sourceImage\.style\.backgroundImage/);
 	assert.match(focus, /sourceOverlay\.style\.opacity/);
-	assert.match(focus, /soundController\?\.pause\(\)/);
 	assert.match(focus, /function initializeSoundscape\(\)/);
+	assert.match(focus, /function initializeControlCenter\(\)/);
+	assert.match(focus, /function syncControlCenterWorkspace\(\)/);
+	assert.match(styles, /\.control-center-workspace select[\s\S]*opacity: 0/);
 	assert.match(styles, /body\.focus-mode-active \.focus-mode/);
 	assert.match(styles, /body\.focus-mode-active\[data-background-enabled="true"\] \.ambient-background/);
 	assert.match(styles, /\.focus-mode-image[\s\S]*background-size: cover/);
 	assert.match(styles, /@media \(max-width: 800px\), \(orientation: portrait\)/);
-	assert.match(styles, /\.focus-mode-soundscape/);
+	assert.doesNotMatch(styles, /\.focus-mode-soundscape/);
 	assert.match(serviceWorker, /"\/src\/focus\.js"/);
 	assert.match(serviceWorker, /"\/src\/soundscapes\.js"/);
 	assert.doesNotMatch(

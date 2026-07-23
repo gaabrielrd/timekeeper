@@ -28,7 +28,8 @@ real com Firebase.
 - Timeline SVG responsiva de expediente, próximos marcos de calendário e contadores pessoais.
 - Grade mensal da Timeline com recorte semanal no celular e detalhes por dia.
 - Modo de foco imersivo para qualquer contador, restaurado durante a sessão.
-- Paisagens sonoras locais no modo de foco, com reprodução sob demanda, volume e loop.
+- Paisagens sonoras locais na central do header, com reprodução sob demanda,
+  volume inicial de 20% e repetição contínua.
 - Notificações locais e push FCM com antecedência, fontes e silêncio configuráveis.
 
 ## Visão rápida

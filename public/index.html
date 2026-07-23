@@ -18,6 +18,11 @@
 		<link rel="manifest" href="manifest.webmanifest" />
 		<link rel="preconnect" href="https://use.typekit.net" />
 		<link rel="stylesheet" href="https://use.typekit.net/yhy2qvv.css" />
+		<link
+			rel="stylesheet"
+			href="https://cdn.jsdelivr.net/npm/material-icons@1.13.14/iconfont/material-icons.min.css"
+		/>
+
 		<link rel="stylesheet" href="src/normalize.css" />
 		<link rel="stylesheet" href="src/style.css" />
 
@@ -143,65 +148,6 @@
 					class="focus-mode-progress"
 					aria-hidden="true"
 				></div>
-				<div
-					id="focus-mode-soundscape"
-					class="focus-mode-soundscape"
-					aria-labelledby="focus-mode-soundscape-title"
-				>
-					<div class="focus-mode-soundscape-heading">
-						<div>
-							<p class="focus-mode-soundscape-kicker">Ambiente</p>
-							<h2 id="focus-mode-soundscape-title">Paisagem sonora</h2>
-						</div>
-						<p
-							id="focus-mode-sound-status"
-							class="focus-mode-sound-status"
-							role="status"
-							aria-live="polite"
-						>
-							Som pausado
-						</p>
-					</div>
-					<div class="focus-mode-sound-controls">
-						<label class="focus-mode-sound-select" for="focus-mode-sound-select">
-							<span>Escolha um som</span>
-							<select id="focus-mode-sound-select" aria-label="Escolha uma paisagem sonora">
-								<option value="">Escolha uma paisagem sonora</option>
-							</select>
-						</label>
-						<button
-							id="focus-mode-sound-toggle"
-							class="focus-mode-sound-toggle"
-							type="button"
-							aria-pressed="false"
-							disabled
-							aria-label="Reproduzir paisagem sonora"
-						>
-							<i id="focus-mode-sound-toggle-icon" class="material-icons" aria-hidden="true">play_arrow</i>
-							<span id="focus-mode-sound-toggle-label">Reproduzir</span>
-						</button>
-						<label class="focus-mode-sound-volume" for="focus-mode-sound-volume">
-							<span>Volume <output id="focus-mode-sound-volume-output" for="focus-mode-sound-volume">60%</output></span>
-							<input
-								id="focus-mode-sound-volume"
-								type="range"
-								min="0"
-								max="100"
-								value="60"
-								step="1"
-								aria-label="Volume da paisagem sonora"
-							/>
-						</label>
-						<label class="focus-mode-sound-loop" for="focus-mode-sound-loop">
-							<input
-								id="focus-mode-sound-loop"
-								type="checkbox"
-								aria-label="Repetir paisagem sonora"
-							/>
-							<span>Repetir</span>
-						</label>
-					</div>
-				</div>
 				<p class="focus-mode-hint"><kbd>Esc</kbd> para sair</p>
 			</div>
 		</section>
@@ -240,32 +186,6 @@
 				</div>
 
 				<button
-					id="custom-visibility-button"
-					class="header-tool-button"
-					type="button"
-					aria-pressed="true"
-					title="Ocultar contadores personalizados"
-					hidden
-				>
-					<i
-						id="custom-visibility-icon"
-						class="material-icons"
-						aria-hidden="true"
-						>visibility</i
-					>
-					<span>Meus contadores</span>
-				</button>
-
-				<select
-					id="workspace-switcher"
-					class="workspace-switcher-select"
-					aria-label="Espaço de trabalho"
-					hidden
-				>
-					<option value="personal">👤 Meu Espaço Pessoal</option>
-				</select>
-
-				<button
 					id="pending-invites-button"
 					class="header-tool-button pending-invites-btn"
 					type="button"
@@ -273,7 +193,9 @@
 					hidden
 				>
 					<i class="material-icons" aria-hidden="true">mail</i>
-					<span id="pending-invites-count" class="invite-badge">0</span>
+					<span id="pending-invites-count" class="invite-badge"
+						>0</span
+					>
 				</button>
 
 				<button
@@ -309,14 +231,182 @@
 					<span>Instalar</span>
 				</button>
 
-				<button
-					id="toggle-config"
-					onclick="toggleFs()"
-					aria-label="Alternar tela cheia"
-					title="Tela cheia"
-				>
-					<i class="material-icons">fullscreen</i>
-				</button>
+				<div id="header-control-center-anchor" class="control-center-anchor">
+					<button
+						id="toggle-config"
+						type="button"
+						aria-label="Abrir central de controles"
+						aria-controls="header-control-center"
+						aria-expanded="false"
+						aria-haspopup="dialog"
+						title="Controles"
+					>
+						<i class="material-icons" aria-hidden="true">tune</i>
+					</button>
+
+					<section
+						id="header-control-center"
+						class="header-control-center"
+						role="dialog"
+						aria-label="Central de controles"
+						hidden
+					>
+						<header class="control-center-heading">
+							<div>
+								<p>Central de controles</p>
+								<h2>Timekeeper</h2>
+							</div>
+							<span
+								id="control-center-sound-indicator"
+								class="control-center-status-dot"
+								aria-hidden="true"
+							></span>
+						</header>
+
+						<div class="control-center-grid">
+							<button
+								id="custom-visibility-button"
+								class="control-center-tile"
+								type="button"
+								aria-pressed="true"
+								title="Ocultar contadores personalizados"
+								hidden
+							>
+								<span class="control-center-tile-icon">
+									<i
+										id="custom-visibility-icon"
+										class="material-icons"
+										aria-hidden="true"
+										>visibility</i
+									>
+								</span>
+								<span class="control-center-tile-copy">
+									<strong>Meus contadores</strong>
+									<small id="control-center-visibility-state"
+										>Visíveis</small
+									>
+								</span>
+							</button>
+
+							<label
+								id="control-center-workspace-card"
+								class="control-center-tile control-center-workspace"
+								for="workspace-switcher"
+								hidden
+							>
+								<span class="control-center-tile-icon">
+									<i class="material-icons" aria-hidden="true"
+										>workspaces</i
+									>
+								</span>
+								<span class="control-center-tile-copy">
+									<strong>Área de trabalho</strong>
+									<small id="control-center-workspace-value"
+										>Meu Espaço Pessoal</small
+									>
+								</span>
+								<select
+									id="workspace-switcher"
+									aria-label="Alterar área de trabalho ativa"
+									hidden
+								>
+									<option value="personal"
+										>Meu Espaço Pessoal</option
+									>
+								</select>
+							</label>
+						</div>
+
+						<section
+							class="control-center-media"
+							aria-labelledby="control-center-sound-title"
+						>
+							<div class="control-center-media-heading">
+								<span class="control-center-album">
+									<i class="material-icons" aria-hidden="true"
+										>graphic_eq</i
+									>
+								</span>
+								<div>
+									<label
+										id="control-center-sound-title"
+										for="control-center-sound-select"
+										>Som ambiente</label
+									>
+									<select
+										id="control-center-sound-select"
+										aria-label="Escolher som ambiente"
+									>
+										<option value="">Escolha um som</option>
+									</select>
+								</div>
+							</div>
+							<div class="control-center-media-controls">
+								<button
+									id="control-center-sound-toggle"
+									class="control-center-play"
+									type="button"
+									aria-pressed="false"
+									aria-label="Reproduzir som ambiente"
+									disabled
+								>
+									<i
+										id="control-center-sound-toggle-icon"
+										class="material-icons"
+										aria-hidden="true"
+										>play_arrow</i
+									>
+								</button>
+								<label
+									class="control-center-volume"
+									for="control-center-sound-volume"
+								>
+									<i class="material-icons" aria-hidden="true"
+										>volume_down</i
+									>
+									<input
+										id="control-center-sound-volume"
+										type="range"
+										min="0"
+										max="100"
+										value="20"
+										step="1"
+										aria-label="Volume do som ambiente"
+									/>
+									<i class="material-icons" aria-hidden="true"
+										>volume_up</i
+									>
+									<output
+										id="control-center-sound-volume-output"
+										for="control-center-sound-volume"
+										>20%</output
+									>
+								</label>
+							</div>
+						</section>
+
+						<button
+							id="control-center-fullscreen"
+							class="control-center-wide-action"
+							type="button"
+						>
+							<span class="control-center-wide-icon">
+								<i
+									id="control-center-fullscreen-icon"
+									class="material-icons"
+									aria-hidden="true"
+									>fullscreen</i
+								>
+							</span>
+							<span>
+								<strong id="control-center-fullscreen-label"
+									>Entrar em tela cheia</strong
+								>
+								<small>Use o espaço inteiro para acompanhar o tempo</small>
+							</span>
+						</button>
+					</section>
+				</div>
 			</div>
 		</div>
 
@@ -415,7 +505,12 @@
 				<div class="custom-counters-reveal">
 					<div class="section-heading">
 						<div>
-							<p id="custom-counters-kicker" class="section-kicker">Sua conta</p>
+							<p
+								id="custom-counters-kicker"
+								class="section-kicker"
+							>
+								Sua conta
+							</p>
 							<h2 id="custom-counters-title">Meus contadores</h2>
 						</div>
 						<span
@@ -646,7 +741,9 @@
 								Até cinco
 							</p>
 							<h2 id="counter-management-title">
-								<span id="counter-management-label">Meus contadores</span>
+								<span id="counter-management-label"
+									>Meus contadores</span
+								>
 								<span
 									id="user-tier-badge"
 									class="user-tier-badge"
@@ -672,24 +769,7 @@
 						class="counter-list"
 						aria-live="polite"
 					></div>
-					<div id="counter-group-controls" class="counter-group-controls" hidden>
-						<div class="counter-group-controls-heading">
-							<div>
-								<p class="setting-label">Visualização dos grupos</p>
-								<p class="setting-help">Defina a sequência e quais grupos aparecem na dashboard.</p>
-							</div>
-							<button
-								id="create-counter-group-button"
-								class="icon-button"
-								type="button"
-								aria-label="Criar grupo"
-								title="Criar grupo"
-							>
-								<i class="material-icons" aria-hidden="true">create_new_folder</i>
-							</button>
-						</div>
-						<div id="counter-group-order-list" class="counter-group-order-list"></div>
-					</div>
+
 					<button
 						id="open-counter-modal"
 						class="primary-button confirmation-dialog-confirm"
@@ -767,6 +847,17 @@
 						Use as setas para organizar as seções.
 					</p>
 
+					<div
+						id="counter-group-controls"
+						class="counter-group-controls"
+						hidden
+					>
+						<div
+							id="counter-group-order-list"
+							class="counter-group-order-list"
+						></div>
+					</div>
+
 					<div class="appearance-divider"></div>
 					<label class="toggle-field" for="background-enabled">
 						<span>
@@ -787,14 +878,26 @@
 					>
 						<label class="field-label">
 							Estilo
-							<select id="background-style" class="settings-select" disabled>
+							<select
+								id="background-style"
+								class="settings-select"
+								disabled
+							>
 								<option value="lava">Lava lamp</option>
 								<option value="float">Blobs flutuantes</option>
-								<option value="glass">Correntes de vidro</option>
-								<option value="rings">Anéis cronológicos</option>
+								<option value="glass">
+									Correntes de vidro
+								</option>
+								<option value="rings">
+									Anéis cronológicos
+								</option>
 								<option value="aurora">Aurora orbital</option>
-								<option value="topography">Mapa topográfico</option>
-								<option value="constellation">Constelação dinâmica</option>
+								<option value="topography">
+									Mapa topográfico
+								</option>
+								<option value="constellation">
+									Constelação dinâmica
+								</option>
 							</select>
 						</label>
 						<p id="background-description" class="setting-help">
@@ -980,7 +1083,10 @@
 					<label class="toggle-field" for="notifications-enabled">
 						<span>
 							<strong>Ativar neste dispositivo</strong>
-							<small>A permissão só será solicitada ao ativar.</small>
+							<small
+								>A permissão só será solicitada ao
+								ativar.</small
+							>
 						</span>
 						<input
 							id="notifications-enabled"
@@ -1300,14 +1406,35 @@
 						<i class="material-icons">close</i>
 					</button>
 				</div>
-				<div id="nlp-prompt-container" class="nlp-prompt-container">
+				<section
+					id="nlp-prompt-container"
+					class="nlp-prompt-container"
+					aria-labelledby="nlp-prompt-label"
+				>
+					<div class="nlp-panel-heading">
+						<div>
+							<span
+								id="nlp-prompt-label"
+								class="nlp-panel-label"
+								>Criação assistida</span
+							>
+							<p>
+								Descreva o evento e deixe a IA preencher o
+								formulário.
+							</p>
+						</div>
+						<span class="nlp-panel-mark" aria-hidden="true">
+							<i class="material-icons">auto_awesome</i>
+						</span>
+					</div>
+					<label class="nlp-input-label" for="nlp-prompt-input"
+						>O que você quer acompanhar?</label
+					>
 					<div class="input-with-button nlp-prompt-card">
-						<i class="material-icons nlp-icon" aria-hidden="true">auto_awesome</i>
 						<input
 							id="nlp-prompt-input"
 							type="text"
 							placeholder="Ex: Lançamento em 15 de agosto com checklist..."
-							aria-label="Criação rápida com IA"
 						/>
 						<button
 							id="nlp-parse-button"
@@ -1319,7 +1446,7 @@
 							<i class="material-icons">send</i>
 						</button>
 					</div>
-				</div>
+				</section>
 				<section
 					class="counter-live-preview"
 					aria-label="Prévia do contador"
@@ -1466,15 +1593,16 @@
 				</fieldset>
 				<div class="counter-organization-card">
 					<div class="card-section-header">
-						<span class="card-section-title">Grupo / Categoria</span>
+						<span class="card-section-title"
+							>Grupo / Categoria</span
+						>
 						<span class="premium-badge-tag">Premium</span>
 					</div>
-					<div id="counter-group-chips" class="counter-group-chips"></div>
-					<input
-						id="counter-group"
-						name="group"
-						type="hidden"
-					/>
+					<div
+						id="counter-group-chips"
+						class="counter-group-chips"
+					></div>
+					<input id="counter-group" name="group" type="hidden" />
 				</div>
 				<label class="field-label">
 					Tipo
@@ -1596,6 +1724,94 @@
 						<i class="material-icons" aria-hidden="true">add</i>
 						Adicionar subtarefa
 					</button>
+				</fieldset>
+				<fieldset class="counter-public-fields">
+					<legend>Publicação</legend>
+					<label
+						class="counter-public-toggle"
+						for="counter-is-public"
+					>
+						<span class="counter-public-icon" aria-hidden="true">
+							<i class="material-icons">language</i>
+						</span>
+						<span class="counter-public-copy">
+							<strong>Publicar na web</strong>
+							<small
+								>Gere um link direto e um código para incorporar
+								este contador.</small
+							>
+							<span
+								id="counter-public-quota-text"
+								class="field-hint"
+							></span>
+						</span>
+						<input
+							id="counter-is-public"
+							name="isPublic"
+							type="checkbox"
+						/>
+					</label>
+					<div
+						id="counter-public-links-panel"
+						class="public-links-panel"
+						hidden
+					>
+						<div class="public-links-heading">
+							<strong>Links de publicação</strong>
+							<small
+								>Os endereços definitivos são ativados ao
+								salvar.</small
+							>
+						</div>
+						<div class="public-link-field">
+							<label for="counter-public-link-url"
+								>Link direto</label
+							>
+							<div class="input-with-button">
+								<input
+									id="counter-public-link-url"
+									type="text"
+									readonly
+								/>
+								<button
+									type="button"
+									class="secondary-button compact-button"
+									data-copy-target="counter-public-link-url"
+								>
+									<i
+										class="material-icons"
+										aria-hidden="true"
+										>content_copy</i
+									>
+									<span>Copiar</span>
+								</button>
+							</div>
+						</div>
+						<div class="public-link-field">
+							<label for="counter-public-iframe-code"
+								>Código de incorporação</label
+							>
+							<div class="input-with-button">
+								<input
+									id="counter-public-iframe-code"
+									type="text"
+									readonly
+								/>
+								<button
+									type="button"
+									class="secondary-button compact-button"
+									data-copy-target="counter-public-iframe-code"
+								>
+									<i
+										class="material-icons"
+										aria-hidden="true"
+										>content_copy</i
+									>
+									<span>Copiar</span>
+								</button>
+							</div>
+						</div>
+					</div>
 				</fieldset>
 				<p
 					id="counter-message"
@@ -2245,7 +2461,11 @@
 						<i class="material-icons">close</i>
 					</button>
 				</div>
-				<div id="pending-invites-list" class="pending-invites-list" aria-live="polite"></div>
+				<div
+					id="pending-invites-list"
+					class="pending-invites-list"
+					aria-live="polite"
+				></div>
 			</div>
 		</dialog>
 		<dialog
@@ -2270,17 +2490,27 @@
 				</div>
 
 				<div class="team-manage-content">
-					<div id="team-create-panel" class="team-create-panel team-section">
+					<div
+						id="team-create-panel"
+						class="team-create-panel team-section"
+					>
 						<div class="team-section-heading">
 							<div>
 								<p class="section-kicker">Novo espaço</p>
 								<h3>Crie uma equipe para colaborar</h3>
-								<p class="team-section-description">Separe os contadores do trabalho, da família ou de qualquer projeto.</p>
+								<p class="team-section-description">
+									Separe os contadores do trabalho, da família
+									ou de qualquer projeto.
+								</p>
 							</div>
-							<span class="team-section-icon" aria-hidden="true"><i class="material-icons">group</i></span>
+							<span class="team-section-icon" aria-hidden="true"
+								><i class="material-icons">group</i></span
+							>
 						</div>
 						<div class="form-row">
-							<label for="create-team-name-input">Criar nova equipe</label>
+							<label for="create-team-name-input"
+								>Criar nova equipe</label
+							>
 							<div class="input-with-button">
 								<input
 									id="create-team-name-input"
@@ -2288,7 +2518,11 @@
 									maxlength="50"
 									placeholder="Ex: Projeto Alpha, Família, Estudo..."
 								/>
-								<button id="create-team-submit-button" class="primary-button compact-button" type="button">
+								<button
+									id="create-team-submit-button"
+									class="primary-button compact-button"
+									type="button"
+								>
 									Criar equipe
 								</button>
 							</div>
@@ -2334,16 +2568,28 @@
 
 				<div class="team-manage-content">
 					<div class="team-identity-panel">
-						<span class="team-identity-mark" aria-hidden="true"><i class="material-icons">group</i></span>
+						<span class="team-identity-mark" aria-hidden="true"
+							><i class="material-icons">group</i></span
+						>
 						<div class="team-identity-copy">
 							<p class="section-kicker">Espaço compartilhado</p>
 							<h3 id="team-details-name">Sua equipe</h3>
-							<p id="team-details-subtitle" class="team-section-description">Contadores sincronizados em tempo real.</p>
+							<p
+								id="team-details-subtitle"
+								class="team-section-description"
+							>
+								Contadores sincronizados em tempo real.
+							</p>
 						</div>
-						<span id="team-details-role" class="team-role-chip">ADMIN</span>
+						<span id="team-details-role" class="team-role-chip"
+							>ADMIN</span
+						>
 					</div>
 
-					<section class="team-section team-settings-section" aria-labelledby="team-settings-title">
+					<section
+						class="team-section team-settings-section"
+						aria-labelledby="team-settings-title"
+					>
 						<div class="team-section-heading">
 							<div>
 								<p class="section-kicker">Identidade</p>
@@ -2351,51 +2597,139 @@
 							</div>
 						</div>
 						<div class="form-row">
-							<label for="team-name-input">Nome visível para os membros</label>
+							<label for="team-name-input"
+								>Nome visível para os membros</label
+							>
 							<div class="input-with-button">
-								<input id="team-name-input" type="text" maxlength="50" placeholder="Nome da equipe" />
-								<button id="save-team-name-button" class="primary-button compact-button" type="button"><i class="material-icons" aria-hidden="true">check</i>Salvar</button>
+								<input
+									id="team-name-input"
+									type="text"
+									maxlength="50"
+									placeholder="Nome da equipe"
+								/>
+								<button
+									id="save-team-name-button"
+									class="primary-button compact-button"
+									type="button"
+								>
+									<i class="material-icons" aria-hidden="true"
+										>check</i
+									>Salvar
+								</button>
 							</div>
-							<p class="field-hint">Use um nome curto para que todos reconheçam este espaço rapidamente.</p>
+							<p class="field-hint">
+								Use um nome curto para que todos reconheçam este
+								espaço rapidamente.
+							</p>
 						</div>
 					</section>
 
-					<section class="team-section team-invite-section" aria-labelledby="team-invite-title">
+					<section
+						class="team-section team-invite-section"
+						aria-labelledby="team-invite-title"
+					>
 						<div class="team-section-heading">
 							<div>
 								<p class="section-kicker">Acesso</p>
 								<h3 id="team-invite-title">Convide seu time</h3>
-								<p class="team-section-description">Gere um link para compartilhar com quem precisa acompanhar este espaço.</p>
+								<p class="team-section-description">
+									Gere um link para compartilhar com quem
+									precisa acompanhar este espaço.
+								</p>
 							</div>
 						</div>
-						<button id="generate-team-invite-button" class="secondary-button" type="button">
-							<i class="material-icons" aria-hidden="true">link</i>
-							<span>Gerar link de convite</span><i class="material-icons team-button-arrow" aria-hidden="true">arrow_forward</i>
+						<button
+							id="generate-team-invite-button"
+							class="secondary-button"
+							type="button"
+						>
+							<i class="material-icons" aria-hidden="true"
+								>link</i
+							>
+							<span>Gerar link de convite</span
+							><i
+								class="material-icons team-button-arrow"
+								aria-hidden="true"
+								>arrow_forward</i
+							>
 						</button>
-						<div id="team-invite-link-box" class="invite-link-box" hidden>
-							<input id="team-invite-link-input" type="text" readonly />
-							<button id="copy-team-invite-button" class="primary-button compact-button" type="button"><i class="material-icons" aria-hidden="true">content_copy</i><span>Copiar</span></button>
+						<div
+							id="team-invite-link-box"
+							class="invite-link-box"
+							hidden
+						>
+							<input
+								id="team-invite-link-input"
+								type="text"
+								readonly
+							/>
+							<button
+								id="copy-team-invite-button"
+								class="primary-button compact-button"
+								type="button"
+							>
+								<i class="material-icons" aria-hidden="true"
+									>content_copy</i
+								><span>Copiar</span>
+							</button>
 						</div>
 					</section>
 
-					<section class="team-section team-members-section" aria-labelledby="team-members-title">
+					<section
+						class="team-section team-members-section"
+						aria-labelledby="team-members-title"
+					>
 						<div class="team-section-heading">
 							<div>
 								<p class="section-kicker">Pessoas</p>
-								<h3 id="team-members-title">Membros da equipe <span class="team-count-mark">· <span id="team-member-count">0</span></span></h3>
+								<h3 id="team-members-title">
+									Membros da equipe
+									<span class="team-count-mark"
+										>·
+										<span id="team-member-count"
+											>0</span
+										></span
+									>
+								</h3>
 							</div>
-							<span id="team-member-capacity" class="team-capacity">0 / 5</span>
+							<span
+								id="team-member-capacity"
+								class="team-capacity"
+								>0 / 5</span
+							>
 						</div>
-						<div id="team-members-list" class="team-members-list"></div>
+						<div
+							id="team-members-list"
+							class="team-members-list"
+						></div>
 					</section>
 					<div class="team-actions-footer">
 						<div>
 							<p class="section-kicker">Zona de saída</p>
-							<p class="field-hint">Ações aqui alteram o acesso de todos os membros.</p>
+							<p class="field-hint">
+								Ações aqui alteram o acesso de todos os membros.
+							</p>
 						</div>
 						<div class="team-footer-actions">
-							<button id="leave-team-button" class="secondary-button danger-button" type="button"><i class="material-icons" aria-hidden="true">logout</i>Sair</button>
-							<button id="delete-team-button" class="secondary-button danger-button" type="button" hidden><i class="material-icons" aria-hidden="true">delete_outline</i>Excluir equipe</button>
+							<button
+								id="leave-team-button"
+								class="secondary-button danger-button"
+								type="button"
+							>
+								<i class="material-icons" aria-hidden="true"
+									>logout</i
+								>Sair
+							</button>
+							<button
+								id="delete-team-button"
+								class="secondary-button danger-button"
+								type="button"
+								hidden
+							>
+								<i class="material-icons" aria-hidden="true"
+									>delete_outline</i
+								>Excluir equipe
+							</button>
 						</div>
 					</div>
 				</div>
@@ -2583,12 +2917,6 @@
 				document.getElementById("config-minutos").value =
 					document.getElementById("guest-config-minutos").value;
 				setMinutes();
-			}
-
-			function toggleFs() {
-				if (!document.fullscreenElement)
-					document.documentElement.requestFullscreen?.();
-				else document.exitFullscreen?.();
 			}
 
 			window.addEventListener("load", () => {

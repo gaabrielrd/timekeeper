@@ -285,6 +285,8 @@ service cloud.firestore {
           || (counter.group is string && counter.group.matches('^.{1,30}$')))
         && (!('hidden' in counter)
           || counter.hidden is bool)
+        && (!('isPublic' in counter)
+          || counter.isPublic is bool)
         && (!('checklist' in counter)
           || counter.checklist == null
           || isValidChecklist(counter.checklist));

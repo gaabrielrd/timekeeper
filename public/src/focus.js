@@ -10,6 +10,8 @@
 	let restoreTimer = null;
 	let restoreObserver = null;
 	let soundController = null;
+	let controlCenterObserver = null;
+	let controlCenterVisibilityObserver = null;
 	let initialized = false;
 
 	function storedCounterId() {
@@ -42,65 +44,73 @@
 			overlay: root.document.querySelector("#focus-mode-overlay"),
 			checklist: root.document.querySelector("#focus-mode-checklist"),
 			progress: root.document.querySelector("#focus-mode-progress"),
-			soundscape: root.document.querySelector("#focus-mode-soundscape"),
-			soundSelect: root.document.querySelector("#focus-mode-sound-select"),
-			soundToggle: root.document.querySelector("#focus-mode-sound-toggle"),
-			soundToggleIcon: root.document.querySelector(
-				"#focus-mode-sound-toggle-icon",
-			),
-			soundToggleLabel: root.document.querySelector(
-				"#focus-mode-sound-toggle-label",
-			),
-			soundVolume: root.document.querySelector("#focus-mode-sound-volume"),
-			soundVolumeOutput: root.document.querySelector(
-				"#focus-mode-sound-volume-output",
-			),
-			soundLoop: root.document.querySelector("#focus-mode-sound-loop"),
-			soundStatus: root.document.querySelector("#focus-mode-sound-status"),
 		};
 	}
 
-	function soundTrackStatus(snapshot) {
-		if (!snapshot.track) return "Escolha um som";
-		if (snapshot.state === "playing") return `Tocando · ${snapshot.track.label}`;
-		if (snapshot.state === "error") return "Indisponível offline";
-		if (snapshot.state === "loading") return "Carregando…";
-		return `Pausado · ${snapshot.track.label}`;
+	function controlCenterElements() {
+		return {
+			anchor: root.document.querySelector("#header-control-center-anchor"),
+			trigger: root.document.querySelector("#toggle-config"),
+			panel: root.document.querySelector("#header-control-center"),
+			visibility: root.document.querySelector("#custom-visibility-button"),
+			visibilityState: root.document.querySelector(
+				"#control-center-visibility-state",
+			),
+			workspaceCard: root.document.querySelector(
+				"#control-center-workspace-card",
+			),
+			workspaceValue: root.document.querySelector(
+				"#control-center-workspace-value",
+			),
+			workspace: root.document.querySelector("#workspace-switcher"),
+			soundSelect: root.document.querySelector(
+				"#control-center-sound-select",
+			),
+			soundToggle: root.document.querySelector(
+				"#control-center-sound-toggle",
+			),
+			soundToggleIcon: root.document.querySelector(
+				"#control-center-sound-toggle-icon",
+			),
+			soundVolume: root.document.querySelector(
+				"#control-center-sound-volume",
+			),
+			soundVolumeOutput: root.document.querySelector(
+				"#control-center-sound-volume-output",
+			),
+			soundIndicator: root.document.querySelector(
+				"#control-center-sound-indicator",
+			),
+			fullscreen: root.document.querySelector(
+				"#control-center-fullscreen",
+			),
+			fullscreenIcon: root.document.querySelector(
+				"#control-center-fullscreen-icon",
+			),
+			fullscreenLabel: root.document.querySelector(
+				"#control-center-fullscreen-label",
+			),
+		};
 	}
 
-	function renderSoundscape(snapshot) {
-		const elements = focusElements();
-		if (!elements.soundscape) return;
-		if (elements.soundStatus) {
-			elements.soundStatus.textContent = soundTrackStatus(snapshot);
-		}
-		if (elements.soundSelect && snapshot.track) {
-			elements.soundSelect.value = snapshot.track.id;
-		} else if (elements.soundSelect) {
-			elements.soundSelect.value = "";
+	function renderControlCenterSound(snapshot) {
+		const elements = controlCenterElements();
+		const isPlaying = snapshot.state === "playing";
+		if (elements.soundSelect) {
+			elements.soundSelect.value = snapshot.track?.id || "";
 		}
 		if (elements.soundToggle) {
-			const isPlaying = snapshot.state === "playing";
 			elements.soundToggle.disabled = !snapshot.track;
 			elements.soundToggle.setAttribute("aria-pressed", String(isPlaying));
 			elements.soundToggle.setAttribute(
 				"aria-label",
-				isPlaying
-					? "Pausar paisagem sonora"
-					: "Reproduzir paisagem sonora",
+				isPlaying ? "Pausar som ambiente" : "Reproduzir som ambiente",
 			);
 		}
 		if (elements.soundToggleIcon) {
-			elements.soundToggleIcon.textContent =
-				snapshot.state === "playing" ? "pause" : "play_arrow";
-		}
-		if (elements.soundToggleLabel) {
-			elements.soundToggleLabel.textContent =
-				snapshot.state === "playing"
-					? "Pausar"
-					: snapshot.state === "error"
-						? "Tentar novamente"
-						: "Reproduzir";
+			elements.soundToggleIcon.textContent = isPlaying
+				? "pause"
+				: "play_arrow";
 		}
 		if (elements.soundVolume) {
 			elements.soundVolume.value = String(Math.round(snapshot.volume * 100));
@@ -110,7 +120,7 @@
 				snapshot.volume * 100,
 			)}%`;
 		}
-		if (elements.soundLoop) elements.soundLoop.checked = snapshot.loop;
+		elements.soundIndicator?.classList.toggle("is-playing", isPlaying);
 	}
 
 	function populateSoundscapeSelect(elements) {
@@ -138,24 +148,100 @@
 	}
 
 	function initializeSoundscape() {
-		const elements = focusElements();
-		if (!elements.soundscape) return;
-		if (!root.TimekeeperSoundscapes?.createController) {
-			elements.soundscape.hidden = true;
-			return;
-		}
+		const elements = controlCenterElements();
+		if (!root.TimekeeperSoundscapes?.createController) return;
 		soundController = root.TimekeeperSoundscapes.createController();
-		if (!soundController) {
-			elements.soundscape.hidden = true;
-			return;
+		if (!soundController) return;
+		soundController.setVolume(Number(elements.soundVolume?.value || 20) / 100);
+	}
+
+	function syncControlCenterWorkspace() {
+		const elements = controlCenterElements();
+		if (!elements.workspace || !elements.workspaceCard) return;
+		elements.workspaceCard.hidden = elements.workspace.hidden;
+		if (elements.workspaceValue) {
+			elements.workspaceValue.textContent =
+				elements.workspace.selectedOptions[0]?.textContent?.trim() ||
+				"Escolher espaço";
 		}
+	}
+
+	function syncControlCenterVisibility() {
+		const elements = controlCenterElements();
+		if (!elements.visibilityState || !elements.visibility) return;
+		const isVisible =
+			elements.visibility.getAttribute("aria-pressed") !== "false";
+		elements.visibilityState.textContent = isVisible ? "Visíveis" : "Ocultos";
+	}
+
+	function renderFullscreenControl() {
+		const elements = controlCenterElements();
+		const isFullscreen = Boolean(root.document.fullscreenElement);
+		if (elements.fullscreenIcon) {
+			elements.fullscreenIcon.textContent = isFullscreen
+				? "fullscreen_exit"
+				: "fullscreen";
+		}
+		if (elements.fullscreenLabel) {
+			elements.fullscreenLabel.textContent = isFullscreen
+				? "Sair da tela cheia"
+				: "Entrar em tela cheia";
+		}
+	}
+
+	function setControlCenterOpen(isOpen, options = {}) {
+		const elements = controlCenterElements();
+		if (!elements.panel || !elements.trigger) return;
+		elements.panel.hidden = !isOpen;
+		elements.trigger.setAttribute("aria-expanded", String(isOpen));
+		elements.trigger.setAttribute(
+			"aria-label",
+			isOpen ? "Fechar central de controles" : "Abrir central de controles",
+		);
+		elements.trigger.title = isOpen ? "Fechar controles" : "Controles";
+		if (isOpen) {
+			syncControlCenterWorkspace();
+			syncControlCenterVisibility();
+		}
+		if (!isOpen && options.restoreFocus) {
+			elements.trigger.focus({ preventScroll: true });
+		}
+	}
+
+	function toggleFullscreenFromControlCenter() {
+		if (!root.document.fullscreenElement) {
+			root.document.documentElement.requestFullscreen?.();
+		} else {
+			root.document.exitFullscreen?.();
+		}
+	}
+
+	function initializeControlCenter() {
+		const elements = controlCenterElements();
+		if (!elements.panel || !elements.trigger || !elements.anchor) return;
+
 		populateSoundscapeSelect(elements);
-		soundController.setVolume(Number(elements.soundVolume?.value || 60) / 100);
-		soundController.subscribe(renderSoundscape);
+		if (soundController) {
+			soundController.subscribe(renderControlCenterSound);
+		} else {
+			elements.soundSelect.disabled = true;
+			elements.soundToggle.disabled = true;
+			elements.soundVolume.disabled = true;
+		}
+
+		syncControlCenterWorkspace();
+		syncControlCenterVisibility();
+		renderFullscreenControl();
+
+		elements.trigger.addEventListener("click", () => {
+			setControlCenterOpen(elements.panel.hidden);
+		});
+		elements.workspace?.addEventListener("change", syncControlCenterWorkspace);
 		elements.soundSelect?.addEventListener("change", () => {
-			soundController.select(elements.soundSelect.value);
+			soundController?.select(elements.soundSelect.value);
 		});
 		elements.soundToggle?.addEventListener("click", () => {
+			if (!soundController) return;
 			if (soundController.snapshot().state === "playing") {
 				soundController.pause();
 			} else {
@@ -163,11 +249,43 @@
 			}
 		});
 		elements.soundVolume?.addEventListener("input", () => {
-			soundController.setVolume(Number(elements.soundVolume.value) / 100);
+			soundController?.setVolume(Number(elements.soundVolume.value) / 100);
 		});
-		elements.soundLoop?.addEventListener("change", () => {
-			soundController.setLoop(elements.soundLoop.checked);
+		elements.fullscreen?.addEventListener("click", () => {
+			toggleFullscreenFromControlCenter();
+			setControlCenterOpen(false);
 		});
+		root.document.addEventListener("fullscreenchange", renderFullscreenControl);
+
+		root.document.addEventListener("click", (event) => {
+			if (elements.panel.hidden || elements.anchor.contains(event.target)) return;
+			setControlCenterOpen(false);
+		});
+		root.document.addEventListener("keydown", (event) => {
+			if (event.key !== "Escape" || elements.panel.hidden) return;
+			event.preventDefault();
+			event.stopImmediatePropagation();
+			setControlCenterOpen(false, { restoreFocus: true });
+		});
+
+		controlCenterObserver = new MutationObserver(syncControlCenterWorkspace);
+		if (elements.workspace) {
+			controlCenterObserver.observe(elements.workspace, {
+				attributes: true,
+				attributeFilter: ["hidden", "disabled"],
+				childList: true,
+				subtree: true,
+			});
+		}
+		controlCenterVisibilityObserver = new MutationObserver(
+			syncControlCenterVisibility,
+		);
+		if (elements.visibility) {
+			controlCenterVisibilityObserver.observe(elements.visibility, {
+				attributes: true,
+				attributeFilter: ["aria-pressed", "hidden", "disabled"],
+			});
+		}
 	}
 
 	function counterElement(counterId) {
@@ -286,7 +404,6 @@
 	function closeFocusMode(options = {}) {
 		const { restoreFocus = true } = options;
 		const elements = focusElements();
-		soundController?.pause();
 		stopRestoreWatch();
 		root.clearInterval(syncTimer);
 		syncTimer = null;
@@ -337,6 +454,7 @@
 		const elements = focusElements();
 		if (!elements.view) return;
 		initializeSoundscape();
+		initializeControlCenter();
 
 		root.document.addEventListener("click", (event) => {
 			const trigger = event.target.closest?.("[data-focus-trigger]");
@@ -368,6 +486,21 @@
 		sound: {
 			pause() {
 				soundController?.pause();
+			},
+			play() {
+				return soundController?.play() || Promise.resolve(false);
+			},
+			select(trackId) {
+				return soundController?.select(trackId) || null;
+			},
+			setVolume(value) {
+				soundController?.setVolume(value);
+			},
+			snapshot() {
+				return soundController?.snapshot() || null;
+			},
+			subscribe(listener) {
+				return soundController?.subscribe(listener) || (() => {});
 			},
 		},
 	};

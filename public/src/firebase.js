@@ -508,6 +508,11 @@ const elements = {
 	counterOverlayOpacityOutput: document.querySelector(
 		"#counter-overlay-opacity-output",
 	),
+	counterIsPublic: document.querySelector("#counter-is-public"),
+	counterPublicQuotaText: document.querySelector("#counter-public-quota-text"),
+	counterPublicLinksPanel: document.querySelector("#counter-public-links-panel"),
+	counterPublicLinkUrl: document.querySelector("#counter-public-link-url"),
+	counterPublicIframeCode: document.querySelector("#counter-public-iframe-code"),
 	imageLibraryDialog: document.querySelector("#image-library-dialog"),
 	imageLibraryClose: document.querySelector("#image-library-close"),
 	imageLibraryUsage: document.querySelector("#image-library-usage"),
@@ -2863,6 +2868,10 @@ function renderDashboardSectionControls(data = userSettings) {
 		row.append(mainLine);
 
 		elements.dashboardSectionControls.append(row);
+		
+		if (sectionId === "custom" && elements.counterGroupControls) {
+			row.append(elements.counterGroupControls);
+		}
 	});
 }
 
@@ -5271,11 +5280,50 @@ function openCounterDialog(counter = null) {
 		elements.counterHidden.checked = Boolean(counter?.hidden);
 		elements.counterHidden.disabled = !isActiveWorkspacePremium();
 	}
+	if (elements.counterIsPublic) {
+		const isPremium = isActiveWorkspacePremium();
+		const maxPublic = isPremium ? 5 : 1;
+		const currentPublicCount = userSettings.customCounters.filter(
+			(c) => c.isPublic && c.id !== counter?.id,
+		).length;
+		
+		elements.counterIsPublic.checked = Boolean(counter?.isPublic);
+		if (currentPublicCount >= maxPublic && !elements.counterIsPublic.checked) {
+			elements.counterIsPublic.disabled = true;
+			elements.counterPublicQuotaText.textContent = `(Limite de ${maxPublic} atingido)`;
+		} else {
+			elements.counterIsPublic.disabled = false;
+			elements.counterPublicQuotaText.textContent = `(Você pode ter até ${maxPublic})`;
+		}
+		syncPublicLinksPanel(counter?.id);
+	}
 	currentChecklist = counter?.checklist ? JSON.parse(JSON.stringify(counter.checklist)) : [];
 	renderChecklistInputs();
+	updateCounterPreview();
 	elements.counterDialog.showModal();
 	elements.counterForm.elements.name.focus();
 }
+
+function syncPublicLinksPanel(counterId) {
+	if (!elements.counterIsPublic || !elements.counterPublicLinksPanel) return;
+	
+	if (elements.counterIsPublic.checked) {
+		elements.counterPublicLinksPanel.hidden = false;
+		const baseUrl = window.location.origin;
+		const id = counterId || "novo-contador";
+		const workspacePrefix = activeWorkspace.type === "team" ? "t" : "u";
+		const workspaceId = activeWorkspace.id || currentUser.uid;
+		const link = `${baseUrl}/p/${workspacePrefix}/${workspaceId}/c/${id}`;
+		
+		elements.counterPublicLinkUrl.value = link;
+		elements.counterPublicIframeCode.value = `<iframe src="${link}?embed=true" width="100%" height="100%" style="min-height: 400px; border: none; border-radius: 8px;"></iframe>`;
+	} else {
+		elements.counterPublicLinksPanel.hidden = true;
+	}
+}
+elements.counterIsPublic?.addEventListener("change", () => {
+	syncPublicLinksPanel(editingCounterId);
+});
 
 function renderAiQuota(userData = {}) {
 	const tier = userData.tier === "premium" ? "premium" : "free";
@@ -5894,6 +5942,11 @@ elements.counterForm.addEventListener("submit", async (event) => {
 		if (groupName) counter.group = groupName;
 		if (existingCounter?.hidden) counter.hidden = true;
 	}
+	if (elements.counterIsPublic) {
+		if (elements.counterIsPublic.checked) {
+			counter.isPublic = true;
+		}
+	}
 	if (currentChecklist.length > 0) {
 		counter.checklist = currentChecklist.map((item) => ({
 			id: item.id || createCounterId(),
@@ -5927,36 +5980,106 @@ elements.counterForm.addEventListener("submit", async (event) => {
 	}
 });
 
-onAuthStateChanged(auth, (user) => {
-	currentUser = user;
-	if (!user) pushRegistrationState = pushConfigured ? "idle" : "local";
-	document.body.classList.toggle("signed-in", Boolean(user));
-	elements.guestTimeConfig.hidden = Boolean(user);
-	updateAccountUi(user);
-	if (user) {
-		subscribeToUserData(user);
-		subscribeToTeams(user);
-		checkInviteUrlParams();
-		return;
-	}
-	unsubscribeUserData();
-	activeUploadTask?.cancel();
-	activeUploadTask = null;
-	closeImageLibrary();
-	closeArchiveDialog();
-	closeAdminDialog();
-	closeSidebar();
-	userImages = [];
-	imageUrls = new Map();
-	setImageLibraryAvailability(true);
-	renderImageLibrary();
-	applySettings({ ...DEFAULTS, ...guestTimeSettings() });
-	applyCounters([]);
-	applyArchive([]);
-	setArchiveState("Conectando...", "connecting");
-});
+const PUBLIC_PATH_REGEX = /^\/p\/([ut])\/([^\/]+)\/c\/([^\/]+)/;
+const publicPathMatch = window.location.pathname.match(PUBLIC_PATH_REGEX);
 
-subscribeToGeneralConfig();
+if (publicPathMatch) {
+	initPublicMode(publicPathMatch[1], publicPathMatch[2], publicPathMatch[3]);
+} else {
+	onAuthStateChanged(auth, (user) => {
+		currentUser = user;
+		if (!user) pushRegistrationState = pushConfigured ? "idle" : "local";
+		document.body.classList.toggle("signed-in", Boolean(user));
+		elements.guestTimeConfig.hidden = Boolean(user);
+		updateAccountUi(user);
+		if (user) {
+			subscribeToUserData(user);
+			subscribeToTeams(user);
+			checkInviteUrlParams();
+			return;
+		}
+		unsubscribeUserData();
+		activeUploadTask?.cancel();
+		activeUploadTask = null;
+		closeImageLibrary();
+		closeArchiveDialog();
+		closeAdminDialog();
+		closeSidebar();
+		userImages = [];
+		imageUrls = new Map();
+		setImageLibraryAvailability(true);
+		renderImageLibrary();
+		applySettings({ ...DEFAULTS, ...guestTimeSettings() });
+		applyCounters([]);
+		applyArchive([]);
+		setArchiveState("Conectando...", "connecting");
+	});
+
+	subscribeToGeneralConfig();
+}
+
+async function initPublicMode(workspaceType, workspaceId, counterId) {
+	document.body.classList.add("public-focus-mode");
+	
+	const isEmbed = new URLSearchParams(window.location.search).get("embed") === "true";
+	if (isEmbed) {
+		document.body.classList.add("embed-mode");
+	}
+
+	try {
+		const getPublicCounterData = httpsCallable(functions, "getPublicCounterData");
+		const result = await getPublicCounterData({
+			uid: workspaceType === "u" ? workspaceId : undefined,
+			teamId: workspaceType === "t" ? workspaceId : undefined,
+			counterId
+		});
+		
+		const { counter, settings } = result.data;
+		
+		applySettings({ ...DEFAULTS, ...settings });
+		userSettings.customCounters = normalizeCounters([counter]);
+		
+		// Iniciar o modo de foco diretamente no contador público
+		if (typeof root !== "undefined" && root.TimekeeperFocus) {
+			const counterEl = document.querySelector(`[data-focus-id="${counter.id}"]`);
+			if (counterEl) {
+				const openFn = root.TimekeeperFocus.open || window.TimekeeperFocus.open;
+				openFn(counter.id);
+				
+				// Garantir que os botões de fechar e pausar sumam se for embed
+				const closeBtn = document.getElementById("focus-close");
+				const controls = document.getElementById("focus-controls");
+				if (isEmbed) {
+					if (closeBtn) closeBtn.style.display = "none";
+					if (controls) controls.style.display = "none";
+				} else {
+					if (closeBtn) {
+						closeBtn.onclick = () => {
+							window.location.href = "/";
+						};
+					}
+				}
+			}
+		} else if (window.TimekeeperFocus) {
+			window.TimekeeperFocus.open(counter.id);
+			const closeBtn = document.getElementById("focus-close");
+			const controls = document.getElementById("focus-controls");
+			if (isEmbed) {
+				if (closeBtn) closeBtn.style.display = "none";
+				if (controls) controls.style.display = "none";
+			} else {
+				if (closeBtn) {
+					closeBtn.onclick = () => {
+						window.location.href = "/";
+					};
+				}
+			}
+		}
+	} catch (error) {
+		console.error("Erro ao carregar contador público:", error);
+		document.body.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100vh;color:var(--text-primary);font-family:var(--font-sans);"><div style="text-align:center;"><i class="material-icons" style="font-size:48px;margin-bottom:16px;opacity:0.5;">lock</i><h2>Acesso Negado</h2><p>Este contador não é público ou não existe.</p></div></div>`;
+	}
+}
 
 window.addEventListener("resize", syncConstellation);
 window.addEventListener("pointermove", (event) => {
@@ -6862,7 +6985,7 @@ async function handleNlpPrompt() {
 				elements.counterForm.elements.startAt.value = toLocalInputValue(start);
 				elements.counterForm.elements.endAt.value = toLocalInputValue(end);
 			}
-			updatePreviewCard();
+			updateCounterPreview();
 		}
 	}
 
@@ -6892,13 +7015,13 @@ async function handleNlpPrompt() {
 						if (cp.startAtMs) elements.counterForm.elements.startAt.value = toLocalInputValue(new Date(cp.startAtMs));
 						if (cp.endAtMs) elements.counterForm.elements.endAt.value = toLocalInputValue(new Date(cp.endAtMs));
 					}
-					updatePreviewCard();
+					updateCounterPreview();
 				}
 
 				if (data.checklist && data.checklist.length > 0) {
 					if (!elements.counterForm.elements.name.value || elements.counterForm.elements.name.value === "Contador Recorrente" || elements.counterForm.elements.name.value === "Novo Contador") {
 						elements.counterForm.elements.name.value = data.title || promptText;
-						updatePreviewCard();
+						updateCounterPreview();
 					}
 
 					data.checklist.forEach(itemText => {

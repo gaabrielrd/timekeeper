@@ -16,6 +16,7 @@ const {
 const { calculateAiQuota } = require("./src/ai-generator.js");
 const { generateChecklistForPrompt } = require("./src/nlp-generator.js");
 const { parseStripeEvent, extractSubscriptionDetails } = require("./src/stripe-webhook.js");
+const { getPublicCounterData } = require("./src/public-links.js");
 
 initializeApp();
 setGlobalOptions({ region: "southamerica-east1" });
@@ -715,4 +716,16 @@ exports.createStripePortalSession = onCall(
 			);
 		}
 	},
+);
+
+exports.getPublicCounterData = onCall(
+	{
+		invoker: "public",
+		cors: true,
+		maxInstances: 20,
+		timeoutSeconds: 30,
+	},
+	async (request) => {
+		return getPublicCounterData(request.data);
+	}
 );
