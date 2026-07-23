@@ -16,6 +16,8 @@ test("limite de contadores permanece alinhado entre HTML, cliente e rules", () =
 	assert.match(client, /getMaxCounters/);
 	assert.match(rules, /getMaxCounters\(userId\)/);
 	assert.match(rules, /isPremiumUser\(userId\) \? 15 : 5/);
+	assert.match(rules, /match \/counters\/\{slot\} \{/);
+	assert.match(rules, /'10', '11', '12', '13', '14'/);
 });
 
 test("documentos Firestore usam matches isolados para preservar o orçamento de expressões", () => {
@@ -27,6 +29,20 @@ test("documentos Firestore usam matches isolados para preservar o orçamento de 
 	assert.doesNotMatch(rules, /function isValidDocument\(\)/);
 	assert.match(rules, /days\.hasOnly\(\[0, 1, 2, 3, 4, 5, 6\]\)/);
 	assert.doesNotMatch(rules, /function isValidDayAt\(/);
+});
+
+test("contadores usam subcoleções por slot com migração legada", () => {
+	const client = read("public/src/firebase.js");
+	const functions = read("functions/index.js");
+	const rules = read("firestore.rules");
+	assert.match(client, /function migrateLegacyCounters\(/);
+	assert.match(client, /collection\(db, "users", userId, "counters"\)/);
+	assert.match(client, /query\(activeCountersCollectionReference\(\), orderBy\("order"\)\)/);
+	assert.match(client, /batch\.delete\(legacyReference\)/);
+	assert.match(client, /migrationMaxCounters = legacy\.tier === "premium" \? 15 : 5/);
+	assert.match(functions, /collection\(`users\/\$\{uid\}\/counters`\)\.orderBy\("order"\)/);
+	assert.match(rules, /function isValidCounterSlot\(userId, slot\)/);
+	assert.match(rules, /allow create, update: if false;/);
 });
 
 test("configuração geral mantém seed, modal administrativo e regras alinhados", () => {
@@ -53,7 +69,7 @@ test("configuração geral mantém seed, modal administrativo e regras alinhados
 test("todos os backgrounds da interface possuem descrição no cliente", () => {
 	const html = read("public/index.html");
 	const client = read("public/src/firebase.js");
-	const select = html.match(/<select id="background-style"[\s\S]*?<\/select>/);
+	const select = html.match(/<select(?=[^>]*id="background-style")[^>]*>[\s\S]*?<\/select>/);
 	assert.ok(select, "select de backgrounds não encontrado");
 	const options = [...select[0].matchAll(/<option value="([^"]+)"/g)].map(
 		(match) => match[1],
@@ -184,10 +200,15 @@ test("exclusão de conta remove dados após reautenticação Google", () => {
 	const privacy = read("public/privacy.html");
 	assert.match(html, /id="delete-account-button"/);
 	assert.match(client, /reauthenticateWithPopup\(userToDelete, googleProvider\)/);
-	assert.match(client, /deleteDoc\(doc\(db, "users", userToDelete\.uid, "data", "settings"\)\)/);
-	assert.match(client, /deleteDoc\(doc\(db, "users", userToDelete\.uid, "data", "counters"\)\)/);
-	assert.match(client, /deleteDoc\(doc\(db, "users", userToDelete\.uid, "data", "archive"\)\)/);
-	assert.match(client, /deleteDoc\(doc\(db, "users", userToDelete\.uid, "data", "images"\)\)/);
+	assert.match(client, /getDocs\(\s*countersCollectionReference\(userToDelete\.uid\)/);
+	assert.match(client, /counterItems\.forEach\(\(counterDoc\) => deleteBatch\.delete\(counterDoc\.ref\)\)/);
+	for (const documentId of ["settings", "archive", "images"]) {
+		assert.match(
+			client,
+			new RegExp(`deleteBatch\\.delete\\(doc\\(db, "users", userToDelete\\.uid, "data", "${documentId}"\\)\\)`),
+		);
+	}
+	assert.match(client, /deleteBatch\.delete\(legacyCountersReference\(userToDelete\.uid\)\)/);
 	assert.match(client, /deleteObject\(imageStorageReference\(userToDelete\.uid, slot\)\)/);
 	assert.match(client, /deleteUser\(userToDelete\)/);
 	assert.match(privacy, /Excluir conta e dados/);
@@ -305,7 +326,7 @@ test("notificações locais exigem gesto explícito e usam deduplicação", () =
 	const serviceWorker = read("public/sw.js");
 	const rules = read("firestore.rules");
 	assert.match(html, /id="notifications-enabled"/);
-	assert.match(html, /A permissão só será solicitada ao ativar/);
+	assert.match(html, /A permissão só será solicitada ao\s*ativar/);
 	assert.match(client, /notificationsEnabled\.addEventListener\("change"/);
 	assert.match(client, /Notification\.requestPermission\(\)/);
 	assert.doesNotMatch(client, /onAuthStateChanged[\s\S]{0,300}requestPermission/);

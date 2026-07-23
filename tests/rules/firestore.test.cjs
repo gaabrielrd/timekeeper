@@ -16,6 +16,7 @@ const {
 	serverTimestamp,
 	setLogLevel,
 	setDoc,
+	writeBatch,
 } = require("firebase/firestore");
 const {
 	deleteObject,
@@ -105,6 +106,18 @@ function recurringCounter() {
 		color: "#22c55e",
 		createdAt: "2026-07-17T12:00:00.000Z",
 	};
+}
+
+function storedCounter(counter, order = 0) {
+	return { ...counter, order, updatedAt: serverTimestamp() };
+}
+
+function personalCounterReference(database, slot = 0, uid = "alice") {
+	return doc(database, `users/${uid}/counters/${slot}`);
+}
+
+function teamCounterReference(database, slot = 0, teamId = "team-alpha") {
+	return doc(database, `teams/${teamId}/counters/${slot}`);
 }
 
 function archivedCounter(index = 1) {
@@ -401,6 +414,32 @@ test("settings da equipe são compartilhadas e viewers permanecem somente leitur
 	);
 });
 
+test("contadores da equipe respeitam slots e papéis", async () => {
+	await seedTeam();
+	const editorReference = teamCounterReference(googleDb("editor"), 14);
+	await assertSucceeds(
+		setDoc(editorReference, storedCounter(fixedCounter(14), 14)),
+	);
+	await assertSucceeds(
+		getDoc(teamCounterReference(googleDb("viewer"), 14)),
+	);
+	await assertFails(
+		setDoc(
+			teamCounterReference(googleDb("viewer"), 0),
+			storedCounter(fixedCounter(0), 0),
+		),
+	);
+	await assertFails(
+		getDoc(teamCounterReference(googleDb("outsider"), 14)),
+	);
+	await assertFails(
+		setDoc(
+			teamCounterReference(googleDb("editor"), 15),
+			storedCounter(fixedCounter(15), 15),
+		),
+	);
+});
+
 test("convite pode ser lido pelo link exato sem expor a coleção", async () => {
 	await seedTeam();
 	const inviteId = "11111111-1111-4111-8111-111111111111";
@@ -433,10 +472,13 @@ test("convite pode ser lido pelo link exato sem expor a coleção", async () => 
 
 test("aceita contadores fixo e recorrente válidos", async () => {
 	await assertSucceeds(
-		setDoc(doc(googleDb(), "users/alice/data/counters"), {
-			items: [fixedCounter(), recurringCounter()],
-			updatedAt: serverTimestamp(),
-		}),
+		setDoc(personalCounterReference(googleDb(), 0), storedCounter(fixedCounter())),
+	);
+	await assertSucceeds(
+		setDoc(
+			personalCounterReference(googleDb(), 1),
+			storedCounter(recurringCounter(), 1),
+		),
 	);
 });
 
@@ -445,39 +487,87 @@ test("aceita dois contadores recorrentes com imagens e opacidades", async () => 
 		"11111111-1111-4111-8111-111111111111",
 		"22222222-2222-4222-8222-222222222222",
 	];
-	await assertSucceeds(
-		setDoc(doc(googleDb(), "users/alice/data/counters"), {
-			items: imageIds.map((imageId, index) => ({
+	for (const [index, imageId] of imageIds.entries()) {
+		await assertSucceeds(
+			setDoc(personalCounterReference(googleDb(), index), storedCounter({
 				...recurringCounter(),
 				id: `recurring-${index}`,
 				name: index === 0 ? "Almoço" : "Academia",
 				imageId,
 				imageOpacity: index === 0 ? 51 : 100,
 				overlayOpacity: index === 0 ? 30 : 55,
-			})),
-			updatedAt: serverTimestamp(),
-		}),
-	);
+			}, index)),
+		);
+	}
 });
 
 test("permite cinco contadores e rejeita seis", async () => {
-	const reference = doc(googleDb(), "users/alice/data/counters");
+	for (let slot = 0; slot < 5; slot += 1) {
+		await assertSucceeds(
+			setDoc(
+				personalCounterReference(googleDb(), slot),
+				storedCounter(fixedCounter(slot), slot),
+			),
+		);
+	}
+	await assertFails(
+		setDoc(
+			personalCounterReference(googleDb(), 5),
+			storedCounter(fixedCounter(5), 5),
+		),
+	);
+});
+
+test("premium aceita quinze slots e rejeita slot fora da faixa", async () => {
+	await environment.withSecurityRulesDisabled(async (context) => {
+		await setDoc(doc(context.firestore(), "users/premium"), {
+			displayName: "Premium",
+			tier: "premium",
+		});
+	});
+	const premiumDb = googleDb("premium");
 	await assertSucceeds(
-		setDoc(reference, {
-			items: Array.from({ length: 5 }, (_, index) => fixedCounter(index)),
-			updatedAt: serverTimestamp(),
-		}),
+		setDoc(
+			personalCounterReference(premiumDb, 14, "premium"),
+			storedCounter(fixedCounter(14), 14),
+		),
 	);
 	await assertFails(
-		setDoc(reference, {
-			items: Array.from({ length: 6 }, (_, index) => fixedCounter(index)),
+		setDoc(
+			personalCounterReference(premiumDb, 15, "premium"),
+			storedCounter(fixedCounter(15), 15),
+		),
+	);
+});
+
+test("documento agregado legado pode ser lido e removido, mas não recriado", async () => {
+	const legacyPath = "users/alice/data/counters";
+	await environment.withSecurityRulesDisabled(async (context) => {
+		await setDoc(doc(context.firestore(), legacyPath), {
+			items: [fixedCounter()],
+			updatedAt: new Date(),
+		});
+	});
+	const ownerDb = googleDb();
+	const ownerReference = doc(ownerDb, legacyPath);
+	await assertSucceeds(getDoc(ownerReference));
+	const migration = writeBatch(ownerDb);
+	migration.set(
+		personalCounterReference(ownerDb, 0),
+		storedCounter(fixedCounter()),
+	);
+	migration.delete(ownerReference);
+	await assertSucceeds(migration.commit());
+	await assertFails(
+		setDoc(ownerReference, {
+			items: [fixedCounter()],
 			updatedAt: serverTimestamp(),
 		}),
 	);
 });
 
 test("rejeita schema, horários, dias e cores inválidos", async () => {
-	const reference = doc(googleDb(), "users/alice/data/counters");
+	const reference = personalCounterReference(googleDb(), 0);
 	const invalidCounters = [
 		{ ...fixedCounter(), name: "" },
 		{ ...fixedCounter(), endAtMs: fixedCounter().startAtMs },
@@ -490,28 +580,26 @@ test("rejeita schema, horários, dias e cores inválidos", async () => {
 		{ ...recurringCounter(), daysOfWeek: [7] },
 	];
 	for (const counter of invalidCounters) {
-		await assertFails(setDoc(reference, { items: [counter] }));
+		await assertFails(setDoc(reference, storedCounter(counter)));
 	}
 });
 test("aceita checklists válidos de até 3 itens", async () => {
 	await assertSucceeds(
-		setDoc(doc(googleDb(), "users/alice/data/counters"), {
-			items: [
-				{
+		setDoc(
+			personalCounterReference(googleDb(), 0),
+			storedCounter({
 					...fixedCounter(),
 					checklist: [
 						{ id: "task-1", text: "Revisão", done: false },
 						{ id: "task-2", text: "Exercícios", done: true },
 					],
-				},
-			],
-			updatedAt: serverTimestamp(),
-		}),
+				}),
+		),
 	);
 });
 
 test("rejeita checklists inválidos ou com mais de 3 itens", async () => {
-	const reference = doc(googleDb(), "users/alice/data/counters");
+	const reference = personalCounterReference(googleDb(), 0);
 	const invalidChecklists = [
 		[
 			{ id: "t1", text: "1", done: false },
@@ -526,10 +614,7 @@ test("rejeita checklists inválidos ou com mais de 3 itens", async () => {
 	];
 	for (const checklist of invalidChecklists) {
 		await assertFails(
-			setDoc(reference, {
-				items: [{ ...fixedCounter(), checklist }],
-				updatedAt: serverTimestamp(),
-			}),
+			setDoc(reference, storedCounter({ ...fixedCounter(), checklist })),
 		);
 	}
 });
@@ -617,10 +702,10 @@ test("dispositivos, fila push e métricas são privados até para o proprietári
 });
 
 test("documentos válidos podem ser lidos pelo proprietário", async () => {
-	const reference = doc(googleDb(), "users/alice/data/counters");
-	await assertSucceeds(setDoc(reference, { items: [fixedCounter()] }));
+	const reference = personalCounterReference(googleDb(), 0);
+	await assertSucceeds(setDoc(reference, storedCounter(fixedCounter())));
 	const snapshot = await assertSucceeds(getDoc(reference));
-	assert.equal(snapshot.data().items.length, 1);
+	assert.equal(snapshot.data().id, fixedCounter().id);
 });
 
 test("aceita metadados de até dez imagens e rejeita schema inválido", async () => {

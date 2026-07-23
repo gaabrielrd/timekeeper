@@ -84,8 +84,9 @@ as dependências em `functions/` pertencem ao runtime server-side.
   `team:{teamId}`. A seleção sincroniza entre abas/dispositivos.
 - A troca de workspace deve cancelar/versionar subscriptions anteriores, limpar
   estado transitório e carregar contadores e settings do novo espaço sem mistura.
-- Dados pessoais vivem em `/users/{uid}/data/*`; dados compartilhados vivem em
-  `/teams/{teamId}/data/*`.
+- Dados pessoais vivem em `/users/{uid}/data/*` e `/users/{uid}/counters/*`;
+  dados compartilhados vivem em `/teams/{teamId}/data/*` e
+  `/teams/{teamId}/counters/*`.
 - `admin` e `editor` podem editar contadores e visualização da equipe. `viewer` é
   estritamente somente leitura no cliente e nas Rules.
 - Cotas de um workspace de equipe usam o plano real do proprietário, não o plano
@@ -98,7 +99,8 @@ as dependências em `functions/` pertencem ao runtime server-side.
 ### Cotas alinhadas
 
 - Contadores: 5 em Free e 15 em Premium. No cliente, use `getMaxCounters()` e o
-  workspace ativo; nas Rules, use `getMaxCounters(userId)`.
+  workspace ativo; nas Rules, use `getMaxCounters(userId)` e limite os IDs de slot
+  a `0`–`4` ou `0`–`14`.
 - Equipes criadas: 1 em Free e 3 em Premium.
 - Membros por equipe: 5 em Free e 12 em Premium, conforme o perfil do proprietário.
 - Biblioteca: até 10 slots, 5 MiB por imagem e 50 MiB no total pelas APIs previstas.
@@ -108,10 +110,12 @@ as dependências em `functions/` pertencem ao runtime server-side.
 ### Dados em tempo real
 
 - Settings pessoais: `/users/{uid}/data/settings`.
-- Contadores pessoais: `/users/{uid}/data/counters`.
+- Contadores pessoais: `/users/{uid}/counters/{slot}`.
 - Arquivo e metadados de imagens: `/users/{uid}/data/archive` e `data/images`.
-- Contadores e settings de equipe: `/teams/{teamId}/data/counters` e
+- Contadores e settings de equipe: `/teams/{teamId}/counters/{slot}` e
   `/teams/{teamId}/data/settings`.
+- Os agregados `data/counters` são legados: podem ser lidos e removidos somente
+  durante a migração para subcoleções; não aceite novas escritas neles.
 - Use `onSnapshot` como fonte de verdade e cancele listeners ao trocar usuário,
   workspace ou sair.
 - Preserve rollback visual em mutações otimistas, especialmente exclusão e ordem.
@@ -185,7 +189,8 @@ duas abas, troca de workspace, papéis admin/editor/viewer, falha de rede, cotas
 isolamento entre dois usuários. O checklist completo fica em `docs/testing.md`.
 
 A CI em `.github/workflows/ci.yml` executa sintaxe, unitários, contratos, testes das
-Functions, E2E Chromium desktop/mobile e Firestore/Storage Rules em pushes e PRs.
+Functions, E2E Chromium desktop/mobile e Firestore/Storage Rules em pull requests e
+pushes na branch base.
 
 ## Deploy
 
