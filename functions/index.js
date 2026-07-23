@@ -28,6 +28,7 @@ const METRIC_RETENTION_MS = 30 * 24 * 60 * MINUTE_MS;
 const LEASE_MS = 2 * MINUTE_MS;
 const MAX_DEVICES_PER_RUN = 200;
 const MAX_CONCURRENT_DEVICES = 10;
+const TEAM_INVITE_ID_PATTERN = /^[0-9a-f-]{36}$/i;
 const INVALID_FID_CODES = new Set([
 	"messaging/installation-id-not-registered",
 	"messaging/registration-token-not-registered",
@@ -56,6 +57,70 @@ function requireGoogleUser(request) {
 	}
 	return request.auth.uid;
 }
+
+exports.acceptTeamInvite = onCall(
+	{ invoker: "public", cors: true, maxInstances: 20, timeoutSeconds: 30 },
+	async (request) => {
+		const uid = requireGoogleUser(request);
+		const { teamId, inviteId } = request.data || {};
+		if (
+			typeof teamId !== "string" ||
+			teamId.length < 1 ||
+			teamId.length > 100 ||
+			!TEAM_INVITE_ID_PATTERN.test(inviteId || "")
+		) {
+			throw new HttpsError("invalid-argument", "Convite inválido.");
+		}
+
+		return db.runTransaction(async (transaction) => {
+			const teamReference = db.doc(`teams/${teamId}`);
+			const inviteReference = db.doc(`teams/${teamId}/invites/${inviteId}`);
+			const [teamSnapshot, inviteSnapshot] = await Promise.all([
+				transaction.get(teamReference),
+				transaction.get(inviteReference),
+			]);
+			if (!teamSnapshot.exists || !inviteSnapshot.exists) {
+				throw new HttpsError("not-found", "Equipe ou convite não encontrado.");
+			}
+
+			const team = teamSnapshot.data();
+			const invite = inviteSnapshot.data();
+			const expiresAtMs = invite.expiresAt?.toMillis?.();
+			if (invite.teamId !== teamId || !Number.isFinite(expiresAtMs) || expiresAtMs <= Date.now()) {
+				throw new HttpsError("failed-precondition", "Este convite expirou.");
+			}
+
+			const members = team.members || {};
+			const existingRole = members[uid]?.role;
+			if (!existingRole) {
+				const ownerSnapshot = await transaction.get(db.doc(`users/${team.ownerUid}`));
+				const owner = ownerSnapshot.data() || {};
+				const maxMembers = owner.tier === "premium" || owner.isAdmin === true ? 12 : 5;
+				if (Object.keys(members).length >= maxMembers) {
+					throw new HttpsError("resource-exhausted", `Esta equipe atingiu o limite de ${maxMembers} membros.`);
+				}
+				members[uid] = {
+					role: invite.role === "viewer" ? "viewer" : "editor",
+					joinedAt: new Date().toISOString(),
+				};
+				transaction.update(teamReference, {
+					members,
+					updatedAt: FieldValue.serverTimestamp(),
+				});
+			}
+
+			return {
+				team: {
+					id: teamId,
+					name: team.name,
+					ownerUid: team.ownerUid,
+					ownerTier: team.ownerTier || "free",
+					role: existingRole || members[uid].role,
+				},
+			};
+		});
+	},
+);
 
 function validDeviceId(value) {
 	return typeof value === "string" && /^[A-Za-z0-9_-]{16,100}$/.test(value);

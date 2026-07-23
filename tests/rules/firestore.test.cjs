@@ -401,6 +401,36 @@ test("settings da equipe são compartilhadas e viewers permanecem somente leitur
 	);
 });
 
+test("convite pode ser lido pelo link exato sem expor a coleção", async () => {
+	await seedTeam();
+	const inviteId = "11111111-1111-4111-8111-111111111111";
+	const invitePath = `teams/team-alpha/invites/${inviteId}`;
+	await assertSucceeds(
+		setDoc(doc(googleDb("owner"), invitePath), {
+			teamId: "team-alpha",
+			teamName: "Equipe Alpha",
+			role: "editor",
+			createdBy: "owner",
+			createdAt: serverTimestamp(),
+			expiresAt: new Date(Date.now() + 6 * 24 * 60 * 60 * 1000),
+		}),
+	);
+	await assertSucceeds(getDoc(doc(googleDb("outsider"), invitePath)));
+	await assertFails(
+		getDocs(collection(googleDb("outsider"), "teams/team-alpha/invites")),
+	);
+	await assertFails(
+		setDoc(doc(googleDb("viewer"), `teams/team-alpha/invites/${crypto.randomUUID()}`), {
+			teamId: "team-alpha",
+			teamName: "Equipe Alpha",
+			role: "editor",
+			createdBy: "viewer",
+			createdAt: serverTimestamp(),
+			expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+		}),
+	);
+});
+
 test("aceita contadores fixo e recorrente válidos", async () => {
 	await assertSucceeds(
 		setDoc(doc(googleDb(), "users/alice/data/counters"), {

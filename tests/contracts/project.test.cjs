@@ -397,7 +397,13 @@ test("modo de foco cobre todos os cards, restaura a sessão e integra o shell PW
 	assert.match(html, /id="focus-mode"[\s\S]*role="dialog"[\s\S]*aria-modal="true"/);
 	assert.match(html, /id="focus-mode-close"[\s\S]*Sair do modo de foco/);
 	assert.match(html, /id="focus-mode-media"[\s\S]*id="focus-mode-image"[\s\S]*id="focus-mode-overlay"/);
+	assert.match(html, /id="focus-mode-soundscape"/);
+	assert.match(html, /id="focus-mode-sound-select"/);
+	assert.match(html, /id="focus-mode-sound-toggle"[\s\S]*aria-pressed="false"/);
+	assert.match(html, /id="focus-mode-sound-volume"/);
+	assert.match(html, /id="focus-mode-sound-loop"/);
 	assert.match(html, /src="src\/focus\.js"/);
+	assert.match(html, /src="src\/soundscapes\.js"/);
 	assert.match(client, /panel\.dataset\.focusId = counter\.id/);
 	assert.match(client, /focusButton\.dataset\.focusTrigger/);
 	assert.match(focus, /timekeeper:focus-counter/);
@@ -407,11 +413,19 @@ test("modo de foco cobre todos os cards, restaura a sessão e integra o shell PW
 	assert.match(focus, /function syncFocusedMedia/);
 	assert.match(focus, /sourceImage\.style\.backgroundImage/);
 	assert.match(focus, /sourceOverlay\.style\.opacity/);
+	assert.match(focus, /soundController\?\.pause\(\)/);
+	assert.match(focus, /function initializeSoundscape\(\)/);
 	assert.match(styles, /body\.focus-mode-active \.focus-mode/);
 	assert.match(styles, /body\.focus-mode-active\[data-background-enabled="true"\] \.ambient-background/);
 	assert.match(styles, /\.focus-mode-image[\s\S]*background-size: cover/);
 	assert.match(styles, /@media \(max-width: 800px\), \(orientation: portrait\)/);
+	assert.match(styles, /\.focus-mode-soundscape/);
 	assert.match(serviceWorker, /"\/src\/focus\.js"/);
+	assert.match(serviceWorker, /"\/src\/soundscapes\.js"/);
+	assert.doesNotMatch(
+		serviceWorker.slice(serviceWorker.indexOf("const APP_SHELL"), serviceWorker.indexOf("let firebaseMessaging")),
+		/"\/sounds\//,
+	);
 });
 
 test("confirmações usam dialog acessível em vez da interface nativa", () => {
@@ -513,8 +527,12 @@ test("espaços de equipe e colaboração mantêm regras, cotas e papéis alinhad
 	assert.match(rules, /isTeamEditorOrAdmin\(teamId\)/);
 	assert.match(rules, /match \/data\/settings \{/);
 	assert.match(rules, /isValidTeamSettingsDocument\(request\.resource\.data\)/);
+	assert.match(rules, /isValidTeamInviteDocument\(teamId, request\.resource\.data\)/);
 	const client = read("public/src/firebase.js");
 	assert.match(client, /activeWorkspace: "personal"/);
 	assert.match(client, /teamSettingsReference\(teamId\)/);
 	assert.match(client, /canEditActiveWorkspace\(\)/);
+	assert.match(client, /httpsCallable\(ensureFunctionsBackend\(\), "acceptTeamInvite"\)/);
+	const functions = read("functions/index.js");
+	assert.match(functions, /exports\.acceptTeamInvite = onCall/);
 });

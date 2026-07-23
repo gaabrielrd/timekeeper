@@ -376,6 +376,27 @@ service cloud.firestore {
         && hasValidUpdatedAt(data);
     }
 
+    function isValidTeamInviteDocument(teamId, data) {
+      return data.keys().hasOnly([
+          'teamId',
+          'teamName',
+          'role',
+          'createdBy',
+          'createdAt',
+          'expiresAt'
+        ])
+        && data.teamId == teamId
+        && data.teamName is string
+        && data.teamName.size() >= 1
+        && data.teamName.size() <= 50
+        && data.role == 'editor'
+        && data.createdBy == request.auth.uid
+        && data.createdAt is timestamp
+        && data.expiresAt is timestamp
+        && data.expiresAt > request.time
+        && data.expiresAt <= request.time + duration.value(7, 'd');
+    }
+
     function hasValidCounterItems(userId, items) {
       return items is list
         && items.size() <= getMaxCounters(userId)
@@ -670,8 +691,11 @@ service cloud.firestore {
       }
 
       match /invites/{inviteId} {
-        allow read: if request.auth != null;
-        allow create, update, delete: if isTeamAdmin(teamId);
+        allow get: if request.auth != null;
+        allow list: if false;
+        allow create: if isTeamAdmin(teamId)
+          && isValidTeamInviteDocument(teamId, request.resource.data);
+        allow update, delete: if isTeamAdmin(teamId);
       }
     }
 

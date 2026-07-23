@@ -22,6 +22,7 @@ import {
 	runTransaction,
 	serverTimestamp,
 	setDoc,
+	Timestamp,
 	where,
 	writeBatch,
 } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
@@ -34,6 +35,7 @@ import {
 	uploadBytesResumable,
 } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-storage.js";
 import {
+	connectFunctionsEmulator,
 	getFunctions,
 	httpsCallable,
 } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-functions.js";
@@ -81,6 +83,7 @@ const pushConfigured =
 	typeof pushConfig.recaptchaEnterpriseSiteKey === "string" &&
 	pushConfig.recaptchaEnterpriseSiteKey.length > 10;
 let pushFunctions = null;
+let sharedFunctions = null;
 let appCheckInitialized = false;
 /** Sentinel used in counterGroups to track the "ungrouped" row position. */
 const OUTROS_KEY = "__outros__";
@@ -119,6 +122,18 @@ function ensurePushBackend() {
 		);
 	}
 	return pushFunctions;
+}
+
+function ensureFunctionsBackend() {
+	ensureAppCheck();
+	if (!sharedFunctions) {
+		sharedFunctions = getFunctions(
+			app,
+			pushConfig.functionsRegion || "southamerica-east1",
+		);
+		if (useLocalEmulators) connectFunctionsEmulator(sharedFunctions, "127.0.0.1", 5001);
+	}
+	return sharedFunctions;
 }
 
 // Initialize Firebase AI Logic (Gemini API)
@@ -6452,8 +6467,19 @@ function renderTeamsModalContent() {
 	}
 }
 
-function generateTeamInviteLink(teamId) {
-	const inviteToken = btoa(JSON.stringify({ teamId, ts: Date.now() }));
+async function generateTeamInviteLink(teamId) {
+	const team = userTeams.find((item) => item.id === teamId);
+	if (!team || !currentUser) throw new Error("Equipe indisponível para convite.");
+	const inviteId = crypto.randomUUID();
+	await setDoc(doc(db, "teams", teamId, "invites", inviteId), {
+		teamId,
+		teamName: team.name,
+		role: "editor",
+		createdBy: currentUser.uid,
+		createdAt: serverTimestamp(),
+		expiresAt: Timestamp.fromMillis(Date.now() + 7 * 24 * 60 * 60 * 1000),
+	});
+	const inviteToken = btoa(JSON.stringify({ teamId, inviteId }));
 	const url = new URL(window.location.href);
 	url.searchParams.set("invite", inviteToken);
 	return url.toString();
@@ -6466,32 +6492,40 @@ function checkInviteUrlParams() {
 
 	try {
 		const data = JSON.parse(atob(inviteToken));
-		if (data.teamId) {
-			showPendingInviteModal(data.teamId);
+		if (data.teamId && data.inviteId) {
+			showPendingInviteModal(data.teamId, data.inviteId);
+		} else {
+			showToast("Este link de convite é antigo. Peça um novo link ao administrador.");
 		}
 	} catch (e) {
 		console.error("Link de convite inválido.", e);
 	}
 }
 
-async function showPendingInviteModal(teamId) {
+async function showPendingInviteModal(teamId, inviteId) {
 	if (!currentUser) {
 		showToast("Faça login com sua conta Google para aceitar o convite!");
 		return;
 	}
 	try {
-		const teamDoc = await getDoc(doc(db, "teams", teamId));
-		if (!teamDoc.exists()) {
+		const inviteDoc = await getDoc(doc(db, "teams", teamId, "invites", inviteId));
+		if (!inviteDoc.exists()) {
 			showToast("Equipe não encontrada ou convite expirado.");
 			return;
 		}
-		const team = teamDoc.data();
-		if (hasOwn(team.members, currentUser.uid)) {
-			showToast(`Você já é membro da equipe "${team.name}"!`);
-			switchWorkspace(`team:${team.id}`);
+		const invite = inviteDoc.data();
+		const expiresAtMs = invite.expiresAt?.toMillis?.();
+		if (invite.teamId !== teamId || !Number.isFinite(expiresAtMs) || expiresAtMs <= Date.now()) {
+			showToast("Este convite expirou. Peça um novo link ao administrador.");
 			return;
 		}
-		pendingInvites = [{ teamId: team.id, teamName: team.name, teamOwnerTier: team.ownerTier }];
+		const existingTeam = userTeams.find((team) => team.id === teamId);
+		if (existingTeam) {
+			showToast(`Você já é membro da equipe "${existingTeam.name}"!`);
+			await switchWorkspace(`team:${teamId}`);
+			return;
+		}
+		pendingInvites = [{ teamId, inviteId, teamName: invite.teamName }];
 		renderPendingInvites();
 		if (elements.pendingInvitesDialog) {
 			elements.pendingInvitesDialog.showModal();
@@ -6519,8 +6553,8 @@ function renderPendingInvites() {
 					<p class="muted">Você foi convidado para esta equipe.</p>
 				</div>
 				<div class="pending-invite-actions">
-					<button class="primary-button compact-button" data-action="accept-invite" data-team-id="${invite.teamId}">Aceitar</button>
-					<button class="secondary-button compact-button" data-action="decline-invite" data-team-id="${invite.teamId}">Recusar</button>
+					<button class="primary-button compact-button" data-action="accept-invite" data-team-id="${invite.teamId}" data-invite-id="${invite.inviteId}">Aceitar</button>
+					<button class="secondary-button compact-button" data-action="decline-invite" data-team-id="${invite.teamId}" data-invite-id="${invite.inviteId}">Recusar</button>
 				</div>
 			</div>
 		`,
@@ -6529,28 +6563,17 @@ function renderPendingInvites() {
 	}
 }
 
-async function acceptTeamInvite(teamId) {
+async function acceptTeamInvite(teamId, inviteId) {
 	if (!currentUser) return;
 	try {
-		const teamRef = doc(db, "teams", teamId);
-		const teamDoc = await getDoc(teamRef);
-		if (!teamDoc.exists()) return;
-		const team = teamDoc.data();
-		const currentMemberCount = Object.keys(team.members || {}).length;
-		const maxMembers = getMaxTeamMembers(team.ownerTier);
-		if (currentMemberCount >= maxMembers) {
-			showToast(`Esta equipe atingiu o limite máximo de ${maxMembers} membros.`);
-			return;
-		}
-		const updatedMembers = {
-			...team.members,
-			[currentUser.uid]: {
-				role: "editor",
-				joinedAt: new Date().toISOString(),
-			},
+		const acceptInvite = httpsCallable(ensureFunctionsBackend(), "acceptTeamInvite");
+		const response = await acceptInvite({ teamId, inviteId });
+		const team = response.data?.team;
+		if (!team) throw new Error("Resposta inválida ao aceitar convite.");
+		const joinedTeam = {
+			...team,
+			members: { [currentUser.uid]: { role: team.role || "editor" } },
 		};
-		await setDoc(teamRef, { members: updatedMembers, updatedAt: serverTimestamp() }, { merge: true });
-		const joinedTeam = { ...team, members: updatedMembers };
 		userTeams = [
 			...userTeams.filter((item) => item.id !== teamId),
 			joinedTeam,
@@ -6562,7 +6585,7 @@ async function acceptTeamInvite(teamId) {
 		await switchWorkspace(`team:${teamId}`);
 	} catch (error) {
 		console.error("Falha ao aceitar convite.", error);
-		showToast("Não foi possível aceitar o convite.");
+		showToast(error?.message || "Não foi possível aceitar o convite.");
 	}
 }
 
@@ -6624,11 +6647,34 @@ if (elements.userTeamsGrid) {
 }
 
 if (elements.generateTeamInviteButton) {
-	elements.generateTeamInviteButton.addEventListener("click", () => {
+	elements.generateTeamInviteButton.addEventListener("click", async () => {
 		if (!currentlyManagingTeamId) return;
-		const inviteUrl = generateTeamInviteLink(currentlyManagingTeamId);
-		if (elements.teamInviteLinkInput) elements.teamInviteLinkInput.value = inviteUrl;
-		if (elements.teamInviteLinkBox) elements.teamInviteLinkBox.hidden = false;
+		elements.generateTeamInviteButton.disabled = true;
+		try {
+			const inviteUrl = await generateTeamInviteLink(currentlyManagingTeamId);
+			if (elements.teamInviteLinkInput) elements.teamInviteLinkInput.value = inviteUrl;
+			if (elements.teamInviteLinkBox) elements.teamInviteLinkBox.hidden = false;
+		} catch (error) {
+			console.error("Falha ao gerar convite.", error);
+			showToast("Não foi possível gerar o link de convite.");
+		} finally {
+			elements.generateTeamInviteButton.disabled = false;
+		}
+	});
+}
+
+if (elements.pendingInvitesList) {
+	elements.pendingInvitesList.addEventListener("click", async (event) => {
+		const target = event.target.closest("button[data-action]");
+		if (!target) return;
+		const { action, teamId, inviteId } = target.dataset;
+		if (!teamId || !inviteId) return;
+		if (action === "accept-invite") {
+			target.disabled = true;
+			await acceptTeamInvite(teamId, inviteId);
+			target.disabled = false;
+		}
+		if (action === "decline-invite") declineTeamInvite(teamId);
 	});
 }
 

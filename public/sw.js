@@ -140,7 +140,19 @@ async function staleWhileRevalidate(request) {
 			return response;
 		})
 		.catch(() => null);
-	return cached || refresh;
+	return (
+		cached ||
+		refresh.then(
+			(response) =>
+				response ||
+				(request.destination === "audio"
+					? new Response(null, {
+							status: 503,
+							statusText: "Audio indisponível offline",
+						})
+					: null),
+		)
+	);
 }
 
 self.addEventListener("fetch", (event) => {

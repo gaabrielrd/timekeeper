@@ -51,6 +51,12 @@ foco ao abrir, `Esc` encerra o modo e o foco retorna ao botão de origem quando 
 ainda existe. A regra global de `prefers-reduced-motion` reduz as transições e as
 animações do fundo sem esconder conteúdo.
 
+O painel de paisagem sonora ocupa uma faixa compacta abaixo do progresso, com
+hierarquia editorial discreta para não competir com o contador. Seus controles
+mantêm alvos de toque confortáveis, reorganizam-se em duas colunas até 600 px e
+usam a cor do contador apenas como sinal de ação. A seleção inicial é neutra e o
+estado pausado fica explícito, evitando surpresa sonora ao entrar no foco.
+
 ### Header
 
 Barra de controle fixa com título, horário anônimo ou toggle de contadores, conta e

@@ -58,7 +58,11 @@ Para `/teams/{teamId}`:
 - `data/settings` possui allowlist restrita a `counterGroups`,
   `hiddenCounterGroups` e `updatedAt`;
 - o limite dos contadores usa o plano do proprietário da equipe, não o plano do
-  membro que realiza a edição.
+  membro que realiza a edição;
+- convites autenticados permitem apenas `get` pelo UUID exato; consultas à coleção
+  são negadas, e somente administradores podem criar ou revogar links;
+- a entrada na equipe passa pela callable Function `acceptTeamInvite`, que valida
+  Google OAuth, expiração e limite de membros antes da atualização transacional.
 
 Para `/users/{userId}/counter-images/{slot}` no Cloud Storage:
 

@@ -10,7 +10,6 @@
 	let restoreTimer = null;
 	let restoreObserver = null;
 	let soundController = null;
-	let unsubscribeSound = null;
 	let initialized = false;
 
 	function storedCounterId() {
@@ -152,7 +151,7 @@
 		}
 		populateSoundscapeSelect(elements);
 		soundController.setVolume(Number(elements.soundVolume?.value || 60) / 100);
-		unsubscribeSound = soundController.subscribe(renderSoundscape);
+		soundController.subscribe(renderSoundscape);
 		elements.soundSelect?.addEventListener("change", () => {
 			soundController.select(elements.soundSelect.value);
 		});

@@ -96,6 +96,17 @@ evitando reinício das animações na entrada e na saída. Em contadores pessoai
 sincronização também espelha a imagem e as opacidades de imagem/overlay diretamente
 das camadas renderizadas pelo cliente.
 
+### Paisagens sonoras — `public/src/soundscapes.js`
+
+O catálogo transforma os assets locais de `public/sounds/` em faixas agrupadas
+por categoria e cria um controlador de `HTMLAudioElement` por sessão. O módulo
+não chama `play()` durante a inicialização: a faixa só é carregada após uma
+seleção e reproduzida por ação explícita. Erros de rede, codec ou permissão
+viram o estado `error` para a interface exibir `Indisponível offline`. O modo de
+foco pausa o controlador ao fechar, sem adicionar dados ao Firestore. O service
+worker pré-carrega somente o módulo; os arquivos de áudio entram no cache
+somente quando requisitados.
+
 ### Aplicação autenticada — `public/src/firebase.js`
 
 Responsável por:
