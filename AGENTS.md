@@ -35,7 +35,7 @@ pessoais e personalização visual.
 
 O limite é de 5 contadores para contas gratuitas (Free) e até 15 contadores para contas Premium. O limite aparece em três camadas:
 
-- `MAX_COUNTERS` (calculado com base em `userTier`) em `public/src/firebase.js`;
+- `getMaxCounters()` (calculado com base no plano do workspace) em `public/src/firebase.js`;
 - texto e contador visual em `public/index.html`;
 - função `getMaxCounters(uid)` em `firestore.rules`.
 
@@ -44,7 +44,8 @@ Qualquer alteração exige atualizar e testar as três.
 ### Autenticação e privacidade
 
 - Login/cadastro é somente Google OAuth.
-- Cada usuário só pode acessar `/users/{seu uid}` e os dois documentos permitidos.
+- Cada usuário só pode acessar seu perfil, documentos operacionais e sua própria
+  subcoleção de contadores.
 - Não afrouxe regras para `request.auth != null` sem conferir propriedade pelo UID.
 - A configuração Firebase do cliente é pública por natureza; nunca adicione chaves
   privadas, service accounts ou tokens ao repositório.
@@ -59,7 +60,9 @@ Qualquer alteração exige atualizar e testar as três.
 ### Dados em tempo real
 
 - Configurações vivem em `/users/{uid}/data/settings`.
-- Contadores vivem em `/users/{uid}/data/counters`.
+- Contadores vivem em documentos individuais de `/users/{uid}/counters/{slot}`;
+  equipes usam `/teams/{teamId}/counters/{slot}`. Slots `0`–`4` são Free e
+  `0`–`14` são Premium.
 - Use `onSnapshot` como fonte de verdade após login.
 - Preserve rollback visual em operações otimistas de excluir e reordenar.
 - Cancele subscriptions ao trocar de usuário ou sair.

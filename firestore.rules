@@ -262,16 +262,17 @@ service cloud.firestore {
       return counter is map
         && counter.id.matches('^.{1,100}$')
         && counter.name.matches('^.{1,50}$')
-        && counter.get('createdAt', '').matches('^.{0,40}$')
-        && (counter.get('color', null) == null || isHexColor(counter.color))
-        && (counter.get('imageId', null) == null
-          || (counter.imageId is string && counter.imageId.matches('^.{1,100}$')))
-        && (counter.get('imageOpacity', null) == null
-          || (counter.imageOpacity is number
+        && counter.createdAt.matches('^.{0,40}$')
+        && (counter.color == null || isHexColor(counter.color))
+        && ((!('imageId' in counter)
+            && !('imageOpacity' in counter)
+            && !('overlayOpacity' in counter))
+          || (counter.imageId is string
+            && counter.imageId.matches('^.{1,100}$')
+            && counter.imageOpacity is number
             && counter.imageOpacity >= 0
-            && counter.imageOpacity <= 100))
-        && (counter.get('overlayOpacity', null) == null
-          || (counter.overlayOpacity is number
+            && counter.imageOpacity <= 100
+            && counter.overlayOpacity is number
             && counter.overlayOpacity >= 0
             && counter.overlayOpacity <= 100))
         && (counter.get('group', null) == null
@@ -318,17 +319,15 @@ service cloud.firestore {
           'overlayOpacity',
           'group',
           'hidden',
-          'checklist'
+          'checklist',
+          'order',
+          'updatedAt'
         ])
         && hasValidCounterBase(counter)
         && ((counter.type == 'fixed'
             && isValidFixedCounter(counter))
           || (counter.type == 'recurring'
             && isValidRecurringCounter(counter)));
-    }
-
-    function isValidCounterAt(items, index) {
-      return items.size() <= index ? true : isValidCounter(items[index]);
     }
 
     function isPremiumUser(userId) {
@@ -406,39 +405,18 @@ service cloud.firestore {
         && data.expiresAt <= request.time + duration.value(7, 'd');
     }
 
-    function hasValidFreeCounterItems(items) {
-      return items.size() <= 5
-        && isValidCounterAt(items, 0)
-        && isValidCounterAt(items, 1)
-        && isValidCounterAt(items, 2)
-        && isValidCounterAt(items, 3)
-        && isValidCounterAt(items, 4);
+    function isValidCounterSlot(userId, slot) {
+      return slot in ['0', '1', '2', '3', '4']
+        || (isPremiumUser(userId)
+          && slot in ['5', '6', '7', '8', '9', '10', '11', '12', '13', '14']);
     }
 
-    function hasValidPremiumCounterItems(items) {
-      return items.size() <= 15
-        && isValidCounterAt(items, 0)
-        && isValidCounterAt(items, 1)
-        && isValidCounterAt(items, 2)
-        && isValidCounterAt(items, 3)
-        && isValidCounterAt(items, 4)
-        && isValidCounterAt(items, 5)
-        && isValidCounterAt(items, 6)
-        && isValidCounterAt(items, 7)
-        && isValidCounterAt(items, 8)
-        && isValidCounterAt(items, 9)
-        && isValidCounterAt(items, 10)
-        && isValidCounterAt(items, 11)
-        && isValidCounterAt(items, 12)
-        && isValidCounterAt(items, 13)
-        && isValidCounterAt(items, 14);
-    }
-
-    function hasValidCounterItems(userId, items) {
-      return items is list
-        && (isPremiumUser(userId)
-          ? hasValidPremiumCounterItems(items)
-          : hasValidFreeCounterItems(items));
+    function isValidStoredCounter(data) {
+      return isValidCounter(data)
+        && data.order is int
+        && data.order >= 0
+        && data.order <= 14
+        && hasValidUpdatedAt(data);
     }
 
     function isValidSettingsDocument(data) {
@@ -468,12 +446,6 @@ service cloud.firestore {
           'updatedAt'
         ])
         && hasValidSettingsFields(data)
-        && hasValidUpdatedAt(data);
-    }
-
-    function isValidCountersDocument(userId, data) {
-      return data.keys().hasOnly(['items', 'updatedAt'])
-        && hasValidCounterItems(userId, data.items)
         && hasValidUpdatedAt(data);
     }
 
@@ -660,8 +632,7 @@ service cloud.firestore {
 
       match /data/counters {
         allow read, delete: if isGoogleOwner(userId);
-        allow create, update: if isGoogleOwner(userId)
-          && isValidCountersDocument(userId, request.resource.data);
+        allow create, update: if false;
       }
 
       match /data/archive {
@@ -686,6 +657,13 @@ service cloud.firestore {
       match /devices/{deviceId} {
         allow read, write: if false;
       }
+
+      match /counters/{slot} {
+        allow read, delete: if isGoogleOwner(userId);
+        allow create, update: if isGoogleOwner(userId)
+          && isValidCounterSlot(userId, slot)
+          && isValidStoredCounter(request.resource.data);
+      }
     }
 
     match /teams/{teamId} {
@@ -702,9 +680,8 @@ service cloud.firestore {
 
       match /data/counters {
         allow read: if isTeamMember(teamId);
-        allow create, update: if isTeamEditorOrAdmin(teamId)
-          && isValidCountersDocument(get(/databases/$(database)/documents/teams/$(teamId)).data.ownerUid, request.resource.data);
-        allow delete: if isTeamAdmin(teamId);
+        allow create, update: if false;
+        allow delete: if isTeamEditorOrAdmin(teamId);
       }
 
       match /data/settings {
@@ -720,6 +697,17 @@ service cloud.firestore {
         allow create: if isTeamAdmin(teamId)
           && isValidTeamInviteDocument(teamId, request.resource.data);
         allow update, delete: if isTeamAdmin(teamId);
+      }
+
+      match /counters/{slot} {
+        allow read: if isTeamMember(teamId);
+        allow create, update: if isTeamEditorOrAdmin(teamId)
+          && isValidCounterSlot(
+            get(/databases/$(database)/documents/teams/$(teamId)).data.ownerUid,
+            slot
+          )
+          && isValidStoredCounter(request.resource.data);
+        allow delete: if isTeamEditorOrAdmin(teamId);
       }
     }
 

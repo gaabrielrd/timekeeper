@@ -34,7 +34,7 @@ Para `/generalConfig/{configId}`:
 - IDs, tipos, horários, dias e `dateTime` seguem allowlists/formatos conhecidos;
 - a consulta do perfil administrativo acontece nas Rules, nunca por confiança na UI.
 
-Para `/users/{userId}/data/{documentId}`:
+Para `/users/{userId}/data/{documentId}` e `/users/{userId}/counters/{slot}`:
 
 - apenas `settings`, `counters`, `archive` e `images` são permitidos;
 - cada documento usa um `match` literal próprio para não somar os três schemas no
@@ -42,7 +42,10 @@ Para `/users/{userId}/data/{documentId}`:
 - somente o dono Google pode ler/escrever/excluir;
 - settings validam allowlist, tipos, cores, estilos, layouts, widgets de clima e
   preferências aninhadas de notificação;
-- counters validam allowlist, limite cinco e schemas fixo/recorrente;
+- o documento agregado legado de counters é somente leitura/exclusão para permitir
+  migração; novas escritas usam um documento por contador;
+- cada contador valida allowlist e schema fixo/recorrente isoladamente;
+- slots `0`–`4` impõem o limite Free e `0`–`14` o Premium sem contagem agregada;
 - archive nasce vazio, aceita até 100 itens e só permite inserir um contador fixo
   válido no início ou remover exatamente um item existente;
 - o tipo do contador seleciona o schema antes da validação e os dias usam uma
@@ -52,7 +55,7 @@ Para `/users/{userId}/data/{documentId}`:
 Para `/teams/{teamId}`:
 
 - somente membros presentes no mapa da equipe podem ler o documento e seus dados;
-- `data/counters` e `data/settings` aceitam escrita apenas de `admin` e `editor`;
+- `counters/{slot}` e `data/settings` aceitam escrita apenas de `admin` e `editor`;
 - `viewer` pode acompanhar contadores, grupos e visibilidade em tempo real, sem
   permissão de criar, atualizar ou excluir esses documentos;
 - `data/settings` possui allowlist restrita a `counterGroups`,

@@ -15,9 +15,11 @@ import {
 	deleteDoc,
 	doc,
 	getDoc,
+	getDocs,
 	getFirestore,
 	initializeFirestore,
 	onSnapshot,
+	orderBy,
 	query,
 	runTransaction,
 	serverTimestamp,
@@ -557,6 +559,7 @@ let currentUser = null;
 let userSettings = { ...DEFAULTS };
 let unsubscribeSettings = null;
 let unsubscribeCounters = null;
+let counterSlots = new Map();
 let unsubscribeArchive = null;
 let unsubscribeImages = null;
 let unsubscribeProfile = null;
@@ -713,8 +716,16 @@ function teamSettingsReference(teamId) {
 	return doc(db, "teams", teamId, "data", "settings");
 }
 
-function countersReference(userId) {
+function legacyCountersReference(userId) {
 	return doc(db, "users", userId, "data", "counters");
+}
+
+function countersCollectionReference(userId) {
+	return collection(db, "users", userId, "counters");
+}
+
+function teamCountersCollectionReference(teamId) {
+	return collection(db, "teams", teamId, "counters");
 }
 
 function archiveReference(userId) {
@@ -1430,6 +1441,10 @@ async function deleteLibraryImage(image) {
 	const affectedCounters = userSettings.customCounters.filter(
 		(counter) => counter.imageId === image.id,
 	).length;
+	if (affectedCounters && !canEditActiveWorkspace()) {
+		showToast("Remova a imagem dos contadores com uma conta editora antes de excluí-la.");
+		return;
+	}
 	const suffix = affectedCounters
 		? ` Ela será removida de ${affectedCounters} ${affectedCounters === 1 ? "contador" : "contadores"}.`
 		: "";
@@ -1454,9 +1469,12 @@ async function deleteLibraryImage(image) {
 			updatedAt: serverTimestamp(),
 		});
 		if (affectedCounters) {
-			batch.set(countersReference(ownerId), {
-				items: nextCounters,
-				updatedAt: serverTimestamp(),
+			const countersCollection = activeCountersCollectionReference();
+			nextCounters.forEach((counter, order) => {
+				const slot = counterSlots.get(counter.id);
+				if (slot != null) {
+					batch.set(doc(countersCollection, slot), counterPayload(counter, order));
+				}
 			});
 		}
 		await batch.commit();
@@ -2154,6 +2172,17 @@ async function saveSettings(partialSettings) {
 	}
 }
 
+function availableCounterSlot(usedSlots) {
+	for (let slot = 0; slot < getMaxCounters(); slot += 1) {
+		if (!usedSlots.has(String(slot))) return String(slot);
+	}
+	return null;
+}
+
+function counterPayload(counter, order) {
+	return { ...counter, order, updatedAt: serverTimestamp() };
+}
+
 async function saveCounters(counters) {
 	if (!currentUser) return false;
 	if (!canEditActiveWorkspace()) {
@@ -2161,12 +2190,38 @@ async function saveCounters(counters) {
 		return false;
 	}
 	setCounterState("Salvando...", "saving");
-	const sanitized = normalizeCounters(counters);
+	const sanitized = normalizeCounters(counters).slice(0, getMaxCounters());
 	try {
-		await setDoc(
-			activeCountersReference(),
-			{ items: sanitized.slice(0, getMaxCounters()), updatedAt: serverTimestamp() },
-		);
+		const countersCollection = activeCountersCollectionReference();
+		const nextSlots = new Map();
+		const usedSlots = new Set();
+		for (const counter of sanitized) {
+			const existingSlot = counterSlots.get(counter.id);
+			if (existingSlot != null && !usedSlots.has(existingSlot)) {
+				nextSlots.set(counter.id, existingSlot);
+				usedSlots.add(existingSlot);
+			}
+		}
+		for (const counter of sanitized) {
+			if (nextSlots.has(counter.id)) continue;
+			const slot = availableCounterSlot(usedSlots);
+			if (slot == null) throw new Error("counter-slot-limit-reached");
+			nextSlots.set(counter.id, slot);
+			usedSlots.add(slot);
+		}
+
+		const batch = writeBatch(db);
+		sanitized.forEach((counter, order) => {
+			batch.set(
+				doc(countersCollection, nextSlots.get(counter.id)),
+				counterPayload(counter, order),
+			);
+		});
+		for (const [counterId, slot] of counterSlots) {
+			if (!nextSlots.has(counterId)) batch.delete(doc(countersCollection, slot));
+		}
+		await batch.commit();
+		counterSlots = nextSlots;
 		userSettings.customCounters = sanitized;
 		setCounterState("Ao vivo", "live");
 		return true;
@@ -4389,9 +4444,9 @@ function normalizeCounter(counter) {
 	};
 }
 
-function normalizeCounters(counters) {
+function normalizeCounters(counters, maxCounters = getMaxCounters()) {
 	return (Array.isArray(counters) ? counters : [])
-		.slice(0, getMaxCounters())
+		.slice(0, maxCounters)
 		.map(normalizeCounter)
 		.filter(Boolean);
 }
@@ -4413,6 +4468,30 @@ function normalizeArchive(counters) {
 		.slice(0, MAX_ARCHIVED_COUNTERS)
 		.map(normalizeArchivedCounter)
 		.filter(Boolean);
+}
+
+function applyCounterCollectionSnapshot(snapshot, legacyFallback = []) {
+	if (snapshot.empty && legacyFallback.length > 0) {
+		counterSlots = new Map();
+		applyCounters(legacyFallback);
+		return;
+	}
+	const records = snapshot.docs
+		.map((counterDoc) => ({
+			slot: counterDoc.id,
+			order: Number(counterDoc.data().order),
+			counter: normalizeCounter(counterDoc.data()),
+		}))
+		.filter((record) => record.counter)
+		.sort((a, b) => {
+			const orderA = Number.isInteger(a.order) ? a.order : Number(a.slot);
+			const orderB = Number.isInteger(b.order) ? b.order : Number(b.slot);
+			return orderA - orderB || Number(a.slot) - Number(b.slot);
+		});
+	counterSlots = new Map(
+		records.map(({ slot, counter }) => [counter.id, slot]),
+	);
+	applyCounters(records.map(({ counter }) => counter));
 }
 
 function applyCounters(counters) {
@@ -4452,6 +4531,7 @@ function unsubscribeUserData() {
 	preferredWorkspaceValue = "personal";
 	teamsReady = false;
 	workspaceSubscriptionVersion += 1;
+	counterSlots = new Map();
 	if (elements.workspaceSwitcher) elements.workspaceSwitcher.hidden = true;
 	if (elements.pendingInvitesButton) elements.pendingInvitesButton.hidden = true;
 	countersReady = false;
@@ -4474,13 +4554,49 @@ async function accountDataOperation(label, operation) {
 	}
 }
 
+async function migrateLegacyCounters(
+	legacyReference,
+	countersCollection,
+	legacySnapshot = null,
+	collectionSnapshot = null,
+	maxCounters = getMaxCounters(),
+) {
+	const [legacy, current] = await Promise.all([
+		legacySnapshot ? Promise.resolve(legacySnapshot) : getDoc(legacyReference),
+		collectionSnapshot
+			? Promise.resolve(collectionSnapshot)
+			: getDocs(countersCollection),
+	]);
+	if (!legacy.exists()) return;
+
+	const batch = writeBatch(db);
+	if (current.empty) {
+		const counters = normalizeCounters(legacy.data().items, maxCounters);
+		counters.forEach((counter, order) => {
+			batch.set(
+				doc(countersCollection, String(order)),
+				counterPayload(counter, order),
+			);
+		});
+	}
+	batch.delete(legacyReference);
+	await batch.commit();
+}
+
 async function ensureUserData(user) {
 	const profileReference = doc(db, "users", user.uid);
 	const settingsDoc = settingsReference(user.uid);
-	const countersDoc = countersReference(user.uid);
+	const countersDoc = legacyCountersReference(user.uid);
+	const countersCollection = countersCollectionReference(user.uid);
 	const archiveDoc = archiveReference(user.uid);
 	const imagesDoc = imagesReference(user.uid);
-	const [legacySnapshot, settingsSnapshot, countersSnapshot, archiveSnapshot] =
+	const [
+		legacySnapshot,
+		settingsSnapshot,
+		countersSnapshot,
+		counterItemsSnapshot,
+		archiveSnapshot,
+	] =
 		await Promise.all([
 			accountDataOperation(`ler users/${user.uid}`, () =>
 				getDoc(profileReference),
@@ -4490,6 +4606,9 @@ async function ensureUserData(user) {
 			),
 			accountDataOperation(`ler users/${user.uid}/data/counters`, () =>
 				getDoc(countersDoc),
+			),
+			accountDataOperation(`listar users/${user.uid}/counters`, () =>
+				getDocs(countersCollection),
 			),
 			accountDataOperation(`ler users/${user.uid}/data/archive`, () =>
 				getDoc(archiveDoc),
@@ -4507,6 +4626,7 @@ async function ensureUserData(user) {
 		imagesAvailable = false;
 	}
 	const legacy = legacySnapshot.exists() ? legacySnapshot.data() : {};
+	const migrationMaxCounters = legacy.tier === "premium" ? 15 : 5;
 	if (!settingsSnapshot.exists()) {
 		await accountDataOperation(
 			`criar users/${user.uid}/data/settings`,
@@ -4563,13 +4683,30 @@ async function ensureUserData(user) {
 			},
 		);
 	}
-	if (!countersSnapshot.exists()) {
+	if (countersSnapshot.exists()) {
 		await accountDataOperation(
-			`criar users/${user.uid}/data/counters`,
-			() => setDoc(countersDoc, {
-				items: normalizeCounters(legacy.customCounters),
-				updatedAt: serverTimestamp(),
-			}),
+			`migrar users/${user.uid}/data/counters`,
+			() =>
+				migrateLegacyCounters(
+					countersDoc,
+					countersCollection,
+					countersSnapshot,
+					counterItemsSnapshot,
+					migrationMaxCounters,
+				),
+		);
+	} else if (counterItemsSnapshot.empty && Array.isArray(legacy.customCounters)) {
+		const batch = writeBatch(db);
+		normalizeCounters(legacy.customCounters, migrationMaxCounters).forEach(
+			(counter, order) => {
+				batch.set(
+					doc(countersCollection, String(order)),
+					counterPayload(counter, order),
+				);
+			},
+		);
+		await accountDataOperation(`migrar users/${user.uid}/customCounters`, () =>
+			batch.commit(),
 		);
 	}
 	if (!archiveSnapshot.exists()) {
@@ -4616,6 +4753,30 @@ async function ensureUserData(user) {
 	return imagesAvailable;
 }
 
+function isTransientFirestoreError(error) {
+	return (
+		error?.code === "unavailable" ||
+		/ client is offline|could not reach cloud firestore backend/i.test(
+			String(error?.message || ""),
+		)
+	);
+}
+
+async function ensureUserDataWithRetry(user) {
+	let lastError;
+	for (let attempt = 0; attempt < 3; attempt += 1) {
+		try {
+			return await ensureUserData(user);
+		} catch (error) {
+			lastError = error;
+			if (!isTransientFirestoreError(error) || attempt === 2) throw error;
+			await new Promise((resolve) => window.setTimeout(resolve, 250 * (attempt + 1)));
+			if (currentUser?.uid !== user.uid) throw error;
+		}
+	}
+	throw lastError;
+}
+
 async function subscribeToUserData(user) {
 	unsubscribeUserData();
 	setSaveState("Conectando...", true);
@@ -4625,7 +4786,7 @@ async function subscribeToUserData(user) {
 	setArchiveState("Conectando...", "connecting");
 	let imagesAvailable;
 	try {
-		imagesAvailable = await ensureUserData(user);
+		imagesAvailable = await ensureUserDataWithRetry(user);
 	} catch (error) {
 		console.error("Falha ao preparar dados da conta.", error);
 		setSaveState("Erro de conexão");
@@ -4731,10 +4892,10 @@ async function subscribeToUserData(user) {
 		},
 	);
 	unsubscribeCounters = onSnapshot(
-		countersReference(user.uid),
+		query(countersCollectionReference(user.uid), orderBy("order")),
 		(snapshot) => {
 			countersReady = true;
-			applyCounters(snapshot.exists() ? snapshot.data().items : []);
+			applyCounterCollectionSnapshot(snapshot);
 			setCounterState("Ao vivo", "live");
 		},
 		(error) => {
@@ -4820,17 +4981,18 @@ async function archiveCounter(counter) {
 	updateCustomCounters();
 	try {
 		await runTransaction(db, async (transaction) => {
-			const countersDoc = countersReference(userId);
+			const slot = counterSlots.get(counter.id);
+			if (slot == null) throw new Error("counter-no-longer-available");
+			const counterDoc = doc(activeCountersCollectionReference(), slot);
 			const archiveDoc = archiveReference(userId);
-			const [countersSnapshot, archiveSnapshot] = await Promise.all([
-				transaction.get(countersDoc),
+			const [counterSnapshot, archiveSnapshot] = await Promise.all([
+				transaction.get(counterDoc),
 				transaction.get(archiveDoc),
 			]);
-			if (!countersSnapshot.exists() || !archiveSnapshot.exists()) {
+			if (!counterSnapshot.exists() || !archiveSnapshot.exists()) {
 				throw new Error("archive-documents-missing");
 			}
-			const active = normalizeCounters(countersSnapshot.data().items);
-			const target = active.find((item) => item.id === counter.id);
+			const target = normalizeCounter(counterSnapshot.data());
 			if (!target || target.type !== "fixed") {
 				throw new Error("counter-no-longer-available");
 			}
@@ -4838,10 +5000,7 @@ async function archiveCounter(counter) {
 			if (archive.length >= MAX_ARCHIVED_COUNTERS) {
 				throw new Error("archive-limit-reached");
 			}
-			transaction.set(countersDoc, {
-				items: active.filter((item) => item.id !== target.id),
-				updatedAt: serverTimestamp(),
-			});
+			transaction.delete(counterDoc);
 			transaction.set(archiveDoc, {
 				items: [
 					{ ...target, archivedAt: new Date().toISOString() },
@@ -5590,13 +5749,17 @@ elements.deleteAccountButton.addEventListener("click", async () => {
 			}),
 		);
 		const userRef = doc(db, "users", userToDelete.uid);
-		await Promise.all([
-			deleteDoc(doc(db, "users", userToDelete.uid, "data", "settings")),
-			deleteDoc(doc(db, "users", userToDelete.uid, "data", "counters")),
-			deleteDoc(doc(db, "users", userToDelete.uid, "data", "archive")),
-			deleteDoc(doc(db, "users", userToDelete.uid, "data", "images")),
-		]);
-		await deleteDoc(userRef);
+		const counterItems = await getDocs(
+			countersCollectionReference(userToDelete.uid),
+		);
+		const deleteBatch = writeBatch(db);
+		counterItems.forEach((counterDoc) => deleteBatch.delete(counterDoc.ref));
+		deleteBatch.delete(doc(db, "users", userToDelete.uid, "data", "settings"));
+		deleteBatch.delete(legacyCountersReference(userToDelete.uid));
+		deleteBatch.delete(doc(db, "users", userToDelete.uid, "data", "archive"));
+		deleteBatch.delete(doc(db, "users", userToDelete.uid, "data", "images"));
+		deleteBatch.delete(userRef);
+		await deleteBatch.commit();
 		clearNotificationDeliveryState(userToDelete.uid);
 		await deleteUser(userToDelete);
 		closeSidebar();
@@ -5976,11 +6139,18 @@ window.setInterval(scanNotifications, 15000);
 
 // --- Phase 12: Teams & Collaboration Implementation ---
 
-function activeCountersReference() {
+function activeLegacyCountersReference() {
 	if (activeWorkspace.type === "team" && activeWorkspace.id) {
 		return doc(db, "teams", activeWorkspace.id, "data", "counters");
 	}
-	return doc(db, "users", currentUser.uid, "data", "counters");
+	return legacyCountersReference(currentUser.uid);
+}
+
+function activeCountersCollectionReference() {
+	if (activeWorkspace.type === "team" && activeWorkspace.id) {
+		return teamCountersCollectionReference(activeWorkspace.id);
+	}
+	return countersCollectionReference(currentUser.uid);
 }
 
 function activeWorkspaceValue() {
@@ -6189,7 +6359,7 @@ async function switchWorkspace(workspaceValue, { persist = true } = {}) {
 	}
 }
 
-function listenToWorkspaceData() {
+async function listenToWorkspaceData() {
 	workspaceSubscriptionVersion += 1;
 	const subscriptionVersion = workspaceSubscriptionVersion;
 	if (unsubscribeCounters) {
@@ -6222,14 +6392,36 @@ function listenToWorkspaceData() {
 	} else {
 		applyWorkspaceGroupSettings(personalSettingsData);
 	}
+	let legacyFallback = [];
+	try {
+		if (canEditActiveWorkspace()) {
+			await migrateLegacyCounters(
+				activeLegacyCountersReference(),
+				activeCountersCollectionReference(),
+			);
+		} else {
+			const legacySnapshot = await getDoc(activeLegacyCountersReference());
+			legacyFallback = normalizeCounters(
+				legacySnapshot.exists() ? legacySnapshot.data().items : [],
+			);
+		}
+	} catch (error) {
+		if (subscriptionVersion !== workspaceSubscriptionVersion) return;
+		console.error("Falha ao migrar contadores do espaço.", error);
+		setCounterState("Erro de conexão", "error");
+		showToast("Não foi possível migrar os contadores deste espaço.");
+		return;
+	}
+	if (subscriptionVersion !== workspaceSubscriptionVersion) return;
 
-	const targetRef = activeCountersReference();
+	const targetRef = query(activeCountersCollectionReference(), orderBy("order"));
 	unsubscribeCounters = onSnapshot(
 		targetRef,
 		(snapshot) => {
 			if (subscriptionVersion !== workspaceSubscriptionVersion) return;
 			countersReady = true;
-			applyCounters(snapshot.exists() ? snapshot.data().items : []);
+			applyCounterCollectionSnapshot(snapshot, legacyFallback);
+			if (!snapshot.empty) legacyFallback = [];
 			setCounterState("Ao vivo", "live");
 			updateActiveWorkspaceUi();
 		},
@@ -6274,10 +6466,6 @@ async function createTeam(name) {
 	};
 	try {
 		await setDoc(doc(db, "teams", teamId), newTeam);
-		await setDoc(doc(db, "teams", teamId, "data", "counters"), {
-			items: [],
-			updatedAt: serverTimestamp(),
-		});
 		await setDoc(teamSettingsReference(teamId), {
 			counterGroups: [],
 			hiddenCounterGroups: [],
@@ -6757,7 +6945,14 @@ if (elements.deleteTeamButton) {
 			return;
 
 		try {
-			await deleteDoc(doc(db, "teams", currentlyManagingTeamId));
+			const teamId = currentlyManagingTeamId;
+			const counterItems = await getDocs(teamCountersCollectionReference(teamId));
+			const deleteBatch = writeBatch(db);
+			counterItems.forEach((counterDoc) => deleteBatch.delete(counterDoc.ref));
+			deleteBatch.delete(doc(db, "teams", teamId, "data", "settings"));
+			deleteBatch.delete(doc(db, "teams", teamId, "data", "counters"));
+			deleteBatch.delete(doc(db, "teams", teamId));
+			await deleteBatch.commit();
 			showToast(`Equipe "${team.name}" excluída.`);
 			if (elements.teamDetailsDialog) elements.teamDetailsDialog.close();
 			if (activeWorkspace.type === "team" && activeWorkspace.id === currentlyManagingTeamId) {

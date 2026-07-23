@@ -3,8 +3,8 @@
 ## Estado atual
 
 O projeto usa Node Test Runner, Playwright e Firebase Emulator Suite. A suíte atual
-contém 63 testes unitários/contratuais do cliente, 7 testes do domínio das Functions,
-42 E2E em Chromium (21 cenários em desktop e mobile) e 20 testes de
+contém 69 testes unitários/contratuais do cliente, 12 testes do domínio das Functions,
+44 E2E em Chromium (22 cenários em desktop e mobile) e 25 testes de
 Firestore/Storage Rules. GitHub Actions executa todos em pushes, pull requests e
 disparos manuais.
 
@@ -29,6 +29,8 @@ que uma etapa não dependa do encerramento do processo da outra.
 O servidor HTTP da matriz usa a porta 4174 e nunca reutiliza um processo existente:
 uma colisão interrompe a execução antes dos testes, em vez de servir arquivos de
 outro diretório silenciosamente.
+O Playwright usa dois workers para evitar saturar o Firestore Emulator durante a
+inicialização simultânea dos contextos autenticados.
 
 ## Cobertura automatizada
 
