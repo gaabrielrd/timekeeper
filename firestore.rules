@@ -260,6 +260,24 @@ service cloud.firestore {
 
     function hasValidCounterBase(counter) {
       return counter is map
+        && counter.keys().hasOnly([
+          'id',
+          'name',
+          'type',
+          'startAtMs',
+          'endAtMs',
+          'startTime',
+          'endTime',
+          'daysOfWeek',
+          'color',
+          'createdAt',
+          'imageId',
+          'imageOpacity',
+          'overlayOpacity',
+          'group',
+          'hidden',
+          'checklist'
+        ])
         && counter.id.matches('^.{1,100}$')
         && counter.name.matches('^.{1,50}$')
         && (!('createdAt' in counter)
@@ -397,9 +415,17 @@ service cloud.firestore {
         && data.expiresAt <= request.time + duration.value(7, 'd');
     }
 
-    function hasValidCounterItems(userId, items) {
-      return items is list
-        && items.size() <= getMaxCounters(userId)
+    function hasValidFreeCounterItems(items) {
+      return items.size() <= 5
+        && isValidCounterAt(items, 0)
+        && isValidCounterAt(items, 1)
+        && isValidCounterAt(items, 2)
+        && isValidCounterAt(items, 3)
+        && isValidCounterAt(items, 4);
+    }
+
+    function hasValidPremiumCounterItems(items) {
+      return items.size() <= 15
         && isValidCounterAt(items, 0)
         && isValidCounterAt(items, 1)
         && isValidCounterAt(items, 2)
@@ -415,6 +441,13 @@ service cloud.firestore {
         && isValidCounterAt(items, 12)
         && isValidCounterAt(items, 13)
         && isValidCounterAt(items, 14);
+    }
+
+    function hasValidCounterItems(userId, items) {
+      return items is list
+        && (isPremiumUser(userId)
+          ? hasValidPremiumCounterItems(items)
+          : hasValidFreeCounterItems(items));
     }
 
     function isValidSettingsDocument(data) {

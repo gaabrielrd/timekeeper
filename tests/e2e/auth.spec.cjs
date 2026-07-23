@@ -237,6 +237,11 @@ test("usuário arquiva manualmente apenas contador fixo e exclui a conquista", a
 	await expect(page.locator("#archive-count")).toHaveText("1 / 100");
 	await expect(page.locator("#archive-list")).toContainText("Meta concluída");
 	await expect(page.locator("#archive-list")).toContainText("Arquivado em");
+	await page.locator("#auth-button").click();
+	await expect(page.locator("#account-sidebar")).toHaveAttribute(
+		"aria-hidden",
+		"false",
+	);
 	await page.locator("#open-archive-dialog").click();
 	await expect(page.locator("#archive-dialog")).toBeVisible();
 
