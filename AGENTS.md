@@ -189,7 +189,8 @@ duas abas, troca de workspace, papéis admin/editor/viewer, falha de rede, cotas
 isolamento entre dois usuários. O checklist completo fica em `docs/testing.md`.
 
 A CI em `.github/workflows/ci.yml` executa sintaxe, unitários, contratos, testes das
-Functions, E2E Chromium desktop/mobile e Firestore/Storage Rules em pushes e PRs.
+Functions, E2E Chromium desktop/mobile e Firestore/Storage Rules em pull requests e
+pushes na branch base.
 
 ## Deploy
 
