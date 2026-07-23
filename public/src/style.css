@@ -5210,6 +5210,11 @@ input[type="color"]::-webkit-color-swatch {
 	margin-left: auto;
 	font-size: 17px !important;
 }
+#generate-team-invite-button {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
 .invite-link-box {
 	display: flex;
 	gap: 9px;
@@ -5239,6 +5244,9 @@ input[type="color"]::-webkit-color-swatch {
 	max-height: 288px;
 	overflow-y: auto;
 	padding-right: 2px;
+}
+.team-members-section .team-section-heading {
+	margin-bottom: 8px;
 }
 .team-member-item {
 	display: flex;
