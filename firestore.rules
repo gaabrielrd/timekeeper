@@ -260,51 +260,24 @@ service cloud.firestore {
 
     function hasValidCounterBase(counter) {
       return counter is map
-        && counter.keys().hasOnly([
-          'id',
-          'name',
-          'type',
-          'startAtMs',
-          'endAtMs',
-          'startTime',
-          'endTime',
-          'daysOfWeek',
-          'color',
-          'createdAt',
-          'imageId',
-          'imageOpacity',
-          'overlayOpacity',
-          'group',
-          'hidden',
-          'checklist'
-        ])
         && counter.id.matches('^.{1,100}$')
         && counter.name.matches('^.{1,50}$')
-        && (!('createdAt' in counter)
-          || counter.createdAt.matches('^.{0,40}$'))
-        && (!('color' in counter)
-          || counter.color == null
-          || isHexColor(counter.color))
-        && (!('imageId' in counter)
-          || counter.imageId == null
+        && counter.get('createdAt', '').matches('^.{0,40}$')
+        && (counter.get('color', null) == null || isHexColor(counter.color))
+        && (counter.get('imageId', null) == null
           || (counter.imageId is string && counter.imageId.matches('^.{1,100}$')))
-        && (!('imageOpacity' in counter)
-          || counter.imageOpacity == null
+        && (counter.get('imageOpacity', null) == null
           || ((counter.imageOpacity is int || counter.imageOpacity is float)
             && counter.imageOpacity >= 0
             && counter.imageOpacity <= 100))
-        && (!('overlayOpacity' in counter)
-          || counter.overlayOpacity == null
+        && (counter.get('overlayOpacity', null) == null
           || ((counter.overlayOpacity is int || counter.overlayOpacity is float)
             && counter.overlayOpacity >= 0
             && counter.overlayOpacity <= 100))
-        && (!('group' in counter)
-          || counter.group == null
+        && (counter.get('group', null) == null
           || (counter.group is string && counter.group.matches('^.{1,30}$')))
-        && (!('hidden' in counter)
-          || counter.hidden is bool)
-        && (!('checklist' in counter)
-          || counter.checklist == null
+        && counter.get('hidden', false) is bool
+        && (counter.get('checklist', null) == null
           || isValidChecklist(counter.checklist));
     }
 
@@ -329,7 +302,25 @@ service cloud.firestore {
     }
 
     function isValidCounter(counter) {
-      return hasValidCounterBase(counter)
+      return counter.keys().hasOnly([
+          'id',
+          'name',
+          'type',
+          'startAtMs',
+          'endAtMs',
+          'startTime',
+          'endTime',
+          'daysOfWeek',
+          'color',
+          'createdAt',
+          'imageId',
+          'imageOpacity',
+          'overlayOpacity',
+          'group',
+          'hidden',
+          'checklist'
+        ])
+        && hasValidCounterBase(counter)
         && (((!('type' in counter) || counter.type == 'fixed')
             && isValidFixedCounter(counter))
           || (counter.type == 'recurring'
