@@ -82,9 +82,10 @@ O SDK é importado por URL versionada em `public/src/firebase.js`. Ao atualizar:
 
 Atualize de forma atômica:
 
-- `MAX_COUNTERS` no JavaScript;
+- `getMaxCounters()` no JavaScript;
 - cópia e contador no HTML;
-- regras do documento legado e `counters.items`;
+- allowlist de slots em `/users/{uid}/counters/{slot}` e
+  `/teams/{teamId}/counters/{slot}`;
 - comportamento responsivo para a nova quantidade;
 - documentação e testes.
 

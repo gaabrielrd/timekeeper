@@ -2,6 +2,8 @@ name: CI
 
 on:
   push:
+    branches:
+      - master
   pull_request:
   workflow_dispatch:
 
@@ -13,8 +15,32 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
-    name: Syntax, unit, browser E2E and Firestore rules
+  quality:
+    name: Syntax, unit and contract checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Cloud Functions dependencies
+        run: npm ci --prefix functions
+
+      - name: Run syntax, unit and contract checks
+        run: npm run check
+
+  e2e:
+    name: Browser E2E
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -37,17 +63,35 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install Cloud Functions dependencies
-        run: npm ci --prefix functions
-
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Run syntax, unit and contract checks
-        run: npm run check
-
       - name: Run browser end-to-end tests
         run: npm run test:e2e
+
+  rules:
+    name: Firestore security rules
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Set up Java for Firebase Emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install dependencies
+        run: npm ci
 
       - name: Test Firestore security rules
         run: npm run test:rules

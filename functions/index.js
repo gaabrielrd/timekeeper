@@ -406,10 +406,13 @@ async function loadUserState(uid, cache) {
 			uid,
 			Promise.all([
 				db.doc(`users/${uid}/data/settings`).get(),
+				db.collection(`users/${uid}/counters`).orderBy("order").get(),
 				db.doc(`users/${uid}/data/counters`).get(),
-			]).then(([settings, counters]) => ({
+			]).then(([settings, counters, legacyCounters]) => ({
 				settings: settings.exists ? settings.data() : null,
-				counters: counters.exists ? counters.data().items || [] : [],
+				counters: counters.empty
+					? legacyCounters.data()?.items || []
+					: counters.docs.map((document) => document.data()),
 			})),
 		);
 	}

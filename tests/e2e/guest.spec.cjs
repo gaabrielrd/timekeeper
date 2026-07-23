@@ -30,9 +30,7 @@ test("modo de foco restaura o contador e fecha por Escape sem overflow", async (
 	{ page },
 ) => {
 	await page.emulateMedia({ reducedMotion: "reduce" });
-	await page.evaluate(() => {
-		document.body.dataset.backgroundEnabled = "true";
-	});
+	await expect(page.locator("#account-label")).toHaveText("Entrar com Google");
 	const focusTrigger = page.getByRole("button", {
 		name: "Focar contador Expediente",
 	});
@@ -60,10 +58,20 @@ test("modo de foco restaura o contador e fecha por Escape sem overflow", async (
 	await expect(page.locator("#focus-mode-title")).toHaveText("Expediente");
 	await expect(page.locator("#focus-mode-main")).not.toHaveText("carregando...");
 	await expect(page.locator("#focus-mode-soundscape")).toHaveCount(0);
-	const ambientOpacity = await page
-		.locator("#ambient-background")
-		.evaluate((element) => Number.parseFloat(getComputedStyle(element).opacity));
-	expect(ambientOpacity).toBeGreaterThan(0);
+	await page.evaluate(() => {
+		document.body.dataset.backgroundEnabled = "true";
+	});
+	await expect(page.locator("body")).toHaveAttribute(
+		"data-background-enabled",
+		"true",
+	);
+	await expect
+		.poll(() =>
+			page
+				.locator("#ambient-background")
+				.evaluate((element) => Number.parseFloat(getComputedStyle(element).opacity)),
+		)
+		.toBeGreaterThan(0);
 	await expect
 		.poll(() =>
 			page.evaluate(() => sessionStorage.getItem("timekeeper:focus-counter")),

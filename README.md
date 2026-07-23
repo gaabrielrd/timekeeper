@@ -1,7 +1,7 @@
 # Timekeeper
 
 Uma dashboard de contagem regressiva para acompanhar o expediente, pagamentos,
-feriados e até cinco contadores pessoais. O Timekeeper funciona diretamente no
+feriados e até cinco contadores no plano Free ou quinze no Premium. O Timekeeper funciona diretamente no
 navegador, permite personalização visual e sincroniza os dados da conta em tempo
 real com Firebase.
 
@@ -12,7 +12,7 @@ real com Firebase.
 - Modal administrativo para expediente, pagamentos e feriados.
 - Configuração do fim do expediente sem exigir login, persistida em cookie.
 - Login e criação de conta exclusivamente pelo Google OAuth.
-- Até cinco contadores pessoais por conta.
+- Até cinco contadores no plano Free e quinze no Premium, pessoais ou compartilhados em equipe.
 - Contadores de período fixo ou eventos recorrentes por dias da semana.
 - Criação e edição em modal, exclusão e ordenação por botões.
 - Arquivamento manual de contadores fixos e histórico de até 100 conquistas.

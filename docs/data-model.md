@@ -2,7 +2,8 @@
 
 ## Visão geral
 
-Cada conta Google possui um documento de perfil e quatro documentos operacionais.
+Cada conta Google possui um documento de perfil, três documentos operacionais e
+uma subcoleção de contadores.
 Os três contadores padrão usam uma coleção pública separada.
 
 ```text
@@ -17,8 +18,9 @@ users/{uid}/data/settings
 ├── aparência e fundo
 └── updatedAt
 
-users/{uid}/data/counters
-├── items[0..4]
+users/{uid}/counters/{slot}
+├── dados de um contador
+├── order
 └── updatedAt
 
 users/{uid}/data/images
@@ -42,7 +44,7 @@ generalConfig/holiday-YYYY-MM-DD
 
 teams/{teamId}
 ├── id, name, ownerUid, ownerTier, members map (admin | editor | viewer)
-├── data/counters (items[0..4] Free ou items[0..14] Premium)
+├── counters/{slot} (slots 0..4 Free ou 0..14 Premium)
 ├── data/settings (counterGroups, hiddenCounterGroups, updatedAt)
 └── invites/{inviteId} (teamId, teamName, role, createdBy, createdAt, expiresAt)
 ```
@@ -67,8 +69,9 @@ Function `acceptTeamInvite` valida convite, expiração e cota em uma transaçã
 | `updatedAt` | timestamp | `serverTimestamp()` |
 
 Esse documento também é a origem do formato legado. `ensureUserData` lê eventuais
-configurações/`customCounters` na raiz, cria os documentos novos se ainda faltarem e
-então substitui a raiz somente pelos campos atuais do perfil. Quando `isAdmin` ou `tier`
+configurações/`customCounters` na raiz e o antigo `data/counters.items`, migra cada
+contador para um slot da subcoleção e remove o documento agregado depois do batch.
+Quando `isAdmin` ou `tier`
 existem, a normalização preserva o valor; o próprio usuário não pode alterar `tier` ou `isAdmin` pelas Rules.
 
 ## Configuração geral — `/generalConfig/{configId}`
@@ -150,14 +153,13 @@ status e timestamps, sem título ou corpo. O ID é determinístico e a fila expi
 sete dias. `/pushMetrics/{YYYY-MM-DD}` contém apenas contagens agregadas de
 `scheduled`, `sent`, `invalid`, `failed` e `suppressed`, com TTL de 30 dias.
 
-## Contadores — `/users/{uid}/data/counters`
+## Contadores — `/users/{uid}/counters/{slot}`
 
-```js
-{
-  items: [/* até 5 (Free) ou 15 (Premium) objetos, em ordem de exibição */],
-  updatedAt: serverTimestamp()
-}
-```
+Cada contador ocupa um documento. O ID do documento é um slot decimal: contas Free
+podem escrever `0`–`4`; contas Premium, `0`–`14`. O `id` lógico do contador continua
+estável dentro do documento, enquanto `order` determina sua posição visual. Esse
+modelo permite validar cada objeto isoladamente sem ultrapassar o orçamento de
+expressões das Firestore Rules.
 
 ### Campos comuns
 
@@ -174,6 +176,8 @@ sete dias. `/pushMetrics/{YYYY-MM-DD}` contém apenas contagens agregadas de
 | `group` | string ou `null` | nome de grupo cadastrado pelo usuário (até 30 chars) |
 | `hidden` | boolean opcional | `true` para ocultar o contador da dashboard principal |
 | `checklist` | object[] ou `null` | Array de até 3 subtarefas: `id` (string), `text` (string), `done` (boolean) |
+| `order` | integer | posição visual entre 0 e 14 |
+| `updatedAt` | timestamp | `serverTimestamp()` da última escrita |
 
 ### Período fixo
 
@@ -267,11 +271,10 @@ nem `HttpOnly`, pois são configurações não sensíveis acessadas pelo JavaScr
 ## Sincronização e concorrência
 
 Há uma subscription pública de `generalConfig` e cinco subscriptions de conta:
-perfil, settings, counters, archive e metadados de images.
-Escritas de contadores substituem o documento completo para remover campos legados
-fora da allowlist. Duas abas podem produzir last-write-wins; `onSnapshot` reconcilia a UI
-com a versão aceita pelo servidor.
-Arquivar usa uma transação para remover um item fixo de `counters` e inseri-lo no
+perfil, settings, a query ordenada da subcoleção counters, archive e metadados de
+images. Escritas usam batch para atualizar documentos e posições de forma atômica;
+`onSnapshot` reconcilia a UI com a versão aceita pelo servidor.
+Arquivar usa uma transação para remover o documento fixo de `counters` e inseri-lo no
 início de `archive`; a exclusão permanente também usa transação para não sobrescrever
 uma alteração concorrente do histórico.
 
@@ -281,16 +284,18 @@ uma alteração concorrente do histórico.
 - `generalConfig` permite leitura pública; criação/edição/remoção exige perfil
   administrativo e o expediente não pode ser removido.
 - O cliente não pode conceder nem alterar sua própria flag `isAdmin`.
-- Subdocumentos permitidos: somente `settings`, `counters`, `images` e `archive`.
+- Subdocumentos operacionais permitidos: `settings`, `images` e `archive`; o
+  agregado legado `data/counters` só pode ser lido ou removido durante a migração.
 - Settings aceitam somente chaves conhecidas, tipos e ranges válidos.
-- `counters.items` precisa ser lista e ter até cinco elementos válidos.
+- Cada `counters/{slot}` contém exatamente um contador; o path limita a cinco slots
+  Free ou quinze Premium.
 - Cada contador valida ID, nome, cor, imagem, opacidades, o schema fixo/recorrente e opcionalmente até 3 subtarefas no checklist.
 - `archive.items` precisa ser lista e ter até 100 contadores arquivados com o campo `archivedAt` válido.
 - Images aceitam até dez metadados válidos; Storage limita dono, tipo, slot e bytes.
 - Horários recorrentes e dias da semana são validados por formato/range; períodos
   fixos exigem inteiros não negativos e fim posterior ao início.
 - O documento raiz legado também limita `customCounters` a cinco.
-- Não há índices compostos porque não existem queries de coleção.
+- Não há índices compostos; `order` usa o índice de campo único automático.
 
 As rules ainda não garantem unicidade dos dias recorrentes; o cliente remove
 duplicatas e ordena esses valores antes de escrever.
