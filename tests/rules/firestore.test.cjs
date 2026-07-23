@@ -154,6 +154,7 @@ async function seedTeam(teamId = "team-alpha") {
 			ownerTier: "premium",
 			members: {
 				owner: { role: "admin" },
+				admin: { role: "admin" },
 				editor: { role: "editor" },
 				viewer: { role: "viewer" },
 			},
@@ -412,6 +413,18 @@ test("settings da equipe são compartilhadas e viewers permanecem somente leitur
 			updatedAt: serverTimestamp(),
 		}),
 	);
+});
+
+test("somente dono e administradores podem excluir uma equipe", async () => {
+	await seedTeam("team-admin-delete");
+	await assertSucceeds(deleteDoc(doc(googleDb("admin"), "teams/team-admin-delete")));
+
+	await seedTeam("team-owner-delete");
+	await assertSucceeds(deleteDoc(doc(googleDb("owner"), "teams/team-owner-delete")));
+
+	await seedTeam("team-member-delete");
+	await assertFails(deleteDoc(doc(googleDb("editor"), "teams/team-member-delete")));
+	await assertFails(deleteDoc(doc(googleDb("viewer"), "teams/team-member-delete")));
 });
 
 test("contadores da equipe respeitam slots e papéis", async () => {

@@ -47,17 +47,25 @@ const responseSchema = {
 
 async function generateChecklistForPrompt(promptText) {
 	const ai = getAiClient();
-	const systemInstruction = `Você é um assistente especializado em produtividade.
-O usuário quer criar um contador de tempo (regressivo ou progressivo) para: "${promptText}".
-A data atual é ${new Date().toISOString()}.
+	const systemInstruction = `Você é um assistente especializado em produtividade e conversão de tempo.
+O usuário quer criar um contador de tempo (regressivo ou progressivo) com o seguinte texto: "${promptText}".
+A data e hora atual em formato ISO (UTC) é: ${new Date().toISOString()}.
+
 Seu objetivo é:
-1. Extrair os parâmetros de data, horário ou recorrência da intenção do usuário e preencher 'counterParams', deduzindo se é fixo ou recorrente. Se nenhum for especificado, omita o 'counterParams'.
-2. Gerar uma checklist (mini-checklists) de no máximo 5 etapas essenciais e curtas relacionadas a esse objetivo.
-A checklist deve ser em português (Brasil).
-O output deve ser estritamente em JSON de acordo com o schema especificado.`;
+1. Interpretar a intenção de data, horário ou recorrência do usuário em QUALQUER IDIOMA (português, inglês, espanhol, etc.):
+   - Se for um evento fixo com data/hora no futuro (ex: "friday at 10am", "reunião amanhã às 15h", "launch on august 15"):
+     - Defina 'type' como 'fixed'.
+     - Defina 'startAtMs' como o timestamp Unix atual em milissegundos (${Date.now()}).
+     - Defina 'endAtMs' como o timestamp Unix exato da data/hora do evento em milissegundos.
+   - Se for um evento recorrente (ex: "toda segunda das 9h às 10h", "every monday at 9am"):
+     - Defina 'type' como 'recurring', 'startTime', 'endTime' (HH:MM) e 'daysOfWeek' (0=Domingo..6=Sábado).
+   - Se nenhum parâmetro de tempo puder ser extraído, omita 'counterParams'.
+2. Gerar uma lista de subtarefas (checklist) de no MÁXIMO 3 etapas essenciais, curtas e diretas.
+3. O 'title' e a 'checklist' devem ser traduzidos e formatados em português (Brasil).
+O output deve ser estritamente em JSON conforme o schema especificado.`;
 
 	const response = await ai.models.generateContent({
-		model: "gemini-2.5-flash",
+		model: "gemini-3.5-flash-lite",
 		contents: [systemInstruction],
 		config: {
 			responseMimeType: "application/json",

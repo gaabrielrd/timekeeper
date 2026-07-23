@@ -66,6 +66,11 @@ Para `/teams/{teamId}`:
   são negadas, e somente administradores podem criar ou revogar links;
 - a entrada na equipe passa pela callable Function `acceptTeamInvite`, que valida
   Google OAuth, expiração e limite de membros antes da atualização transacional.
+- `getTeamMemberProfiles` só retorna nome, email e foto dos membros para um usuário
+  que já pertença à equipe, sem conceder leitura cliente a `/users/{uid}` de outra
+  pessoa;
+- `deleteTeam` exige Google OAuth e valida dono ou papel `admin` no documento atual
+  antes de remover recursivamente a equipe e suas subcoleções com Admin SDK.
 
 Para `/users/{userId}/counter-images/{slot}` no Cloud Storage:
 

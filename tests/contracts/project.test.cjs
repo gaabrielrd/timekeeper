@@ -564,8 +564,12 @@ test("espaços de equipe e colaboração mantêm regras, cotas e papéis alinhad
 	assert.match(client, /teamSettingsReference\(teamId\)/);
 	assert.match(client, /canEditActiveWorkspace\(\)/);
 	assert.match(client, /httpsCallable\(ensureFunctionsBackend\(\), "acceptTeamInvite"\)/);
+	assert.match(client, /getTeamMemberProfiles/);
+	assert.match(client, /httpsCallable\(\s*ensureFunctionsBackend\(\),\s*"deleteTeam"/);
 	const functions = read("functions/index.js");
 	assert.match(functions, /exports\.acceptTeamInvite = onCall/);
+	assert.match(functions, /exports\.getTeamMemberProfiles = onCall/);
+	assert.match(functions, /exports\.deleteTeam = onCall/);
 });
 
 test("criação via linguagem natural e IA inclui parser client-side e function de geração", () => {
@@ -583,6 +587,6 @@ test("criação via linguagem natural e IA inclui parser client-side e function 
 	assert.match(html, /id="nlp-parse-button"/);
 
 	const client = read("public/src/firebase.js");
-	assert.match(client, /httpsCallable\(functions, "generateAiChecklist"\)/);
+	assert.match(client, /httpsCallable\(ensureFunctionsBackend\(\), "generateAiChecklist"\)/);
 	assert.match(client, /window\.NlpParser\.parseNaturalLanguagePrompt/);
 });

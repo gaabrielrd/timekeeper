@@ -60,6 +60,14 @@ function requireGoogleUser(request) {
 	return request.auth.uid;
 }
 
+function validTeamId(value) {
+	return typeof value === "string" && /^[A-Za-z0-9_-]{1,100}$/.test(value);
+}
+
+function profileValue(value, maxLength) {
+	return typeof value === "string" ? value.slice(0, maxLength) : "";
+}
+
 exports.acceptTeamInvite = onCall(
 	{ invoker: "public", cors: true, maxInstances: 20, timeoutSeconds: 30 },
 	async (request) => {
@@ -121,6 +129,77 @@ exports.acceptTeamInvite = onCall(
 				},
 			};
 		});
+	},
+);
+
+exports.getTeamMemberProfiles = onCall(
+	{ invoker: "public", cors: true, maxInstances: 20, timeoutSeconds: 30 },
+	async (request) => {
+		const uid = requireGoogleUser(request);
+		const { teamId } = request.data || {};
+		if (!validTeamId(teamId)) {
+			throw new HttpsError("invalid-argument", "Equipe inválida.");
+		}
+
+		const teamSnapshot = await db.doc(`teams/${teamId}`).get();
+		if (!teamSnapshot.exists) {
+			throw new HttpsError("not-found", "Equipe não encontrada.");
+		}
+		const team = teamSnapshot.data() || {};
+		const members = team.members || {};
+		if (!members[uid]) {
+			throw new HttpsError("permission-denied", "Você não pertence a esta equipe.");
+		}
+
+		const memberIds = Object.keys(members).slice(0, 12);
+		const profileSnapshots = await Promise.all(
+			memberIds.map((memberUid) => db.doc(`users/${memberUid}`).get()),
+		);
+
+		return {
+			members: memberIds.map((memberUid, index) => {
+				const profile = profileSnapshots[index].exists
+					? profileSnapshots[index].data() || {}
+					: {};
+				return {
+					uid: memberUid,
+					displayName: profileValue(profile.displayName, 120),
+					email: profileValue(profile.email, 254),
+					photoURL: /^https?:\/\//i.test(profile.photoURL || "")
+						? profileValue(profile.photoURL, 1000)
+						: "",
+				};
+			}),
+		};
+	},
+);
+
+exports.deleteTeam = onCall(
+	{ invoker: "public", cors: true, maxInstances: 10, timeoutSeconds: 60 },
+	async (request) => {
+		const uid = requireGoogleUser(request);
+		const { teamId } = request.data || {};
+		if (!validTeamId(teamId)) {
+			throw new HttpsError("invalid-argument", "Equipe inválida.");
+		}
+
+		const teamReference = db.doc(`teams/${teamId}`);
+		const teamSnapshot = await teamReference.get();
+		if (!teamSnapshot.exists) {
+			throw new HttpsError("not-found", "Equipe não encontrada.");
+		}
+
+		const team = teamSnapshot.data() || {};
+		const memberRole = team.members?.[uid]?.role;
+		if (team.ownerUid !== uid && memberRole !== "admin") {
+			throw new HttpsError(
+				"permission-denied",
+				"Somente o dono ou um administrador pode excluir a equipe.",
+			);
+		}
+
+		await db.recursiveDelete(teamReference);
+		return { deleted: true, teamId };
 	},
 );
 
@@ -509,6 +588,43 @@ exports.getAiQuota = onCall(
 		const userSnapshot = await db.doc(`users/${uid}`).get();
 		const userDocData = userSnapshot.exists ? userSnapshot.data() : {};
 		return calculateAiQuota(userDocData);
+	},
+);
+
+exports.generateAiChecklist = onCall(
+	{
+		invoker: "public",
+		cors: true,
+		maxInstances: 10,
+		timeoutSeconds: 30,
+	},
+	async (request) => {
+		const uid = requireGoogleUser(request);
+		const { prompt } = request.data || {};
+		if (typeof prompt !== "string" || !prompt.trim()) {
+			throw new HttpsError("invalid-argument", "Prompt de texto é obrigatório.");
+		}
+
+		const userSnapshot = await db.doc(`users/${uid}`).get();
+		const userDocData = userSnapshot.exists ? userSnapshot.data() : {};
+		const quota = calculateAiQuota(userDocData);
+		if (quota.remaining <= 0) {
+			throw new HttpsError(
+				"resource-exhausted",
+				"Sua cota mensal de IA foi esgotada.",
+			);
+		}
+
+		try {
+			const result = await generateChecklistForPrompt(prompt.trim());
+			return result;
+		} catch (error) {
+			logger.error("Erro ao gerar checklist via IA", error);
+			throw new HttpsError(
+				"internal",
+				error.message || "Erro ao processar prompt de IA.",
+			);
+		}
 	},
 );
 

@@ -450,6 +450,7 @@ const elements = {
 	counterDialogCancel: document.querySelector("#counter-dialog-cancel"),
 	nlpPromptInput: document.querySelector("#nlp-prompt-input"),
 	nlpParseButton: document.querySelector("#nlp-parse-button"),
+	generateAiChecklistButton: document.querySelector("#generate-ai-checklist-button"),
 	nlpChecklistFieldset: document.querySelector("#nlp-checklist-fieldset"),
 	nlpChecklistItems: document.querySelector("#nlp-checklist-items"),
 	counterPreviewCard: document.querySelector("#counter-preview-card"),
@@ -5166,7 +5167,11 @@ function renderChecklistInputs() {
 	});
 
 	if (elements.addChecklistItem) {
-		elements.addChecklistItem.disabled = currentChecklist.length >= 3;
+		const isFull = currentChecklist.length >= 3;
+		elements.addChecklistItem.disabled = isFull;
+		if (elements.generateAiChecklistButton) {
+			elements.generateAiChecklistButton.disabled = isFull;
+		}
 	}
 }
 
@@ -5465,7 +5470,7 @@ function openCounterDialog(counter = null) {
 
 function syncPublicLinksPanel(counterId) {
 	if (!elements.counterIsPublic || !elements.counterPublicLinksPanel) return;
-	
+
 	if (elements.counterIsPublic.checked) {
 		elements.counterPublicLinksPanel.hidden = false;
 		const baseUrl = window.location.origin;
@@ -6190,7 +6195,7 @@ async function initPublicMode(workspaceType, workspaceId, counterId) {
 	}
 
 	try {
-		const getPublicCounterData = httpsCallable(functions, "getPublicCounterData");
+		const getPublicCounterData = httpsCallable(ensureFunctionsBackend(), "getPublicCounterData");
 		const result = await getPublicCounterData({
 			uid: workspaceType === "u" ? workspaceId : undefined,
 			teamId: workspaceType === "t" ? workspaceId : undefined,
@@ -6621,6 +6626,108 @@ async function createTeam(name) {
 }
 
 let currentlyManagingTeamId = null;
+let currentTeamMemberProfiles = new Map();
+
+function memberPhotoUrl(value) {
+	return typeof value === "string" && /^https?:\/\//i.test(value)
+		? value.slice(0, 1000)
+		: "";
+}
+
+function memberInitials(name, uid) {
+	const initials = String(name || "")
+		.trim()
+		.split(/\s+/)
+		.filter(Boolean)
+		.slice(0, 2)
+		.map((part) => part[0])
+		.join("");
+	return (initials || String(uid || "??").slice(0, 2)).toUpperCase();
+}
+
+function renderTeamMembersList() {
+	if (!currentUser || !elements.teamMembersList || !currentlyManagingTeamId) return;
+	const team = userTeams.find((item) => item.id === currentlyManagingTeamId);
+	if (!team) return;
+
+	const isOwner = team.ownerUid === currentUser.uid;
+	const myRole = team.members?.[currentUser.uid]?.role || "viewer";
+	const isAdmin = isOwner || myRole === "admin";
+	const members = team.members || {};
+	const roleLabels = { admin: "ADMIN", editor: "EDITOR", viewer: "LEITOR" };
+
+	if (elements.teamMemberCount) {
+		elements.teamMemberCount.textContent = Object.keys(members).length;
+	}
+
+	elements.teamMembersList.innerHTML = Object.entries(members)
+		.map(([uid, memberData = {}]) => {
+			const profile = currentTeamMemberProfiles.get(uid) || {};
+			const isMe = uid === currentUser.uid;
+			const isMemberOwner = uid === team.ownerUid;
+			const role = memberData.role || "viewer";
+			const memberName =
+				profile.displayName ||
+				memberData.displayName ||
+				(isMe ? currentUser.displayName : "") ||
+				(isMe ? "Você" : "Membro da equipe");
+			const memberEmail =
+				profile.email || memberData.email || (isMe ? currentUser.email : "");
+			const photoURL = memberPhotoUrl(
+				profile.photoURL || memberData.photoURL || (isMe ? currentUser.photoURL : ""),
+			);
+			const memberIdentifier =
+				memberEmail || (isMe ? "Sua conta" : `ID ${uid.slice(0, 8)}…`);
+			const avatar = photoURL
+				? `<img src="${escapeHtml(photoURL)}" alt="" />`
+				: escapeHtml(memberInitials(memberName, uid));
+			return `
+				<div class="team-member-item">
+					<div class="team-member-info">
+						<span class="team-member-avatar" aria-hidden="true">${avatar}</span>
+						<span class="team-member-copy">
+							<strong class="team-member-name">${escapeHtml(memberName)}</strong>
+							<span class="team-member-id">${escapeHtml(memberIdentifier)}</span>
+						</span>
+					</div>
+					<div class="team-member-controls">
+						${
+							isAdmin && !isMemberOwner && !isMe
+								? `
+			<select class="team-member-role-select" aria-label="Papel de ${escapeHtml(memberName)}" data-action="change-role" data-uid="${uid}">
+								<option value="admin" ${role === "admin" ? "selected" : ""}>Admin</option>
+								<option value="editor" ${role === "editor" ? "selected" : ""}>Editor</option>
+								<option value="viewer" ${role === "viewer" ? "selected" : ""}>Leitor</option>
+							</select>
+							<button class="icon-button danger-icon" data-action="remove-member" data-uid="${uid}" title="Remover ${escapeHtml(memberName)}"><i class="material-icons">person_remove</i></button>
+						`
+								: `<span class="team-role-label">${isMemberOwner ? "DONO" : roleLabels[role] || "LEITOR"}</span>`
+						}
+					</div>
+				</div>
+			`;
+		})
+		.join("");
+}
+
+async function loadTeamMemberProfiles(teamId) {
+	try {
+		const getProfiles = httpsCallable(
+			ensureFunctionsBackend(),
+			"getTeamMemberProfiles",
+		);
+		const response = await getProfiles({ teamId });
+		if (currentlyManagingTeamId !== teamId) return;
+		currentTeamMemberProfiles = new Map(
+			(response.data?.members || [])
+				.filter((profile) => profile?.uid)
+				.map((profile) => [profile.uid, profile]),
+		);
+		renderTeamMembersList();
+	} catch (error) {
+		console.warn("Não foi possível carregar os perfis da equipe.", error);
+	}
+}
 
 function openTeamManageModal() {
 	if (!currentUser || !elements.teamManageDialog) return;
@@ -6648,7 +6755,7 @@ function openTeamDetailsModal(teamId) {
 	}
 
 	const isOwner = team.ownerUid === currentUser.uid;
-	const myRole = team.members[currentUser.uid]?.role || "viewer";
+	const myRole = team.members?.[currentUser.uid]?.role || "viewer";
 	const isAdmin = isOwner || myRole === "admin";
 	const members = team.members || {};
 	const memberCount = Object.keys(members).length;
@@ -6668,51 +6775,14 @@ function openTeamDetailsModal(teamId) {
 		elements.teamMemberCapacity.textContent = `${memberCount} / ${maxMembers}`;
 	}
 
-	// Members list
-	if (elements.teamMembersList) {
-		if (elements.teamMemberCount) elements.teamMemberCount.textContent = memberCount;
-
-		elements.teamMembersList.innerHTML = Object.entries(members)
-			.map(([uid, memberData]) => {
-				const isMe = uid === currentUser.uid;
-				const isMemberOwner = uid === team.ownerUid;
-				const role = memberData.role || "viewer";
-				const memberName = memberData.displayName || (isMe ? "Você" : "Membro da equipe");
-				const memberIdentifier = isMe ? "Sua conta" : `ID ${uid.slice(0, 8)}…`;
-				const initials = isMe ? "VC" : uid.slice(0, 2).toUpperCase();
-				return `
-				<div class="team-member-item">
-					<div class="team-member-info">
-						<span class="team-member-avatar" aria-hidden="true">${initials}</span>
-						<span class="team-member-copy">
-							<strong class="team-member-name">${escapeHtml(memberName)}</strong>
-							<span class="team-member-id">${escapeHtml(memberIdentifier)}</span>
-						</span>
-					</div>
-					<div class="team-member-controls">
-						${
-							isAdmin && !isMemberOwner && !isMe
-								? `
-			<select class="team-member-role-select" aria-label="Papel de ${escapeHtml(memberName)}" data-action="change-role" data-uid="${uid}">
-								<option value="admin" ${role === "admin" ? "selected" : ""}>Admin</option>
-								<option value="editor" ${role === "editor" ? "selected" : ""}>Editor</option>
-								<option value="viewer" ${role === "viewer" ? "selected" : ""}>Leitor</option>
-							</select>
-							<button class="icon-button danger-icon" data-action="remove-member" data-uid="${uid}" title="Remover ${escapeHtml(memberName)}"><i class="material-icons">person_remove</i></button>
-						`
-								: `<span class="team-role-label">${isMemberOwner ? "DONO" : roleLabels[role] || "LEITOR"}</span>`
-						}
-					</div>
-				</div>
-			`;
-			})
-			.join("");
-	}
+	currentTeamMemberProfiles = new Map();
+	renderTeamMembersList();
 
 	if (elements.leaveTeamButton) elements.leaveTeamButton.hidden = isOwner;
-	if (elements.deleteTeamButton) elements.deleteTeamButton.hidden = !isOwner;
+	if (elements.deleteTeamButton) elements.deleteTeamButton.hidden = !isAdmin;
 
 	elements.teamDetailsDialog.showModal();
+	void loadTeamMemberProfiles(teamId);
 }
 
 function renderTeamsModalContent() {
@@ -7083,18 +7153,17 @@ if (elements.deleteTeamButton) {
 
 		try {
 			const teamId = currentlyManagingTeamId;
-			const counterItems = await getDocs(teamCountersCollectionReference(teamId));
-			const deleteBatch = writeBatch(db);
-			counterItems.forEach((counterDoc) => deleteBatch.delete(counterDoc.ref));
-			deleteBatch.delete(doc(db, "teams", teamId, "data", "settings"));
-			deleteBatch.delete(doc(db, "teams", teamId, "data", "counters"));
-			deleteBatch.delete(doc(db, "teams", teamId));
-			await deleteBatch.commit();
+			const deleteTeamCall = httpsCallable(
+				ensureFunctionsBackend(),
+				"deleteTeam",
+			);
+			await deleteTeamCall({ teamId });
+			const wasActive = activeWorkspace.type === "team" && activeWorkspace.id === teamId;
+			userTeams = userTeams.filter((item) => item.id !== teamId);
+			currentlyManagingTeamId = null;
 			showToast(`Equipe "${team.name}" excluída.`);
 			if (elements.teamDetailsDialog) elements.teamDetailsDialog.close();
-			if (activeWorkspace.type === "team" && activeWorkspace.id === currentlyManagingTeamId) {
-				switchWorkspace("personal");
-			}
+			if (wasActive) await switchWorkspace("personal");
 			renderTeamsModalContent();
 		} catch (e) {
 			console.error("Falha ao excluir equipe.", e);
@@ -7190,7 +7259,7 @@ async function handleNlpPrompt() {
 		elements.nlpParseButton.innerHTML = `<i class="material-icons">hourglass_empty</i>`;
 
 		try {
-			const generateAiChecklist = httpsCallable(functions, "generateAiChecklist");
+			const generateAiChecklist = httpsCallable(ensureFunctionsBackend(), "generateAiChecklist");
 			const { data } = await generateAiChecklist({ prompt: promptText });
 
 			if (data) {
@@ -7220,7 +7289,9 @@ async function handleNlpPrompt() {
 					}
 
 					data.checklist.forEach(itemText => {
-						currentChecklist.push({ id: createCounterId(), text: itemText, done: false });
+						if (currentChecklist.length < 3) {
+							currentChecklist.push({ id: createCounterId(), text: itemText, done: false });
+						}
 					});
 					if (typeof renderChecklistInputs === "function") {
 						renderChecklistInputs();
@@ -7255,4 +7326,54 @@ if (elements.nlpPromptInput) {
 			handleNlpPrompt();
 		}
 	});
+}
+
+// Handler for the inline checklist AI button
+async function generateChecklistFromForm() {
+	if (!elements.generateAiChecklistButton) return;
+
+	const title = elements.counterForm.elements.name.value.trim();
+	const promptText = title ? `Crie 3 subtarefas focadas e objetivas para: ${title}` : "Crie 3 subtarefas genéricas";
+
+	if (currentUser) {
+		elements.generateAiChecklistButton.disabled = true;
+		const originalHtml = elements.generateAiChecklistButton.innerHTML;
+		elements.generateAiChecklistButton.innerHTML = `<i class="material-icons">hourglass_empty</i> Gerando...`;
+
+		try {
+			const generateAiChecklist = httpsCallable(ensureFunctionsBackend(), "generateAiChecklist");
+			const { data } = await generateAiChecklist({ prompt: promptText });
+
+			if (data && data.checklist && data.checklist.length > 0) {
+				data.checklist.forEach(itemText => {
+					if (currentChecklist.length < 3) {
+						currentChecklist.push({ id: createCounterId(), text: itemText, done: false });
+					}
+				});
+				if (typeof renderChecklistInputs === "function") {
+					renderChecklistInputs();
+				}
+				updateCounterPreview();
+				showToast("Checklist gerada com sucesso!");
+			} else {
+				showToast("Não foi possível gerar a checklist.");
+			}
+		} catch (error) {
+			console.error("Erro ao gerar checklist via IA:", error);
+			if (error.code === "functions/resource-exhausted") {
+				showToast("Cota de uso da IA esgotada.", true);
+			} else {
+				showToast("Falha ao gerar checklist. Tente novamente mais tarde.");
+			}
+		} finally {
+			elements.generateAiChecklistButton.disabled = false;
+			elements.generateAiChecklistButton.innerHTML = originalHtml;
+		}
+	} else if (!currentUser) {
+		showToast("Faça login para utilizar a geração de checklists com IA.");
+	}
+}
+
+if (elements.generateAiChecklistButton) {
+	elements.generateAiChecklistButton.addEventListener("click", generateChecklistFromForm);
 }

@@ -120,6 +120,13 @@ Admins geram links de convite com validade de sete dias. O convidado autenticado
 vê o nome da equipe antes de aceitar; a entrada é concluída no backend somente se o
 convite ainda estiver válido e houver vaga no limite do plano do proprietário.
 
+O modal de gerenciamento exibe nome, email e foto de perfil dos membros quando
+disponíveis; essas informações são carregadas por uma callable autenticada e não
+abrem os documentos privados de outros usuários no cliente. O dono e os
+administradores podem alterar papéis, remover membros e excluir permanentemente a
+equipe. A exclusão passa pelo backend e remove também os dados e subcoleções da
+equipe; editores e viewers não recebem essa ação.
+
 ## Aparência
 
 O fundo animado começa desligado. Quando ativado, o usuário escolhe:
