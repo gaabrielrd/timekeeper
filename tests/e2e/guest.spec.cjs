@@ -31,13 +31,6 @@ test("modo de foco restaura o contador e fecha por Escape sem overflow", async (
 ) => {
 	await page.emulateMedia({ reducedMotion: "reduce" });
 	await expect(page.locator("#account-label")).toHaveText("Entrar com Google");
-	await page.evaluate(() => {
-		document.body.dataset.backgroundEnabled = "true";
-	});
-	await expect(page.locator("body")).toHaveAttribute(
-		"data-background-enabled",
-		"true",
-	);
 	const focusTrigger = page.getByRole("button", {
 		name: "Focar contador Expediente",
 	});
@@ -65,6 +58,13 @@ test("modo de foco restaura o contador e fecha por Escape sem overflow", async (
 		"false",
 	);
 	await expect(page.locator("#focus-mode-sound-status")).toContainText("Pausado");
+	await page.evaluate(() => {
+		document.body.dataset.backgroundEnabled = "true";
+	});
+	await expect(page.locator("body")).toHaveAttribute(
+		"data-background-enabled",
+		"true",
+	);
 	await expect
 		.poll(() =>
 			page

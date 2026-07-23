@@ -214,6 +214,11 @@ test("usuário arquiva manualmente apenas contador fixo e exclui a conquista", a
 			name: "Arquivar contador Rotina recorrente",
 		}),
 	).toHaveCount(0);
+	await page.locator("#sidebar-close").click();
+	await expect(page.locator("#account-sidebar")).toHaveAttribute(
+		"aria-hidden",
+		"true",
+	);
 
 	const completedCard = page
 		.locator("#custom-panels .user-panel")
