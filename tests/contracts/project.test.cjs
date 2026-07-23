@@ -53,7 +53,7 @@ test("configuração geral mantém seed, modal administrativo e regras alinhados
 test("todos os backgrounds da interface possuem descrição no cliente", () => {
 	const html = read("public/index.html");
 	const client = read("public/src/firebase.js");
-	const select = html.match(/<select id="background-style"[\s\S]*?<\/select>/);
+	const select = html.match(/<select(?=[^>]*id="background-style")[^>]*>[\s\S]*?<\/select>/);
 	assert.ok(select, "select de backgrounds não encontrado");
 	const options = [...select[0].matchAll(/<option value="([^"]+)"/g)].map(
 		(match) => match[1],
@@ -305,7 +305,7 @@ test("notificações locais exigem gesto explícito e usam deduplicação", () =
 	const serviceWorker = read("public/sw.js");
 	const rules = read("firestore.rules");
 	assert.match(html, /id="notifications-enabled"/);
-	assert.match(html, /A permissão só será solicitada ao ativar/);
+	assert.match(html, /A permissão só será solicitada ao\s*ativar/);
 	assert.match(client, /notificationsEnabled\.addEventListener\("change"/);
 	assert.match(client, /Notification\.requestPermission\(\)/);
 	assert.doesNotMatch(client, /onAuthStateChanged[\s\S]{0,300}requestPermission/);
