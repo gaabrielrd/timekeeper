@@ -145,7 +145,14 @@ service cloud.firestore {
             'grid',
             'singularity',
             'prism',
-            'vortex'
+            'vortex',
+            'hyperdrive',
+            'voronoi',
+            'flow',
+            'pulsar',
+            'matrix',
+            'harmonic',
+            'solar'
           ])
         && (!('backgroundColorA' in data) || isHexColor(data.backgroundColorA))
         && (!('backgroundColorB' in data) || isHexColor(data.backgroundColorB))

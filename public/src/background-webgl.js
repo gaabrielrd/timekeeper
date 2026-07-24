@@ -4,6 +4,13 @@ const STYLE_MODES = Object.freeze({
 	singularity: 2,
 	prism: 3,
 	vortex: 4,
+	hyperdrive: 5,
+	voronoi: 6,
+	flow: 7,
+	pulsar: 8,
+	matrix: 9,
+	harmonic: 10,
+	solar: 11,
 });
 
 export const WEBGL_BACKGROUND_STYLES = Object.freeze(Object.keys(STYLE_MODES));
@@ -135,6 +142,123 @@ const FRAGMENT_SHADER = `
 		return color * (0.58 + u_intensity * 0.54);
 	}
 
+	vec3 hyperdrive(vec2 uv, float time) {
+		float radius = length(uv);
+		float angle = atan(uv.y, uv.x);
+		float stX = (angle / (2.0 * PI) + 0.5) * 32.0;
+		float colId = floor(stX);
+		float colHash = hash21(vec2(colId, 13.37));
+		float colSpeed = 1.2 + colHash * 1.6;
+		float streakY = (1.0 / max(0.05, radius)) - time * colSpeed + colHash * 20.0;
+		float streakCell = floor(streakY * 0.25);
+		float streakNoise = hash21(vec2(colId, streakCell));
+		float isStreak = step(0.68, streakNoise);
+		float streakProgress = fract(streakY * 0.25);
+		float streakGlow = isStreak * smoothstep(0.0, 0.35, streakProgress) * smoothstep(1.0, 0.5, streakProgress);
+		float centerFade = smoothstep(0.08, 0.45, radius);
+		vec3 color = mix(u_color_a, u_color_b, colHash);
+		color *= streakGlow * centerFade * (0.65 + u_intensity * 0.55);
+		color += mix(u_color_b, u_color_a, 0.5) * exp(-14.0 * radius) * 0.35;
+		return color;
+	}
+
+	vec3 voronoiGlass(vec2 uv, float time) {
+		vec2 p = uv * 2.5;
+		vec2 cell = floor(p);
+		vec2 rel = fract(p);
+
+		float minDist1 = 8.0;
+		float minDist2 = 8.0;
+		vec2 minCell = vec2(0.0);
+
+		for (int y = -1; y <= 1; y++) {
+			for (int x = -1; x <= 1; x++) {
+				vec2 neighbor = vec2(float(x), float(y));
+				vec2 cellId = cell + neighbor;
+				float h1 = hash21(cellId);
+				float h2 = hash21(cellId + vec2(41.2, 17.8));
+				vec2 anim = 0.35 * vec2(sin(time * 0.4 + h1 * 6.28), cos(time * 0.4 + h2 * 6.28));
+				vec2 point = neighbor + vec2(0.5) + anim;
+				float dist = length(rel - point);
+
+				if (dist < minDist1) {
+					minDist2 = minDist1;
+					minDist1 = dist;
+					minCell = cellId;
+				} else if (dist < minDist2) {
+					minDist2 = dist;
+				}
+			}
+		}
+
+		float edge = smoothstep(0.015, 0.08, minDist2 - minDist1);
+		float glassFacet = 1.0 - edge;
+		float cellHash = hash21(minCell);
+		vec3 color = mix(u_color_a * 0.25, u_color_b * 0.75, cellHash);
+		color += mix(u_color_a, u_color_b, 0.5) * glassFacet * 0.42;
+		color += vec3(exp(-10.0 * minDist1)) * 0.15;
+		return color * (0.5 + u_intensity * 0.5);
+	}
+
+	vec3 flowField(vec2 uv, float time) {
+		vec2 p = uv * 1.8;
+		float n1 = fbm(p + vec2(time * 0.05, -time * 0.04));
+		float n2 = fbm(p * 1.4 - vec2(time * 0.04, time * 0.06));
+		vec2 flowVec = vec2(cos(n1 * 6.28), sin(n2 * 6.28));
+		float stream = sin(dot(uv, flowVec) * 6.0 + time * 0.5);
+		float ribbon = pow(0.5 + 0.5 * stream, 3.0);
+		vec3 color = mix(u_color_a * 0.15, u_color_b * 0.85, n1);
+		color += mix(u_color_b, u_color_a, n2) * ribbon * 0.55;
+		return color * (0.48 + u_intensity * 0.55);
+	}
+
+	vec3 pulsarStar(vec2 uv, float time) {
+		float radius = length(uv);
+		float angle = atan(uv.y, uv.x);
+		float shockwave = sin(radius * 20.0 - time * 2.2);
+		float ring = exp(-14.0 * abs(shockwave)) / max(0.1, radius + 0.15);
+		float rays = pow(abs(sin(angle * 8.0 + time * 0.3)), 12.0);
+		float core = exp(-6.0 * radius);
+		vec3 color = mix(u_color_a, u_color_b, 0.5 + 0.5 * sin(radius * 10.0 - time * 0.8));
+		color *= (ring * 0.4 + rays * 0.2) * (0.6 + u_intensity * 0.5);
+		color += mix(u_color_b, u_color_a, 0.3) * core * 0.6;
+		return color;
+	}
+
+	vec3 quantumRain(vec2 uv, float time) {
+		float colX = (uv.x + 1.5) * 20.0;
+		float colId = floor(colX);
+		float colHash = hash21(vec2(colId, 3.1415));
+		float colSpeed = colHash * 1.2 + 0.4;
+		float fall = fract(uv.y * 0.4 - time * colSpeed * 0.3 + colHash * 7.0);
+		float dropHead = smoothstep(0.9, 0.98, fall);
+		float dropTrail = smoothstep(0.1, 0.88, fall) * (1.0 - dropHead);
+		float gridLine = smoothstep(0.0, 0.08, fract(colX)) * smoothstep(1.0, 0.92, fract(colX));
+		vec3 color = mix(u_color_a, u_color_b, colHash);
+		color *= (dropHead * 0.9 + dropTrail * 0.35) * gridLine * (0.5 + u_intensity * 0.55);
+		return color;
+	}
+
+	vec3 harmonicWaves(vec2 uv, float time) {
+		float wave1 = sin(uv.x * 6.5 + sin(uv.y * 3.5 + time * 0.5) * 2.2);
+		float wave2 = sin(uv.y * 7.5 + cos(uv.x * 4.5 - time * 0.45) * 2.2);
+		float moire = pow(abs(wave1 * wave2), 2.2);
+		float band = smoothstep(0.1, 0.85, moire);
+		vec3 color = mix(u_color_a * 0.2, u_color_b * 0.8, 0.5 + 0.5 * wave1);
+		color += mix(u_color_b, u_color_a, 0.5 + 0.5 * wave2) * band * 0.5;
+		return color * (0.5 + u_intensity * 0.55);
+	}
+
+	vec3 solarAtmosphere(vec2 uv, float time) {
+		float noise1 = fbm(uv * 2.4 + vec2(time * 0.1, time * 0.06));
+		float noise2 = fbm(uv * 4.8 - vec2(time * 0.06, time * 0.1));
+		float plasma = smoothstep(0.2, 0.85, noise1 + noise2 * 0.4);
+		float arc = exp(-12.0 * abs(sin(atan(uv.y, uv.x) * 4.0 + length(uv) * 8.0 - time * 0.6)));
+		vec3 color = mix(u_color_a * 0.15, u_color_b * 0.85, plasma);
+		color += mix(u_color_b, u_color_a, noise2) * arc * 0.45;
+		return color * (0.5 + u_intensity * 0.55);
+	}
+
 	void main() {
 		vec2 resolution = max(u_resolution, vec2(1.0));
 		vec2 uv = (gl_FragCoord.xy * 2.0 - resolution) / min(resolution.x, resolution.y);
@@ -149,8 +273,22 @@ const FRAGMENT_SHADER = `
 			color = singularity(uv, time);
 		} else if (u_mode == 3) {
 			color = prismFlow(uv, time);
-		} else {
+		} else if (u_mode == 4) {
 			color = chronologicalVortex(uv, time);
+		} else if (u_mode == 5) {
+			color = hyperdrive(uv, time);
+		} else if (u_mode == 6) {
+			color = voronoiGlass(uv, time);
+		} else if (u_mode == 7) {
+			color = flowField(uv, time);
+		} else if (u_mode == 8) {
+			color = pulsarStar(uv, time);
+		} else if (u_mode == 9) {
+			color = quantumRain(uv, time);
+		} else if (u_mode == 10) {
+			color = harmonicWaves(uv, time);
+		} else {
+			color = solarAtmosphere(uv, time);
 		}
 
 		float vignette =

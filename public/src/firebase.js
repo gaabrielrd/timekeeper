@@ -1562,6 +1562,13 @@ const BACKGROUND_DESCRIPTIONS = {
 	singularity: "Um horizonte orbital curva poeira luminosa ao redor de um núcleo escuro.",
 	prism: "Ondas translúcidas se cruzam em faixas e reflexos prismáticos.",
 	vortex: "Anéis e marcas radiais espiralam como um mecanismo cronológico.",
+	hyperdrive: "Feixes radiais aceleram em direção às bordas simulando viagem temporal.",
+	voronoi: "Células orgânicas refratam luz com facetas prismáticas de cristal.",
+	flow: "Correntes estelares e filamentos de luz fluem em curvas contínuas.",
+	pulsar: "Um núcleo denso emite ondas de choque e anéis concêntricos de energia.",
+	matrix: "Colunas verticais de luz e dados deslizam em ritmos assimétricos.",
+	harmonic: "Ondulações senoidais se cruzam criando interferências geométricas.",
+	solar: "Plasma estelar e arcos magnéticos fluem em turbulência contínua.",
 };
 
 function boundedNumber(value, minimum, maximum, fallback) {

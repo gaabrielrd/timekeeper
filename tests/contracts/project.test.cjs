@@ -87,6 +87,13 @@ test("todos os backgrounds da interface possuem descrição no cliente", () => {
 		"singularity",
 		"prism",
 		"vortex",
+		"hyperdrive",
+		"voronoi",
+		"flow",
+		"pulsar",
+		"matrix",
+		"harmonic",
+		"solar",
 	]);
 	assert.deepEqual(
 		[...select[0].matchAll(/<optgroup label="([^"]+)"/g)].map(
@@ -98,7 +105,20 @@ test("todos os backgrounds da interface possuem descrição no cliente", () => {
 		assert.match(client, new RegExp(`\\b${option}:\\s*"`));
 	}
 	const webgl = read("public/src/background-webgl.js");
-	for (const option of ["nebula", "grid", "singularity", "prism", "vortex"]) {
+	for (const option of [
+		"nebula",
+		"grid",
+		"singularity",
+		"prism",
+		"vortex",
+		"hyperdrive",
+		"voronoi",
+		"flow",
+		"pulsar",
+		"matrix",
+		"harmonic",
+		"solar",
+	]) {
 		assert.match(webgl, new RegExp(`\\b${option}:\\s*\\d`));
 	}
 	assert.match(html, /id="webgl-background-canvas"/);

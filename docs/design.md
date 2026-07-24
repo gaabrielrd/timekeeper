@@ -181,12 +181,19 @@ O default é desligado. Todos são configuráveis por cores, velocidade e intens
 | Singularidade orbital | WebGL | Disco de acreção, lente e núcleo escuro |
 | Fluxo prismático | WebGL | Faixas ondulantes e interferência luminosa |
 | Vórtice cronológico | WebGL | Espiral, anéis e marcações radiais |
+| Túnel temporal | WebGL | Feixes radiais acelerando em direção às bordas |
+| Vidro Voronoi | WebGL | Células orgânicas refratando luz em facetas de cristal |
+| Campo de fluxo | WebGL | Correntes estelares e filamentos de luz contínuos |
+| Pulsar estelar | WebGL | Núcleo denso emitindo ondas de choque e anéis |
+| Chuva quântica | WebGL | Colunas verticais de luz e dados em ritmos assimétricos |
+| Ondas Moiré | WebGL | Ondulações senoidais criando interferências geométricas |
+| Atmosfera solar | WebGL | Plasma estelar e arcos magnéticos turbulentos |
 
 Na constelação, a Cor A define estrelas/halos e a Cor B define conexões. A densidade
 depende de área e intensidade. O `devicePixelRatio` é limitado a 1.5 para reduzir
 custo, e o loop pausa quando o efeito não está ativo ou a página não está visível.
 
-Os cinco estilos WebGL compartilham `background-webgl.js`, um único vertex shader e
+Os doze estilos WebGL compartilham `background-webgl.js`, um único vertex shader e
 um fragment shader com modos procedurais distintos. O canvas usa `devicePixelRatio`
 limitado a 1.35, solicita o perfil de baixo consumo e não usa antialiasing. O loop
 pausa quando o fundo é desligado, outro estilo é selecionado, a aba fica oculta ou

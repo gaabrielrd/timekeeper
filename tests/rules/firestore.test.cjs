@@ -325,6 +325,7 @@ test("aceita settings válidas e rejeita range ou campo desconhecido", async () 
 		}),
 	);
 	await assertFails(setDoc(reference, { backgroundStyle: "webgl-invalido" }));
+	await assertSucceeds(setDoc(reference, { backgroundStyle: "hyperdrive" }));
 	await assertFails(setDoc(reference, { backgroundIntensity: 101 }));
 	await assertFails(setDoc(reference, { activeWorkspace: "workspace-invalido" }));
 	await assertFails(setDoc(reference, { dashboardLayout: "unknown" }));
