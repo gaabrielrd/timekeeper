@@ -496,6 +496,22 @@ test("aceita contadores fixo e recorrente válidos", async () => {
 	);
 });
 
+test("aceita publicação explícita e rejeita isPublic fora do schema", async () => {
+	const reference = personalCounterReference(googleDb(), 0);
+	await assertSucceeds(
+		setDoc(
+			reference,
+			storedCounter({ ...fixedCounter(), isPublic: true }),
+		),
+	);
+	await assertFails(
+		setDoc(
+			reference,
+			storedCounter({ ...fixedCounter(), isPublic: "true" }),
+		),
+	);
+});
+
 test("aceita dois contadores recorrentes com imagens e opacidades", async () => {
 	const imageIds = [
 		"11111111-1111-4111-8111-111111111111",

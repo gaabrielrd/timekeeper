@@ -3,8 +3,8 @@
 ## Estado atual
 
 O projeto usa Node Test Runner, Playwright e Firebase Emulator Suite. A suíte atual
-contém 73 testes unitários/contratuais do cliente, 12 testes do domínio das Functions,
-44 E2E em Chromium (22 cenários em desktop e mobile) e 25 testes de
+contém 74 testes unitários/contratuais do cliente, 18 testes do domínio das Functions,
+50 E2E em Chromium (25 cenários em desktop e mobile) e 27 testes de
 Firestore/Storage Rules. GitHub Actions executa todos em pull requests, pushes na
 branch `master` e disparos manuais.
 
@@ -70,6 +70,8 @@ inicialização simultânea dos contextos autenticados.
   Functions.
 - marcação, armazenamento de sessão, saída por teclado e cache offline do Modo de
   Foco.
+- geração/cópia do link público, persistência de `isPublic`, assets em rota profunda
+  e abertura do contador retornado pela callable no Modo de Foco.
 - ação manual, transação, limite e marcação do arquivo de Conquistas.
 - camada climática isolada, pausa por visibilidade e bloqueio por reduced motion.
 
@@ -90,6 +92,7 @@ inicialização simultânea dos contextos autenticados.
   bloqueio de autoelevação e proteção do documento de expediente.
 - layouts, Forecast7 e preferências aninhadas de notificação aceitos somente nos
   formatos e limites conhecidos.
+- `isPublic: true` aceito em contador válido e tipos diferentes de boolean negados.
 - dispositivos, fila e métricas push negados inclusive ao proprietário.
 
 ### Storage Rules
@@ -216,6 +219,10 @@ Viewports sugeridos: 320, 390, 768, 1024 e 1440 px.
 - O sexto contador é impedido na UI e pelas rules.
 - O botão do header só aparece com ao menos um contador.
 - Ocultar/mostrar abre a seção com animação de acordeão.
+- Marcar “Publicar na web” gera um ID definitivo antes do save; os dois botões de
+  cópia funcionam e a edição/reload preservam a marcação.
+- O link profundo carrega CSS/scripts pela raiz, mostra apenas o contador público e
+  o iframe oculta saída e dica de teclado.
 
 ### Modo de Foco
 

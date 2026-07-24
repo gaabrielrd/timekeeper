@@ -23,6 +23,20 @@ const server = http.createServer((request, response) => {
 	}
 	fs.readFile(filePath, (error, content) => {
 		if (error) {
+			if (pathname.startsWith("/p/")) {
+				fs.readFile(path.join(publicDirectory, "index.html"), (fallbackError, fallback) => {
+					if (fallbackError) {
+						response.writeHead(500).end("Internal Server Error");
+						return;
+					}
+					response.writeHead(200, {
+						"Cache-Control": "no-cache, max-age=0, must-revalidate",
+						"Content-Type": contentTypes[".html"],
+					});
+					response.end(fallback);
+				});
+				return;
+			}
 			response.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
 			response.end("Not found");
 			return;

@@ -175,9 +175,16 @@ expressões das Firestore Rules.
 | `overlayOpacity` | number | 0–100; cliente persiste inteiro, rules aceitam number |
 | `group` | string ou `null` | nome de grupo cadastrado pelo usuário (até 30 chars) |
 | `hidden` | boolean opcional | `true` para ocultar o contador da dashboard principal |
+| `isPublic` | boolean opcional | somente `true` publica; ausência ou `false` mantém privado |
 | `checklist` | object[] ou `null` | Array de até 3 subtarefas: `id` (string), `text` (string), `done` (boolean) |
 | `order` | integer | posição visual entre 0 e 14 |
 | `updatedAt` | timestamp | `serverTimestamp()` da última escrita |
+
+`getPublicCounterData` é a única leitura anônima desses contadores. Ela usa Admin
+SDK para consultar o `id` lógico na subcoleção do workspace, valida
+`isPublic == true` e retorna somente o contador e os campos visuais permitidos de
+settings. As Firestore Rules continuam negando leitura direta anônima da
+subcoleção.
 
 ### Período fixo
 
@@ -289,7 +296,8 @@ uma alteração concorrente do histórico.
 - Settings aceitam somente chaves conhecidas, tipos e ranges válidos.
 - Cada `counters/{slot}` contém exatamente um contador; o path limita a cinco slots
   Free ou quinze Premium.
-- Cada contador valida ID, nome, cor, imagem, opacidades, o schema fixo/recorrente e opcionalmente até 3 subtarefas no checklist.
+- Cada contador valida ID, nome, cor, imagem, opacidades, `isPublic` booleano, o
+  schema fixo/recorrente e opcionalmente até 3 subtarefas no checklist.
 - `archive.items` precisa ser lista e ter até 100 contadores arquivados com o campo `archivedAt` válido.
 - Images aceitam até dez metadados válidos; Storage limita dono, tipo, slot e bytes.
 - Horários recorrentes e dias da semana são validados por formato/range; períodos

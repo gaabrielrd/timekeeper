@@ -101,6 +101,11 @@ Ambos podem ter uma cor própria. Sem cor, usam o destaque principal da interfac
 - A imagem pode ser removida no editor ou diretamente pelo botão do card.
 - A biblioteca aceita até dez arquivos de 5 MiB; excluir um remove seu uso em todos
   os contadores sem excluir os próprios contadores.
+- “Publicar na web” gera um link direto e um iframe com o mesmo ID estável que será
+  salvo. O plano Free permite um contador público por workspace e o Premium, cinco.
+- Abrir `/p/u/{uid}/c/{counterId}` ou `/p/t/{teamId}/c/{counterId}` não exige login
+  e mostra somente contadores marcados explicitamente como públicos no Modo de Foco.
+  Desmarcar a publicação revoga o acesso pelo link após a sincronização.
 
 ## Espaços pessoais e de equipe
 

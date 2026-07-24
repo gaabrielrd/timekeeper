@@ -10,43 +10,53 @@ const { HttpsError } = require("firebase-functions/v2/https");
  * @param {string} data.counterId ID do contador
  */
 async function getPublicCounterData(data) {
-	if (!data.counterId || typeof data.counterId !== "string") {
+	const payload = data && typeof data === "object" ? data : {};
+	if (
+		typeof payload.counterId !== "string" ||
+		payload.counterId.length < 1 ||
+		payload.counterId.length > 100 ||
+		payload.counterId.includes("/")
+	) {
 		throw new HttpsError("invalid-argument", "ID do contador é obrigatório.");
 	}
-	if (!data.uid && !data.teamId) {
+	const workspaceIds = [payload.uid, payload.teamId].filter(
+		(value) => typeof value === "string" && value.length > 0,
+	);
+	if (workspaceIds.length !== 1) {
 		throw new HttpsError("invalid-argument", "UID ou ID da equipe é obrigatório.");
+	}
+	const workspaceId = workspaceIds[0];
+	if (workspaceId.length > 128 || workspaceId.includes("/")) {
+		throw new HttpsError("invalid-argument", "Workspace inválido.");
 	}
 
 	const db = getFirestore();
-	let countersRef;
+	let countersQuery;
 	let settingsRef;
 
-	if (data.teamId) {
-		countersRef = db.doc(`teams/${data.teamId}/data/counters`);
-		settingsRef = db.doc(`teams/${data.teamId}/data/settings`);
+	if (payload.teamId) {
+		countersQuery = db
+			.collection(`teams/${workspaceId}/counters`)
+			.where("id", "==", payload.counterId)
+			.limit(1);
+		settingsRef = db.doc(`teams/${workspaceId}/data/settings`);
 	} else {
-		countersRef = db.doc(`users/${data.uid}/data/counters`);
-		settingsRef = db.doc(`users/${data.uid}/data/settings`);
+		countersQuery = db
+			.collection(`users/${workspaceId}/counters`)
+			.where("id", "==", payload.counterId)
+			.limit(1);
+		settingsRef = db.doc(`users/${workspaceId}/data/settings`);
 	}
 
 	const [countersSnap, settingsSnap] = await Promise.all([
-		countersRef.get(),
-		settingsRef.get()
+		countersQuery.get(),
+		settingsRef.get(),
 	]);
 
-	if (!countersSnap.exists) {
-		throw new HttpsError("not-found", "Contadores não encontrados.");
-	}
-
-	const countersData = countersSnap.data();
-	if (!countersData.items || !Array.isArray(countersData.items)) {
-		throw new HttpsError("not-found", "Formato de contadores inválido.");
-	}
-
-	const counter = countersData.items.find(c => c.id === data.counterId);
-	if (!counter) {
+	if (countersSnap.empty) {
 		throw new HttpsError("not-found", "Contador não encontrado.");
 	}
+	const counter = countersSnap.docs[0].data();
 
 	if (counter.isPublic !== true) {
 		throw new HttpsError("permission-denied", "Este contador não é público.");
@@ -55,16 +65,18 @@ async function getPublicCounterData(data) {
 	let settings = {};
 	if (settingsSnap.exists) {
 		const s = settingsSnap.data();
-		settings = {
-			backgroundEnabled: s.backgroundEnabled,
-			backgroundStyle: s.backgroundStyle,
-			backgroundColorA: s.backgroundColorA,
-			backgroundColorB: s.backgroundColorB,
-			backgroundSpeed: s.backgroundSpeed,
-			backgroundIntensity: s.backgroundIntensity,
-			accentPrimary: s.accentPrimary,
-			accentSecondary: s.accentSecondary
-		};
+		for (const key of [
+			"backgroundEnabled",
+			"backgroundStyle",
+			"backgroundColorA",
+			"backgroundColorB",
+			"backgroundSpeed",
+			"backgroundIntensity",
+			"accentPrimary",
+			"accentSecondary",
+		]) {
+			if (s[key] !== undefined) settings[key] = s[key];
+		}
 	}
 
 	return {

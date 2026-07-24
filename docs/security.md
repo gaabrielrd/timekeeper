@@ -72,6 +72,16 @@ Para `/teams/{teamId}`:
 - `deleteTeam` exige Google OAuth e valida dono ou papel `admin` no documento atual
   antes de remover recursivamente a equipe e suas subcoleções com Admin SDK.
 
+Para links públicos de contadores:
+
+- as Firestore Rules continuam negando leitura anônima direta de
+  `/users/{uid}/counters/*` e `/teams/{teamId}/counters/*`;
+- a callable `getPublicCounterData` é a fronteira pública: valida segmentos de path,
+  consulta o ID lógico na subcoleção atual e só retorna o documento quando
+  `isPublic == true`;
+- settings são reduzidos a uma allowlist de campos visuais; perfis, membros,
+  biblioteca, arquivo e outros contadores não são devolvidos.
+
 Para `/users/{userId}/counter-images/{slot}` no Cloud Storage:
 
 - somente o dono autenticado com Google pode ler, enviar ou excluir;
@@ -79,8 +89,9 @@ Para `/users/{userId}/counter-images/{slot}` no Cloud Storage:
 - cada objeto aceita tipos de imagem conhecidos e no máximo 5 MiB;
 - dez slots tornam impossível exceder 50 MiB por usuário pelas APIs do Storage.
 
-`generalConfig` é a única leitura pública e query de coleção autorizada. Perfis,
-settings pessoais e imagens continuam privados por UID; dados de equipe são
+`generalConfig` é a única leitura pública e query de coleção autorizada diretamente
+pelas Rules. A callable de publicação expõe somente um contador opt-in. Perfis,
+settings completos e imagens continuam privados por UID; dados de equipe são
 compartilhados somente entre os membros do respectivo `teamId`.
 
 ## Lacunas conhecidas
@@ -159,10 +170,12 @@ para permitir limpeza de versões anteriores.
 
 O fallback local mantém IDs expirantes no `localStorage` por UID. Para push, FIDs,
 dispositivos, fila e métricas são inacessíveis pelo cliente e só passam pelo Admin
-SDK. Callables exigem Google Auth e App Check, limitam cinco dispositivos e reduzem
-refreshes repetidos. Jobs usam hash determinístico, não armazenam título/corpo e
-expiram por TTL. Logout revoga o dispositivo; exclusão de conta remove dispositivos
-e jobs antes de apagar o usuário. Logs registram somente totais operacionais.
+SDK. As callables privadas exigem Google Auth e App Check; a exceção pública é
+`getPublicCounterData`, limitada ao contador opt-in. O registro push limita cinco
+dispositivos e reduz refreshes repetidos. Jobs usam hash determinístico, não armazenam
+título/corpo e expiram por TTL. Logout revoga o dispositivo; exclusão de conta remove
+dispositivos e jobs antes de apagar o usuário. Logs registram somente totais
+operacionais.
 
 ## Resposta a incidente
 

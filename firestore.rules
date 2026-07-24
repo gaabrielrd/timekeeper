@@ -326,6 +326,7 @@ service cloud.firestore {
           'overlayOpacity',
           'group',
           'hidden',
+          'isPublic',
           'checklist',
           'order',
           'updatedAt'

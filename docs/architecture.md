@@ -126,6 +126,18 @@ Responsável por:
 - criar os cards pessoais com ações e IDs estáveis consumidos pelo modo de foco;
 - executar canvas da constelação, sincronizar anéis cronológicos e coordenar o
   runtime WebGL.
+- gerar/copiar links públicos, preservar `isPublic` na normalização e abrir a rota
+  profunda diretamente no Modo de Foco depois que a callable retorna o contador.
+
+### Links públicos — cliente, Hosting e Functions
+
+As rotas `/p/u/{uid}/c/{counterId}` e `/p/t/{teamId}/c/{counterId}` recebem
+`index.html` pela rewrite do Hosting. O `<base href="/">` mantém CSS, scripts,
+manifesto e ícones apontando para a raiz mesmo em URLs profundas. O cliente chama
+`getPublicCounterData`; a Function consulta a subcoleção atual
+`users/{uid}/counters` ou `teams/{teamId}/counters` pelo ID lógico e só devolve o
+documento quando `isPublic == true`. O agregado legado `data/counters` não participa
+desse fluxo.
 
 ### Fundos WebGL — `public/src/background-webgl.js`
 
@@ -240,8 +252,9 @@ O expediente é modelado como recorrência de segunda a sexta, iniciando às 08:
 ## Hosting e rotas
 
 O `firebase.json` publica `public/` e reescreve qualquer rota para `index.html`.
-Isso dá comportamento SPA, embora o projeto hoje não tenha roteador nem múltiplas
-telas. `public/404.html` raramente é alcançado por causa da rewrite global.
+Isso dá comportamento SPA e permite os links públicos `/p/...`; o cliente reconhece
+essas rotas sem introduzir um roteador. `public/404.html` raramente é alcançado por
+causa da rewrite global.
 
 ## Decisões e trade-offs
 

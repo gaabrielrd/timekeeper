@@ -87,6 +87,15 @@ Mudança que também altera autorização, contadores ou biblioteca de imagens:
 firebase deploy --only hosting,firestore:rules,storage
 ```
 
+Mudança no fluxo de links públicos:
+
+```bash
+firebase deploy --only firestore:rules,functions,hosting
+```
+
+Os três alvos são coordenados: Rules aceitam `isPublic`, a Function lê a subcoleção
+atual e o Hosting entrega assets corretos nas rotas `/p/...`.
+
 Mudança de índices:
 
 ```bash

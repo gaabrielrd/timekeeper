@@ -26,6 +26,71 @@ test("visitante acompanha contadores e persiste o expediente", async ({ page }) 
 	await expect(page.locator("#guest-config-minutos")).toHaveValue("25");
 });
 
+test("link público profundo carrega assets e abre o contador", async ({ page }) => {
+	await page.route("**/getPublicCounterData", async (route) => {
+		const headers = {
+			"Access-Control-Allow-Headers": "content-type",
+			"Access-Control-Allow-Methods": "POST, OPTIONS",
+			"Access-Control-Allow-Origin": "*",
+		};
+		if (route.request().method() === "OPTIONS") {
+			await route.fulfill({ status: 204, headers });
+			return;
+		}
+		await route.fulfill({
+			status: 200,
+			headers: { ...headers, "Content-Type": "application/json" },
+			body: JSON.stringify({
+				data: {
+					counter: {
+						id: "public-counter",
+						name: "Contador público",
+						type: "fixed",
+						startAtMs: Date.now() - 60_000,
+						endAtMs: Date.now() + 3_600_000,
+						color: "#22c55e",
+						createdAt: "2026-07-23T12:00:00.000Z",
+						isPublic: true,
+					},
+					settings: {
+						accentPrimary: "#22c55e",
+						accentSecondary: "#14532d",
+					},
+				},
+			}),
+		});
+	});
+
+	await page.goto("/p/u/public-user/c/public-counter?emulators=1");
+	await expect(page.locator("body")).toHaveClass(/focus-mode-active/);
+	await expect(page.locator("#focus-mode-title")).toHaveText("Contador público");
+	await expect(page.locator("#focus-mode-main")).not.toHaveText("carregando...");
+	await expect(page.locator("#focus-mode-close")).toBeVisible();
+	await expect
+		.poll(() =>
+			page.evaluate(() =>
+				Array.from(document.styleSheets).some((sheet) =>
+					sheet.href?.endsWith("/src/style.css"),
+				),
+			),
+		)
+		.toBe(true);
+	await expect
+		.poll(() =>
+			page.evaluate(() => sessionStorage.getItem("timekeeper:focus-counter")),
+		)
+		.toBeNull();
+
+	await page.goto(
+		"/p/t/public-team/c/public-counter?emulators=1&embed=true",
+	);
+	await expect(page.locator("body")).toHaveClass(/focus-mode-active/);
+	await expect(page.locator("#focus-mode-close")).toBeHidden();
+	await expect(page.locator(".focus-mode-hint")).toBeHidden();
+	await page.keyboard.press("Escape");
+	await expect(page.locator("body")).toHaveClass(/focus-mode-active/);
+});
+
 test("modo de foco restaura o contador e fecha por Escape sem overflow", async (
 	{ page },
 ) => {

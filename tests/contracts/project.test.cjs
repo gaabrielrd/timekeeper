@@ -608,3 +608,26 @@ test("criação via linguagem natural e IA inclui parser client-side e function 
 	assert.match(client, /httpsCallable\(ensureFunctionsBackend\(\), "generateAiChecklist"\)/);
 	assert.match(client, /window\.NlpParser\.parseNaturalLanguagePrompt/);
 });
+
+test("publicação de contador preserva schema, assets e subcoleções atuais", () => {
+	const html = read("public/index.html");
+	const client = read("public/src/firebase.js");
+	const styles = read("public/src/style.css");
+	const rules = read("firestore.rules");
+	const publicLinks = read("functions/src/public-links.js");
+	const testServer = read("scripts/serve-public.cjs");
+
+	assert.match(html, /<base href="\/" \/>/);
+	assert.match(html, /data-copy-target="counter-public-link-url"/);
+	assert.match(html, /data-copy-target="counter-public-iframe-code"/);
+	assert.match(client, /normalized\.isPublic = true/);
+	assert.match(client, /copyTextToClipboard/);
+	assert.match(client, /applyCounters\(\[counter\]\)/);
+	assert.doesNotMatch(client, /getElementById\("focus-close"\)/);
+	assert.match(styles, /\.embed-mode \.focus-mode-close/);
+	assert.match(rules, /'isPublic'/);
+	assert.match(publicLinks, /\.collection\(`users\/\$\{workspaceId\}\/counters`\)/);
+	assert.match(publicLinks, /\.collection\(`teams\/\$\{workspaceId\}\/counters`\)/);
+	assert.doesNotMatch(publicLinks, /data\/counters/);
+	assert.match(testServer, /pathname\.startsWith\("\/p\/"\)/);
+});

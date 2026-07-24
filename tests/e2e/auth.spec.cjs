@@ -439,6 +439,56 @@ test("contador pessoal abre e restaura o modo de foco", async ({ page }, testInf
 	await expect(page.locator("body")).not.toHaveClass(/focus-mode-active/);
 });
 
+test("publicação copia o link e persiste após salvar e recarregar", async (
+	{ page },
+	testInfo,
+) => {
+	await page.addInitScript(() => {
+		Object.defineProperty(navigator, "clipboard", {
+			configurable: true,
+			value: {
+				writeText: async (value) => {
+					sessionStorage.setItem("e2e:clipboard", String(value));
+				},
+			},
+		});
+	});
+	await loginWithGoogleEmulator(page, testInfo.project.name);
+	await page.locator("#auth-button").click();
+	await page.locator("#open-counter-modal").click();
+	await page.locator('[name="name"]').fill("Contador público E2E");
+	await page.locator("#counter-is-public").check();
+
+	const publicLink = await page.locator("#counter-public-link-url").inputValue();
+	expect(publicLink).toMatch(/\/p\/u\/[^/]+\/c\/[^/]+$/);
+	expect(publicLink).not.toContain("novo-contador");
+	await page
+		.locator('[data-copy-target="counter-public-link-url"]')
+		.click();
+	await expect(page.locator("#app-toast")).toContainText("Link público copiado!");
+	await expect
+		.poll(() => page.evaluate(() => sessionStorage.getItem("e2e:clipboard")))
+		.toBe(publicLink);
+
+	await page.locator("#counter-submit").click();
+	await expect(page.locator("#counter-dialog")).toBeHidden();
+	await page.locator("#counter-list")
+		.getByRole("button", { name: "Editar Contador público E2E" })
+		.click();
+	await expect(page.locator("#counter-is-public")).toBeChecked();
+	await expect(page.locator("#counter-public-link-url")).toHaveValue(publicLink);
+	await page.locator("#counter-dialog-cancel").click();
+
+	await page.reload();
+	await expect(page.locator("#account-label")).toHaveText("Pessoa");
+	await page.locator("#auth-button").click();
+	await page.locator("#counter-list")
+		.getByRole("button", { name: "Editar Contador público E2E" })
+		.click();
+	await expect(page.locator("#counter-is-public")).toBeChecked();
+	await expect(page.locator("#counter-public-link-url")).toHaveValue(publicLink);
+});
+
 test("notificações só pedem permissão após ativação explícita", async (
 	{ page },
 	testInfo,

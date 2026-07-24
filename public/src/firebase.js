@@ -589,6 +589,7 @@ let pendingInvites = [];
 let customProgressBars = [];
 let toastTimer = null;
 let editingCounterId = null;
+let draftCounterId = null;
 let userImages = [];
 let imageUrls = new Map();
 let imageLoadVersion = 0;
@@ -4430,6 +4431,9 @@ function normalizeCounter(counter) {
 	if (counter.hidden === true) {
 		normalized.hidden = true;
 	}
+	if (counter.isPublic === true) {
+		normalized.isPublic = true;
+	}
 	if (type === "recurring") {
 		const startTime = String(counter.startTime || "");
 		const endTime = String(counter.endTime || "");
@@ -5197,6 +5201,7 @@ function renderChecklistInputs() {
 function closeCounterDialog() {
 	if (elements.counterDialog.open) elements.counterDialog.close();
 	editingCounterId = null;
+	draftCounterId = null;
 	elements.counterForm.reset();
 	elements.counterColor.disabled = true;
 	setSelectedCounterImage();
@@ -5406,6 +5411,7 @@ function openCounterDialog(counter = null) {
 		return;
 	}
 	editingCounterId = counter?.id || null;
+	draftCounterId = counter?.id || createCounterId();
 	elements.counterForm.reset();
 	if (elements.nlpPromptInput) elements.nlpPromptInput.value = "";
 	if (elements.nlpChecklistItems) {
@@ -5478,7 +5484,7 @@ function openCounterDialog(counter = null) {
 			elements.counterIsPublic.disabled = false;
 			elements.counterPublicQuotaText.textContent = `(Você pode ter até ${maxPublic})`;
 		}
-		syncPublicLinksPanel(counter?.id);
+		syncPublicLinksPanel(counter?.id || draftCounterId);
 	}
 	currentChecklist = counter?.checklist ? JSON.parse(JSON.stringify(counter.checklist)) : [];
 	renderChecklistInputs();
@@ -5493,7 +5499,7 @@ function syncPublicLinksPanel(counterId) {
 	if (elements.counterIsPublic.checked) {
 		elements.counterPublicLinksPanel.hidden = false;
 		const baseUrl = window.location.origin;
-		const id = counterId || "novo-contador";
+		const id = counterId || draftCounterId;
 		const workspacePrefix = activeWorkspace.type === "team" ? "t" : "u";
 		const workspaceId = activeWorkspace.id || currentUser.uid;
 		const link = `${baseUrl}/p/${workspacePrefix}/${workspaceId}/c/${id}`;
@@ -5504,8 +5510,54 @@ function syncPublicLinksPanel(counterId) {
 		elements.counterPublicLinksPanel.hidden = true;
 	}
 }
+
+async function copyTextToClipboard(value) {
+	const text = String(value || "");
+	if (!text) throw new Error("empty-copy-value");
+	if (navigator.clipboard?.writeText) {
+		try {
+			await navigator.clipboard.writeText(text);
+			return;
+		} catch (error) {
+			console.warn("Clipboard API indisponível; usando fallback.", error);
+		}
+	}
+	const helper = document.createElement("textarea");
+	helper.value = text;
+	helper.readOnly = true;
+	helper.style.position = "fixed";
+	helper.style.inset = "-9999px auto auto -9999px";
+	document.body.append(helper);
+	helper.select();
+	const copied = document.execCommand("copy");
+	helper.remove();
+	if (!copied) throw new Error("clipboard-copy-failed");
+}
+
+elements.counterPublicLinksPanel?.addEventListener("click", async (event) => {
+	const button = event.target.closest("button[data-copy-target]");
+	if (!button) return;
+	const target = document.getElementById(button.dataset.copyTarget || "");
+	const value = target?.value;
+	if (!value) return;
+	button.disabled = true;
+	try {
+		await copyTextToClipboard(value);
+		showToast(
+			button.dataset.copyTarget === "counter-public-iframe-code"
+				? "Código de incorporação copiado!"
+				: "Link público copiado!",
+		);
+	} catch (error) {
+		console.error("Falha ao copiar publicação.", error);
+		showToast("Não foi possível copiar. Selecione o conteúdo manualmente.");
+	} finally {
+		button.disabled = false;
+	}
+});
+
 elements.counterIsPublic?.addEventListener("change", () => {
-	syncPublicLinksPanel(editingCounterId);
+	syncPublicLinksPanel(editingCounterId || draftCounterId);
 });
 
 function renderAiQuota(userData = {}) {
@@ -5782,6 +5834,7 @@ elements.counterDialog.addEventListener("click", (event) => {
 });
 elements.counterDialog.addEventListener("close", () => {
 	editingCounterId = null;
+	draftCounterId = null;
 	elements.counterForm.reset();
 	elements.counterColor.disabled = true;
 	setSelectedCounterImage();
@@ -6118,7 +6171,7 @@ elements.counterForm.addEventListener("submit", async (event) => {
 		? requestedImageId
 		: null;
 	const counter = {
-		id: existingCounter?.id || createCounterId(),
+		id: existingCounter?.id || draftCounterId || createCounterId(),
 		name,
 		...schedule,
 		color: data.get("colorEnabled") ? String(data.get("color")) : null,
@@ -6207,60 +6260,49 @@ if (publicPathMatch) {
 
 async function initPublicMode(workspaceType, workspaceId, counterId) {
 	document.body.classList.add("public-focus-mode");
-	
+
 	const isEmbed = new URLSearchParams(window.location.search).get("embed") === "true";
 	if (isEmbed) {
 		document.body.classList.add("embed-mode");
 	}
+	document.addEventListener(
+		"keydown",
+		(event) => {
+			if (event.key !== "Escape") return;
+			event.preventDefault();
+			event.stopImmediatePropagation();
+			if (!isEmbed) window.location.assign("/");
+		},
+		true,
+	);
 
 	try {
 		const getPublicCounterData = httpsCallable(ensureFunctionsBackend(), "getPublicCounterData");
 		const result = await getPublicCounterData({
-			uid: workspaceType === "u" ? workspaceId : undefined,
-			teamId: workspaceType === "t" ? workspaceId : undefined,
-			counterId
+			counterId,
+			[workspaceType === "u" ? "uid" : "teamId"]: workspaceId,
 		});
 		
 		const { counter, settings } = result.data;
-		
+
 		applySettings({ ...DEFAULTS, ...settings });
-		userSettings.customCounters = normalizeCounters([counter]);
-		
-		// Iniciar o modo de foco diretamente no contador público
-		if (typeof root !== "undefined" && root.TimekeeperFocus) {
-			const counterEl = document.querySelector(`[data-focus-id="${counter.id}"]`);
-			if (counterEl) {
-				const openFn = root.TimekeeperFocus.open || window.TimekeeperFocus.open;
-				openFn(counter.id);
-				
-				// Garantir que os botões de fechar e pausar sumam se for embed
-				const closeBtn = document.getElementById("focus-close");
-				const controls = document.getElementById("focus-controls");
-				if (isEmbed) {
-					if (closeBtn) closeBtn.style.display = "none";
-					if (controls) controls.style.display = "none";
-				} else {
-					if (closeBtn) {
-						closeBtn.onclick = () => {
-							window.location.href = "/";
-						};
-					}
-				}
-			}
-		} else if (window.TimekeeperFocus) {
-			window.TimekeeperFocus.open(counter.id);
-			const closeBtn = document.getElementById("focus-close");
-			const controls = document.getElementById("focus-controls");
-			if (isEmbed) {
-				if (closeBtn) closeBtn.style.display = "none";
-				if (controls) controls.style.display = "none";
-			} else {
-				if (closeBtn) {
-					closeBtn.onclick = () => {
-						window.location.href = "/";
-					};
-				}
-			}
+		applyCounters([counter]);
+		const publicCounter = userSettings.customCounters[0];
+		if (!publicCounter || !window.TimekeeperFocus) {
+			throw new Error("public-counter-render-failed");
+		}
+		window.TimekeeperFocus.open(publicCounter.id);
+		try {
+			sessionStorage.removeItem("timekeeper:focus-counter");
+		} catch {}
+		if (!document.body.classList.contains("focus-mode-active")) {
+			throw new Error("public-counter-focus-failed");
+		}
+		const closeButton = document.getElementById("focus-mode-close");
+		if (!isEmbed && closeButton) {
+			closeButton.addEventListener("click", () => {
+				window.location.assign("/");
+			});
 		}
 	} catch (error) {
 		console.error("Erro ao carregar contador público:", error);
@@ -7096,8 +7138,13 @@ if (elements.copyTeamInviteButton) {
 	elements.copyTeamInviteButton.addEventListener("click", async () => {
 		const link = elements.teamInviteLinkInput?.value;
 		if (link) {
-			await navigator.clipboard.writeText(link);
-			showToast("Link de convite copiado!");
+			try {
+				await copyTextToClipboard(link);
+				showToast("Link de convite copiado!");
+			} catch (error) {
+				console.error("Falha ao copiar convite.", error);
+				showToast("Não foi possível copiar o link de convite.");
+			}
 		}
 	});
 }
