@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "timekeeper-shell";
-const CACHE_VERSION = "v7";
+const CACHE_VERSION = "v8";
 const CACHE_NAME = `${CACHE_PREFIX}-${CACHE_VERSION}`;
 const APP_SHELL = [
 	"/",
@@ -9,7 +9,6 @@ const APP_SHELL = [
 	"/manifest.webmanifest",
 	"/src/normalize.css",
 	"/src/style.css",
-	"/src/material.woff",
 	"/src/favicon.png",
 	"/src/assets/icon-192.png",
 	"/src/assets/icon-512.png",
@@ -25,6 +24,7 @@ const APP_SHELL = [
 	"/src/progressbar.min.js",
 	"/src/anime.min.js",
 	"/src/analytics.js",
+	"/src/background-webgl.js",
 	"/src/firebase.js",
 	"/src/pwa.js",
 ];

@@ -102,7 +102,7 @@ remoções intencionais.
 | `accentPrimary` | string hex | `#a78bfa` | `#RRGGBB` |
 | `accentSecondary` | string hex | `#362860` | `#RRGGBB` |
 | `backgroundEnabled` | boolean | `false` | boolean estrito ao aplicar |
-| `backgroundStyle` | string | `lava` | chave conhecida do catálogo |
+| `backgroundStyle` | string | `lava` | uma das 12 chaves conhecidas do catálogo |
 | `backgroundColorA` | string hex | `#7c3aed` | `#RRGGBB` |
 | `backgroundColorB` | string hex | `#0ea5e9` | `#RRGGBB` |
 | `backgroundSpeed` | number | `55` | clamp 20–100 |

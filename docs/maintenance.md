@@ -72,7 +72,8 @@ O SDK é importado por URL versionada em `public/src/firebase.js`. Ao atualizar:
 
 1. Adicione a opção ao select em `index.html`.
 2. Registre a descrição em `BACKGROUND_DESCRIPTIONS`.
-3. Defina o visual em CSS ou runtime em `firebase.js`.
+3. Defina o visual em CSS, no runtime de `firebase.js` ou, para cenas WebGL, em
+   `background-webgl.js`.
 4. Garanta que desligar/trocar pausa loops e limpa recursos.
 5. Respeite velocidade, intensidade, cores e reduced motion.
 6. Teste cards translúcidos, mobile, CPU e troca em tempo real.

@@ -51,6 +51,9 @@ test("modo de foco restaura o contador e fecha por Escape sem overflow", async (
 		.selectOption("rain:light-rain");
 	await expect(page.locator("#control-center-sound-toggle")).toBeEnabled();
 	await page.locator("#toggle-config").click();
+	if (supportsHover) {
+		await page.locator('[data-focus-id="standard:workday"]').hover();
+	}
 	await expect(focusTrigger).toBeVisible();
 	await focusTrigger.click();
 	await expect(page.locator("body")).toHaveClass(/focus-mode-active/);

@@ -284,7 +284,7 @@ test("aceita settings válidas e rejeita range ou campo desconhecido", async () 
 			accentPrimary: "#a78bfa",
 			accentSecondary: "#362860",
 			backgroundEnabled: true,
-			backgroundStyle: "constellation",
+			backgroundStyle: "nebula",
 			backgroundColorA: "#7c3aed",
 			backgroundColorB: "#0ea5e9",
 			backgroundSpeed: 55,
@@ -324,6 +324,7 @@ test("aceita settings válidas e rejeita range ou campo desconhecido", async () 
 			updatedAt: serverTimestamp(),
 		}),
 	);
+	await assertFails(setDoc(reference, { backgroundStyle: "webgl-invalido" }));
 	await assertFails(setDoc(reference, { backgroundIntensity: 101 }));
 	await assertFails(setDoc(reference, { activeWorkspace: "workspace-invalido" }));
 	await assertFails(setDoc(reference, { dashboardLayout: "unknown" }));

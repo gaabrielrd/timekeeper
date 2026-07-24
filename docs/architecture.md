@@ -124,7 +124,15 @@ Responsável por:
 - aplicar cores e fundos;
 - renderizar Timeline linear, calendário e central de notificações local/push;
 - criar os cards pessoais com ações e IDs estáveis consumidos pelo modo de foco;
-- executar canvas da constelação e sincronizar anéis cronológicos.
+- executar canvas da constelação, sincronizar anéis cronológicos e coordenar o
+  runtime WebGL.
+
+### Fundos WebGL — `public/src/background-webgl.js`
+
+Compila um programa WebGL compartilhado e seleciona um dos cinco fragmentos
+procedurais por uniforme. O módulo limita resolução, recebe cores, velocidade e
+intensidade normalizadas de `firebase.js`, pausa o frame loop fora da tela e mantém
+uma cena estática quando o sistema solicita movimento reduzido.
 
 ### Dados de calendário — `public/src/data.js`
 
