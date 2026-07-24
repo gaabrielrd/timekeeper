@@ -136,8 +136,16 @@ O fundo animado começa desligado. Quando ativado, o usuário escolhe:
 - velocidade entre 20 e 100;
 - intensidade entre 15 e 100.
 
-Estilos atuais: lava lamp, blobs flutuantes, correntes de vidro, anéis
-cronológicos, aurora orbital, mapa topográfico e constelação dinâmica.
+O seletor separa os estilos em três grupos:
+
+- Atmosferas CSS: lava lamp, blobs flutuantes, correntes de vidro e aurora orbital;
+- Geometria & Canvas: anéis cronológicos, mapa topográfico e constelação dinâmica;
+- WebGL: nebulosa temporal, grade quântica, singularidade orbital, fluxo prismático
+  e vórtice cronológico.
+
+Os fundos WebGL usam as mesmas duas cores, velocidade e intensidade dos demais.
+Quando `prefers-reduced-motion` está ativo, a cena permanece estática; ao trocar de
+estilo, desativar o fundo ou ocultar a aba, o loop de renderização é interrompido.
 
 Usuários autenticados também escolhem entre layouts `focus`, `balanced` e
 `compact`, reordenam as seções disponíveis e ocultam áreas opcionais. Os contadores

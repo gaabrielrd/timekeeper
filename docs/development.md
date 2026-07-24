@@ -100,7 +100,7 @@ A mesma suíte roda em `.github/workflows/ci.yml` com Node 22 e Java 21.
 | Biblioteca de imagens | HTML, JS, CSS, Firestore Rules e `storage.rules` |
 | Campo de configuração | HTML, JS, rules e `docs/data-model.md` |
 | Estilo visual/layout | `public/src/style.css` e talvez HTML |
-| Novo fundo | HTML, CSS/JS, descrição e docs de design |
+| Novo fundo | HTML, CSS/JS ou `background-webgl.js`, descrição, Rules e docs de design |
 | Limite de contadores | JS, HTML, rules e documentação |
 | Hosting/cache/rotas | `firebase.json` e docs de deploy |
 | Push/Functions | `functions/`, `public/src/firebase.js`, `public/sw.js`, Rules/TTL |

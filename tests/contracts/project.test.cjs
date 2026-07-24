@@ -78,14 +78,32 @@ test("todos os backgrounds da interface possuem descrição no cliente", () => {
 		"lava",
 		"float",
 		"glass",
-		"rings",
 		"aurora",
+		"rings",
 		"topography",
 		"constellation",
+		"nebula",
+		"grid",
+		"singularity",
+		"prism",
+		"vortex",
 	]);
+	assert.deepEqual(
+		[...select[0].matchAll(/<optgroup label="([^"]+)"/g)].map(
+			(match) => match[1],
+		),
+		["Atmosferas CSS", "Geometria &amp; Canvas", "WebGL"],
+	);
 	for (const option of options) {
 		assert.match(client, new RegExp(`\\b${option}:\\s*"`));
 	}
+	const webgl = read("public/src/background-webgl.js");
+	for (const option of ["nebula", "grid", "singularity", "prism", "vortex"]) {
+		assert.match(webgl, new RegExp(`\\b${option}:\\s*\\d`));
+	}
+	assert.match(html, /id="webgl-background-canvas"/);
+	assert.match(client, /createWebGLBackground/);
+	assert.match(read("public/sw.js"), /"\/src\/background-webgl\.js"/);
 });
 
 test("scripts locais essenciais carregam antes do runtime inline", () => {

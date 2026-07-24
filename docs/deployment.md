@@ -154,7 +154,7 @@ Firestore Rules e o Admin SDK formam a barreira de autorização.
 5. Com um admin, abra as três abas e altere uma data temporária.
 6. Em janela privada, confirme que os contadores públicos recebem a atualização.
 7. Envie uma imagem, reutilize-a em dois cards e confirme a quota.
-8. Teste ao menos um fundo CSS e a constelação canvas.
+8. Teste ao menos um fundo CSS, a constelação Canvas 2D e os cinco modos WebGL.
 9. Monitore console, Firestore/Storage Usage e Authentication no Firebase Console.
 10. Ative notificações em um dispositivo de teste e aguarde `Push ativo`.
 11. Crie um evento próximo e valide uma entrega com a aba visível, outra em

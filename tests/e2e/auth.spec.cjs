@@ -91,6 +91,107 @@ async function mockNotificationPermission(page, result) {
 	}, result);
 }
 
+test("fundos WebGL renderizam os cinco modos e pausam com movimento reduzido", async (
+	{ page },
+	testInfo,
+) => {
+	const webglMessages = [];
+	page.on("console", (message) => {
+		if (
+			["error", "warning"].includes(message.type()) &&
+			/(?:shader|falha ao compilar|falha ao vincular|webgl não está disponível)/i.test(
+				message.text(),
+			)
+		) {
+			webglMessages.push(message.text());
+		}
+	});
+
+	await loginWithGoogleEmulator(page, testInfo.project.name);
+	await page.locator("#auth-button").click();
+	await expect(page.locator("#account-sidebar")).toHaveAttribute(
+		"aria-hidden",
+		"false",
+	);
+	await page.locator("#background-enabled").check();
+
+	const canvas = page.locator("#webgl-background-canvas");
+	const styleSelect = page.locator("#background-style");
+	const styles = ["nebula", "grid", "singularity", "prism", "vortex"];
+	const readFrame = () =>
+		canvas.evaluate(async (element) => {
+			await new Promise((resolve) => requestAnimationFrame(resolve));
+			const gl = element.getContext("webgl");
+			if (!gl || !element.width || !element.height) {
+				return { average: 0, checksum: 0, error: -1 };
+			}
+			const pixels = new Uint8Array(element.width * element.height * 4);
+			gl.readPixels(
+				0,
+				0,
+				element.width,
+				element.height,
+				gl.RGBA,
+				gl.UNSIGNED_BYTE,
+				pixels,
+			);
+			let total = 0;
+			let checksum = 2166136261;
+			let samples = 0;
+			for (let index = 0; index < pixels.length; index += 64) {
+				const value = pixels[index] + pixels[index + 1] + pixels[index + 2];
+				total += value;
+				checksum = Math.imul(checksum ^ value, 16777619) >>> 0;
+				samples += 1;
+			}
+			return {
+				average: samples ? total / samples : 0,
+				checksum,
+				error: gl.getError(),
+			};
+		});
+
+	for (const style of styles) {
+		await styleSelect.selectOption(style);
+		await expect(page.locator("body")).toHaveAttribute(
+			"data-background-style",
+			style,
+		);
+		await expect(canvas).toBeVisible();
+		await page.waitForTimeout(180);
+		const frame = await readFrame();
+		expect(frame.error).toBe(0);
+		if (process.env.WEBGL_SCREENSHOTS === "1") {
+			await page.locator("#sidebar-close").click();
+			await expect(page.locator("#account-sidebar")).toHaveAttribute(
+				"aria-hidden",
+				"true",
+			);
+			await page.waitForTimeout(380);
+			await page.screenshot({
+				path: testInfo.outputPath(`background-${style}.png`),
+			});
+			await page.locator("#auth-button").click();
+			await expect(page.locator("#account-sidebar")).toHaveAttribute(
+				"aria-hidden",
+				"false",
+			);
+		}
+		expect(
+			frame.average,
+			`${style} deveria produzir pixels visíveis: ${JSON.stringify(frame)}`,
+		).toBeGreaterThan(1);
+	}
+
+	await page.emulateMedia({ reducedMotion: "reduce" });
+	await styleSelect.selectOption("prism");
+	await page.waitForTimeout(120);
+	const reducedFrame = await readFrame();
+	await page.waitForTimeout(240);
+	expect((await readFrame()).checksum).toBe(reducedFrame.checksum);
+	expect(webglMessages).toEqual([]);
+});
+
 test("usuário cria, edita, reordena e oculta contadores", async (
 	{ page },
 	testInfo,
@@ -120,9 +221,15 @@ test("usuário cria, edita, reordena e oculta contadores", async (
 	await expect(page.locator("#custom-panels .panel-title")).toHaveText(
 		"Entrega E2E",
 	);
+	await page.locator("#sidebar-close").click();
 	await page.locator("#toggle-config").click();
 	await expect(page.locator("#custom-visibility-button")).toBeVisible();
 	await page.locator("#toggle-config").click();
+	await page.locator("#auth-button").click();
+	await expect(page.locator("#account-sidebar")).toHaveAttribute(
+		"aria-hidden",
+		"false",
+	);
 
 	await page
 		.locator("#counter-list")

@@ -140,7 +140,12 @@ service cloud.firestore {
             'rings',
             'aurora',
             'topography',
-            'constellation'
+            'constellation',
+            'nebula',
+            'grid',
+            'singularity',
+            'prism',
+            'vortex'
           ])
         && (!('backgroundColorA' in data) || isHexColor(data.backgroundColorA))
         && (!('backgroundColorB' in data) || isHexColor(data.backgroundColorB))

@@ -19,7 +19,8 @@ real com Firebase.
 - Biblioteca privada com até dez imagens reutilizáveis nos contadores pessoais.
 - Opacidade independente da imagem e da sobreposição do card.
 - Sincronização ao vivo de configurações, contadores, conquistas e biblioteca com Firestore.
-- Duas cores de destaque e sete fundos animados personalizáveis.
+- Duas cores de destaque e doze fundos animados personalizáveis, incluindo cinco
+  cenas procedurais em WebGL.
 - Layout responsivo, tela cheia e respeito a `prefers-reduced-motion`.
 - Aplicação instalável com shell offline e atualização controlada.
 - Presets, ordem e visibilidade sincronizados para as seções da dashboard.
@@ -94,7 +95,8 @@ configurado. Veja [Desenvolvimento](docs/development.md).
 │       ├── weather.js         # Widgets Forecast7 e atmosferas via Open-Meteo
 	│       ├── notifications.js   # Candidatos e preferências de alertas locais
 	│       ├── soundscapes.js     # Catálogo local e controlador transitório de áudio
-	│       ├── focus.js           # Tela imersiva e restauração transitória do contador
+│       ├── focus.js           # Tela imersiva e restauração transitória do contador
+│       ├── background-webgl.js # Cinco fundos procedurais e runtime WebGL
 │       ├── runtime-config.js  # Chaves públicas VAPID/App Check e região
 │       ├── data.js            # Seed/fallback dos calendários públicos
 │       ├── style.css          # Design system, layout, responsividade e animações
@@ -139,7 +141,7 @@ firebase deploy --only hosting,functions,firestore:rules,firestore:indexes,stora
 ```
 
 Faça também o checklist manual descrito em [Testes](docs/testing.md), incluindo
-desktop, iPhone/Safari, login Google, atualização entre duas abas e os sete fundos.
+desktop, iPhone/Safari, login Google, atualização entre duas abas e os doze fundos.
 
 ## Documentação
 

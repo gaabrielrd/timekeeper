@@ -60,6 +60,7 @@ import {
 	GoogleAIBackend,
 	ResponseModality,
 } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-ai.js";
+import { createWebGLBackground } from "./background-webgl.js";
 
 const useLocalEmulators =
 	["localhost", "127.0.0.1"].includes(window.location.hostname) &&
@@ -433,6 +434,7 @@ const elements = {
 	timelineSourceFilter: document.querySelector("#timeline-source-filter"),
 	timelineViewOptions: document.querySelectorAll("[data-timeline-view]"),
 	constellationCanvas: document.querySelector("#constellation-canvas"),
+	webglBackgroundCanvas: document.querySelector("#webgl-background-canvas"),
 	settingsState: document.querySelector("#settings-state"),
 	confirmationDialog: document.querySelector("#confirmation-dialog"),
 	confirmationDialogTitle: document.querySelector("#confirmation-dialog-title"),
@@ -1554,6 +1556,11 @@ const BACKGROUND_DESCRIPTIONS = {
 	aurora: "Faixas luminosas atravessam a tela como uma aurora em movimento.",
 	topography: "Linhas de contorno fluem como um mapa topográfico vivo.",
 	constellation: "Pontos flutuantes formam conexões efêmeras e reagem ao cursor.",
+	nebula: "Nuvens estelares atravessam o tempo em camadas de luz procedural.",
+	grid: "Uma grade em perspectiva pulsa e avança por um horizonte quântico.",
+	singularity: "Um horizonte orbital curva poeira luminosa ao redor de um núcleo escuro.",
+	prism: "Ondas translúcidas se cruzam em faixas e reflexos prismáticos.",
+	vortex: "Anéis e marcas radiais espiralam como um mecanismo cronológico.",
 };
 
 function boundedNumber(value, minimum, maximum, fallback) {
@@ -1623,6 +1630,14 @@ function applyBackground(settings) {
 		.forEach((control) => (control.disabled = !enabled));
 	updateChronoRings();
 	syncConstellation();
+	webglBackground.configure({
+		enabled,
+		style,
+		colorA,
+		colorB,
+		speed,
+		intensity,
+	});
 }
 
 function updateChronoRings() {
@@ -1647,6 +1662,10 @@ function updateChronoRings() {
 
 const reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
 const timelineOrientationQuery = window.matchMedia("(max-width: 700px)");
+const webglBackground = createWebGLBackground(
+	elements.webglBackgroundCanvas,
+	reducedMotionQuery,
+);
 const constellationState = {
 	context: elements.constellationCanvas.getContext("2d"),
 	dpr: 1,

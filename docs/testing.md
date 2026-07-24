@@ -55,7 +55,7 @@ inicialização simultânea dos contextos autenticados.
 ### Contratos do repositório
 
 - limite cinco alinhado entre HTML, JS e rules;
-- catálogo e descrições dos sete backgrounds;
+- catálogo, três grupos e descrições dos doze backgrounds;
 - ordem de carregamento dos scripts;
 - compilação do JavaScript inline;
 - headers de cache e portas dos emuladores;
@@ -283,7 +283,8 @@ Repita isolamento com duas contas: nenhuma deve ler documentos da outra.
 Ordem sugerida:
 
 1. Adicionar formatter/lint para HTML, CSS e JS.
-2. Capturar screenshots de regressão para os sete backgrounds.
+2. Capturar screenshots de regressão para os doze backgrounds, cobrindo ao menos
+   um estilo de cada grupo e os cinco modos WebGL.
 3. Medir desempenho da constelação em viewport móvel.
 4. Executar uma matriz complementar em Firefox/WebKit, mantendo iPhone Safari real
    no checklist de release para OAuth e comportamento de cache.

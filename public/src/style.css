@@ -216,7 +216,8 @@ body[data-background-style="glass"] .ambient-blob {
 }
 .chrono-rings,
 .topographic-map,
-.constellation-canvas {
+.constellation-canvas,
+.webgl-background-canvas {
 	position: absolute;
 	top: 14vmax;
 	left: 14vmax;
@@ -228,7 +229,12 @@ body[data-background-style="glass"] .ambient-blob {
 }
 body[data-background-style="rings"] .ambient-blob,
 body[data-background-style="topography"] .ambient-blob,
-body[data-background-style="constellation"] .ambient-blob {
+body[data-background-style="constellation"] .ambient-blob,
+body[data-background-style="nebula"] .ambient-blob,
+body[data-background-style="grid"] .ambient-blob,
+body[data-background-style="singularity"] .ambient-blob,
+body[data-background-style="prism"] .ambient-blob,
+body[data-background-style="vortex"] .ambient-blob {
 	opacity: 0;
 	animation-play-state: paused;
 }
@@ -448,6 +454,19 @@ body[data-background-style="topography"] .topographic-map {
 }
 body[data-background-style="constellation"] .constellation-canvas {
 	opacity: 0.9;
+}
+.webgl-background-canvas {
+	display: block;
+}
+body[data-background-style="nebula"] .webgl-background-canvas,
+body[data-background-style="grid"] .webgl-background-canvas,
+body[data-background-style="singularity"] .webgl-background-canvas,
+body[data-background-style="prism"] .webgl-background-canvas,
+body[data-background-style="vortex"] .webgl-background-canvas {
+	opacity: 0.96;
+}
+.webgl-background-canvas[data-webgl-unavailable="true"] {
+	display: none;
 }
 body:not([data-background-enabled="true"]) .ambient-background *,
 body:not([data-background-enabled="true"]) .ambient-background::after {

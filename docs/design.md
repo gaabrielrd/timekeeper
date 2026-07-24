@@ -32,7 +32,8 @@ de clima. `applyBackground` atualiza tokens ambientes, duração e opacidade.
   `system-ui`.
 - Números, estados e kickers: `roboto-mono`, também fornecida externamente, com
   fallback `monospace`.
-- Ícones: Material Icons em `public/src/material.woff`.
+- Ícones: Material Icons via stylesheet CDN, com o nome da ligatura preservado no
+  HTML.
 
 O produto deve permanecer legível quando a fonte externa falhar.
 
@@ -43,7 +44,7 @@ O produto deve permanecer legível quando a fonte externa falhar.
 A camada imersiva ocupa o viewport sem desmontar `ambient-background`. Em telas
 largas, título e tempo formam uma composição editorial horizontal; até 800 px ou em
 orientação vertical, o conteúdo passa para uma coluna centralizada. A superfície
-escurecida e o `text-shadow` mantêm contraste nos sete fundos, e a cor do contador
+escurecida e o `text-shadow` mantêm contraste nos doze fundos, e a cor do contador
 é preservada nos detalhes e na barra.
 
 A entrada e a saída usam apenas opacidade e visibilidade. O botão de fechar recebe
@@ -175,10 +176,22 @@ O default é desligado. Todos são configuráveis por cores, velocidade e intens
 | Aurora orbital | Gradientes alongados CSS | Fluxo horizontal luminoso |
 | Mapa topográfico | Paths SVG animados | Contornos intensos e movimento irregular |
 | Constelação dinâmica | Canvas 2D | Partículas, conexões, cursor e halos radiais |
+| Nebulosa temporal | WebGL | Nuvens procedurais, ruído em camadas e estrelas |
+| Grade quântica | WebGL | Grade em perspectiva, horizonte e pulsos luminosos |
+| Singularidade orbital | WebGL | Disco de acreção, lente e núcleo escuro |
+| Fluxo prismático | WebGL | Faixas ondulantes e interferência luminosa |
+| Vórtice cronológico | WebGL | Espiral, anéis e marcações radiais |
 
 Na constelação, a Cor A define estrelas/halos e a Cor B define conexões. A densidade
 depende de área e intensidade. O `devicePixelRatio` é limitado a 1.5 para reduzir
 custo, e o loop pausa quando o efeito não está ativo ou a página não está visível.
+
+Os cinco estilos WebGL compartilham `background-webgl.js`, um único vertex shader e
+um fragment shader com modos procedurais distintos. O canvas usa `devicePixelRatio`
+limitado a 1.35, solicita o perfil de baixo consumo e não usa antialiasing. O loop
+pausa quando o fundo é desligado, outro estilo é selecionado, a aba fica oculta ou
+há movimento reduzido; nesse último caso, uma imagem estática continua visível.
+Navegadores sem WebGL mantêm a superfície escura base sem bloquear a dashboard.
 
 ## Movimento
 
@@ -230,7 +243,7 @@ Cuidados futuros:
 
 ## Checklist de alteração visual
 
-1. Fundos desligados e cada um dos sete fundos ligados.
+1. Fundos desligados e cada um dos doze fundos ligados.
 2. Intensidade mínima/máxima e duas cores claras/escuras.
 3. Zero, três, quatro e cinco contadores pessoais.
 4. Desktop, tablet e iPhone/Safari.
